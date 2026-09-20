@@ -1,0 +1,29 @@
+# --- Environnement virtuel Python (CRITIQUE : ne jamais pusher venv) ---
+venv/
+.venv/
+env/
+ENV/
+
+# --- Caches Python & Jupyter ---
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.ipynb_checkpoints/
+
+# --- Fichiers d'environnement et IDE ---
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# --- Fichiers générés par l'application (Output local) ---
+static/docs/*.txt
+static/audios/*.mp3
+offres.csv
+
+# --- Logs & Fichiers temporaires ---
+*.log
+*.tmp
