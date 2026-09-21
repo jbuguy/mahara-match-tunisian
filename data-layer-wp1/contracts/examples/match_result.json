@@ -1,0 +1,13 @@
+{
+  "candidate_id": "5c2e8f3a-1d4b-4c6e-9a7f-2b3c4d5e6f70",
+  "job_offer_id": "9d8c7b6a-5f4e-4d3c-8b2a-1f0e9d8c7b6a",
+  "score_global": 78.0,
+  "breakdown": {"hard_skills": 80, "experience": 70, "soft_skills": 75, "location": 85},
+  "weights": {"hard_skills": 0.5, "experience": 0.2, "soft_skills": 0.15, "location": 0.15},
+  "gaps": [
+    {"skill_code": "SK-0103", "gap_type": "missing", "requirement": "preferred", "required_level": 2},
+    {"skill_code": "SK-0101", "gap_type": "insufficient_level", "requirement": "required", "required_level": 4, "current_level": 3}
+  ],
+  "model_version": "wp3-hybrid-0.1",
+  "computed_at": "2026-09-21T10:15:00Z"
+}

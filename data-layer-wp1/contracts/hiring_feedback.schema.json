@@ -1,0 +1,82 @@
+{
+  "$defs": {
+    "HiringDecision": {
+      "enum": [
+        "hired",
+        "shortlisted",
+        "rejected",
+        "no_show"
+      ],
+      "title": "HiringDecision",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "application_id": {
+      "format": "uuid",
+      "title": "Application Id",
+      "type": "string"
+    },
+    "employer_id": {
+      "format": "uuid",
+      "title": "Employer Id",
+      "type": "string"
+    },
+    "decision": {
+      "$ref": "#/$defs/HiringDecision"
+    },
+    "reason_code": {
+      "anyOf": [
+        {
+          "maxLength": 64,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "examples": [
+        "skills_mismatch",
+        "experience_too_low",
+        "position_filled"
+      ],
+      "title": "Reason Code"
+    },
+    "match_quality": {
+      "anyOf": [
+        {
+          "maximum": 5,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Match Quality"
+    },
+    "comment": {
+      "anyOf": [
+        {
+          "maxLength": 2000,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Comment"
+    }
+  },
+  "required": [
+    "application_id",
+    "employer_id",
+    "decision"
+  ],
+  "title": "HiringFeedback",
+  "type": "object"
+}

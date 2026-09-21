@@ -1,0 +1,86 @@
+{
+  "$defs": {
+    "ApplicationStatus": {
+      "enum": [
+        "submitted",
+        "viewed",
+        "shortlisted",
+        "interview",
+        "offer_made",
+        "hired",
+        "rejected",
+        "withdrawn"
+      ],
+      "title": "ApplicationStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "application_id": {
+      "format": "uuid",
+      "title": "Application Id",
+      "type": "string"
+    },
+    "candidate_id": {
+      "format": "uuid",
+      "title": "Candidate Id",
+      "type": "string"
+    },
+    "job_offer_id": {
+      "format": "uuid",
+      "title": "Job Offer Id",
+      "type": "string"
+    },
+    "match_id": {
+      "anyOf": [
+        {
+          "format": "uuid",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Match Id"
+    },
+    "score_global": {
+      "anyOf": [
+        {
+          "maximum": 100,
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Score Global"
+    },
+    "status": {
+      "$ref": "#/$defs/ApplicationStatus"
+    },
+    "applied_at": {
+      "format": "date-time",
+      "title": "Applied At",
+      "type": "string"
+    },
+    "updated_at": {
+      "format": "date-time",
+      "title": "Updated At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "application_id",
+    "candidate_id",
+    "job_offer_id",
+    "status",
+    "applied_at",
+    "updated_at"
+  ],
+  "title": "ApplicationRead",
+  "type": "object"
+}

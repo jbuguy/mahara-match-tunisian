@@ -1,0 +1,118 @@
+{
+  "$defs": {
+    "SkillType": {
+      "enum": [
+        "hard",
+        "soft",
+        "language"
+      ],
+      "title": "SkillType",
+      "type": "string"
+    },
+    "TaxonomyStatus": {
+      "enum": [
+        "draft",
+        "validated",
+        "deprecated"
+      ],
+      "title": "TaxonomyStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "skill_id": {
+      "format": "uuid",
+      "title": "Skill Id",
+      "type": "string"
+    },
+    "code": {
+      "maxLength": 32,
+      "minLength": 1,
+      "title": "Code",
+      "type": "string"
+    },
+    "label_fr": {
+      "title": "Label Fr",
+      "type": "string"
+    },
+    "label_ar": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Label Ar"
+    },
+    "label_derja": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Label Derja"
+    },
+    "alt_labels": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Alt Labels",
+      "type": "array"
+    },
+    "skill_type": {
+      "$ref": "#/$defs/SkillType"
+    },
+    "category_code": {
+      "anyOf": [
+        {
+          "maxLength": 32,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Category Code"
+    },
+    "status": {
+      "$ref": "#/$defs/TaxonomyStatus"
+    },
+    "esco_uri": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Esco Uri"
+    },
+    "version": {
+      "minimum": 1,
+      "title": "Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "skill_id",
+    "code",
+    "label_fr",
+    "skill_type",
+    "status",
+    "version"
+  ],
+  "title": "SkillRead",
+  "type": "object"
+}
