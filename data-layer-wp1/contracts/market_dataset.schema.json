@@ -1,0 +1,64 @@
+{
+  "$defs": {
+    "MarketDataOrigin": {
+      "enum": [
+        "official",
+        "informal",
+        "study"
+      ],
+      "title": "MarketDataOrigin",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "title": {
+      "maxLength": 200,
+      "minLength": 3,
+      "title": "Title",
+      "type": "string"
+    },
+    "origin": {
+      "$ref": "#/$defs/MarketDataOrigin"
+    },
+    "publisher": {
+      "maxLength": 200,
+      "minLength": 2,
+      "title": "Publisher",
+      "type": "string"
+    },
+    "period_start": {
+      "format": "date",
+      "title": "Period Start",
+      "type": "string"
+    },
+    "period_end": {
+      "format": "date",
+      "title": "Period End",
+      "type": "string"
+    },
+    "document_id": {
+      "anyOf": [
+        {
+          "format": "uuid",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Uploaded CSV/Excel file, if any",
+      "title": "Document Id"
+    }
+  },
+  "required": [
+    "title",
+    "origin",
+    "publisher",
+    "period_start",
+    "period_end"
+  ],
+  "title": "MarketDatasetCreate",
+  "type": "object"
+}

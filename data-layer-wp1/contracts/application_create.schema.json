@@ -1,0 +1,35 @@
+{
+  "additionalProperties": false,
+  "description": "1-click application: the structured profile is attached server-side, not re-sent.",
+  "properties": {
+    "candidate_id": {
+      "format": "uuid",
+      "title": "Candidate Id",
+      "type": "string"
+    },
+    "job_offer_id": {
+      "format": "uuid",
+      "title": "Job Offer Id",
+      "type": "string"
+    },
+    "cover_note": {
+      "anyOf": [
+        {
+          "maxLength": 2000,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cover Note"
+    }
+  },
+  "required": [
+    "candidate_id",
+    "job_offer_id"
+  ],
+  "title": "ApplicationCreate",
+  "type": "object"
+}
