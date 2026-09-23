@@ -1,0 +1,110 @@
+{
+  "$defs": {
+    "MarketIndicatorType": {
+      "enum": [
+        "job_demand",
+        "job_supply",
+        "vacancies",
+        "unemployment_rate",
+        "median_salary",
+        "skill_demand"
+      ],
+      "title": "MarketIndicatorType",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "One normalized row of a ministry dataset, after nomenclature alignment.",
+  "properties": {
+    "indicator_type": {
+      "$ref": "#/$defs/MarketIndicatorType"
+    },
+    "occupation_code": {
+      "anyOf": [
+        {
+          "maxLength": 32,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Occupation Code"
+    },
+    "skill_code": {
+      "anyOf": [
+        {
+          "maxLength": 32,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Skill Code"
+    },
+    "sector_code": {
+      "anyOf": [
+        {
+          "maxLength": 32,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Sector Code"
+    },
+    "governorate_code": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Governorate Code"
+    },
+    "period_start": {
+      "format": "date",
+      "title": "Period Start",
+      "type": "string"
+    },
+    "period_end": {
+      "format": "date",
+      "title": "Period End",
+      "type": "string"
+    },
+    "value": {
+      "title": "Value",
+      "type": "number"
+    },
+    "unit": {
+      "pattern": "^(count|percent|tnd)$",
+      "title": "Unit",
+      "type": "string"
+    },
+    "extra": {
+      "additionalProperties": true,
+      "title": "Extra",
+      "type": "object"
+    }
+  },
+  "required": [
+    "indicator_type",
+    "period_start",
+    "period_end",
+    "value",
+    "unit"
+  ],
+  "title": "MarketIndicatorRecord",
+  "type": "object"
+}

@@ -1,0 +1,203 @@
+{
+  "$defs": {
+    "GapType": {
+      "enum": [
+        "missing",
+        "insufficient_level"
+      ],
+      "title": "GapType",
+      "type": "string"
+    },
+    "RequirementLevel": {
+      "enum": [
+        "required",
+        "preferred"
+      ],
+      "title": "RequirementLevel",
+      "type": "string"
+    },
+    "ScoreBreakdown": {
+      "additionalProperties": false,
+      "properties": {
+        "hard_skills": {
+          "maximum": 100,
+          "minimum": 0,
+          "title": "Hard Skills",
+          "type": "number"
+        },
+        "experience": {
+          "maximum": 100,
+          "minimum": 0,
+          "title": "Experience",
+          "type": "number"
+        },
+        "soft_skills": {
+          "maximum": 100,
+          "minimum": 0,
+          "title": "Soft Skills",
+          "type": "number"
+        },
+        "location": {
+          "maximum": 100,
+          "minimum": 0,
+          "title": "Location",
+          "type": "number"
+        }
+      },
+      "required": [
+        "hard_skills",
+        "experience",
+        "soft_skills",
+        "location"
+      ],
+      "title": "ScoreBreakdown",
+      "type": "object"
+    },
+    "ScoringWeights": {
+      "additionalProperties": false,
+      "properties": {
+        "hard_skills": {
+          "default": 0.5,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Hard Skills",
+          "type": "number"
+        },
+        "experience": {
+          "default": 0.2,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Experience",
+          "type": "number"
+        },
+        "soft_skills": {
+          "default": 0.15,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Soft Skills",
+          "type": "number"
+        },
+        "location": {
+          "default": 0.15,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Location",
+          "type": "number"
+        }
+      },
+      "title": "ScoringWeights",
+      "type": "object"
+    },
+    "SkillGapItem": {
+      "additionalProperties": false,
+      "properties": {
+        "skill_code": {
+          "maxLength": 32,
+          "minLength": 1,
+          "title": "Skill Code",
+          "type": "string"
+        },
+        "gap_type": {
+          "$ref": "#/$defs/GapType"
+        },
+        "requirement": {
+          "$ref": "#/$defs/RequirementLevel"
+        },
+        "required_level": {
+          "maximum": 4,
+          "minimum": 1,
+          "title": "Required Level",
+          "type": "integer"
+        },
+        "current_level": {
+          "anyOf": [
+            {
+              "maximum": 4,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Current Level"
+        }
+      },
+      "required": [
+        "skill_code",
+        "gap_type",
+        "requirement",
+        "required_level"
+      ],
+      "title": "SkillGapItem",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "match_id": {
+      "anyOf": [
+        {
+          "format": "uuid",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Match Id"
+    },
+    "candidate_id": {
+      "format": "uuid",
+      "title": "Candidate Id",
+      "type": "string"
+    },
+    "job_offer_id": {
+      "format": "uuid",
+      "title": "Job Offer Id",
+      "type": "string"
+    },
+    "score_global": {
+      "maximum": 100,
+      "minimum": 0,
+      "title": "Score Global",
+      "type": "number"
+    },
+    "breakdown": {
+      "$ref": "#/$defs/ScoreBreakdown"
+    },
+    "weights": {
+      "$ref": "#/$defs/ScoringWeights"
+    },
+    "gaps": {
+      "items": {
+        "$ref": "#/$defs/SkillGapItem"
+      },
+      "title": "Gaps",
+      "type": "array"
+    },
+    "model_version": {
+      "maxLength": 32,
+      "minLength": 1,
+      "title": "Model Version",
+      "type": "string"
+    },
+    "computed_at": {
+      "format": "date-time",
+      "title": "Computed At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "candidate_id",
+    "job_offer_id",
+    "score_global",
+    "breakdown",
+    "model_version",
+    "computed_at"
+  ],
+  "title": "MatchResult",
+  "type": "object"
+}

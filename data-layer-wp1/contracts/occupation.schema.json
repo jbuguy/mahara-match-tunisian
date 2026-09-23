@@ -1,0 +1,122 @@
+{
+  "$defs": {
+    "OccupationSkillRead": {
+      "additionalProperties": false,
+      "properties": {
+        "skill_code": {
+          "maxLength": 32,
+          "minLength": 1,
+          "title": "Skill Code",
+          "type": "string"
+        },
+        "requirement": {
+          "$ref": "#/$defs/RequirementLevel"
+        }
+      },
+      "required": [
+        "skill_code",
+        "requirement"
+      ],
+      "title": "OccupationSkillRead",
+      "type": "object"
+    },
+    "RequirementLevel": {
+      "enum": [
+        "required",
+        "preferred"
+      ],
+      "title": "RequirementLevel",
+      "type": "string"
+    },
+    "TaxonomyStatus": {
+      "enum": [
+        "draft",
+        "validated",
+        "deprecated"
+      ],
+      "title": "TaxonomyStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "occupation_id": {
+      "format": "uuid",
+      "title": "Occupation Id",
+      "type": "string"
+    },
+    "code": {
+      "maxLength": 32,
+      "minLength": 1,
+      "title": "Code",
+      "type": "string"
+    },
+    "isco_code": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Isco Code"
+    },
+    "title_fr": {
+      "title": "Title Fr",
+      "type": "string"
+    },
+    "title_ar": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Title Ar"
+    },
+    "alt_titles": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Alt Titles",
+      "type": "array"
+    },
+    "sector_code": {
+      "anyOf": [
+        {
+          "maxLength": 32,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Sector Code"
+    },
+    "status": {
+      "$ref": "#/$defs/TaxonomyStatus"
+    },
+    "skills": {
+      "items": {
+        "$ref": "#/$defs/OccupationSkillRead"
+      },
+      "title": "Skills",
+      "type": "array"
+    }
+  },
+  "required": [
+    "occupation_id",
+    "code",
+    "title_fr",
+    "status"
+  ],
+  "title": "OccupationRead",
+  "type": "object"
+}

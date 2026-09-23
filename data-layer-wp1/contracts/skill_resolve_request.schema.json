@@ -1,0 +1,59 @@
+{
+  "$defs": {
+    "SkillType": {
+      "enum": [
+        "hard",
+        "soft",
+        "language"
+      ],
+      "title": "SkillType",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Free-text label -> taxonomy code, used by WP2 and WP4 while structuring input.",
+  "properties": {
+    "label": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Label",
+      "type": "string"
+    },
+    "language": {
+      "anyOf": [
+        {
+          "maxLength": 8,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Language"
+    },
+    "skill_type": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SkillType"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "top_k": {
+      "default": 3,
+      "maximum": 10,
+      "minimum": 1,
+      "title": "Top K",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "label"
+  ],
+  "title": "SkillResolveRequest",
+  "type": "object"
+}
