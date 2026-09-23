@@ -1,0 +1,15 @@
+# --- Environnement virtuel (NE JAMAIS PUSHER) ---
+venv/
+.venv/
+env/
+
+# --- Caches Python & Jupyter ---
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# --- Fichiers système et IDE ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
