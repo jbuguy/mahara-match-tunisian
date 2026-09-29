@@ -6,6 +6,7 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 import uvicorn
 
 from cv_parser import build_profile_from_cv
+from cv_adapter import adapter_profil_vers_contrat
 
 app = FastAPI(title="WP3 - Skill Matching Engine API")
 
@@ -19,10 +20,14 @@ EXTENSIONS_AUTORISEES = {".pdf", ".docx"}
 
 
 @app.post("/api/v1/parse-cv")
-async def parser_cv(candidat_id: str, fichier: UploadFile = File(...)):
+async def parser_cv(
+    candidat_id: str,
+    governorate_code: str | None = None,
+    fichier: UploadFile = File(...),
+):
     """
-    Recoit un fichier CV envoye par le navigateur (PDF ou DOCX),
-    l'enregistre temporairement, extrait le profil, puis supprime le fichier temporaire.
+    Recoit un CV (PDF ou DOCX), extrait le profil et le renvoie
+    au format du contrat WP1 (sans donnees personnelles).
     """
     extension = os.path.splitext(fichier.filename)[1].lower()
     if extension not in EXTENSIONS_AUTORISEES:
@@ -36,11 +41,14 @@ async def parser_cv(candidat_id: str, fichier: UploadFile = File(...)):
         chemin_temporaire = tmp.name
 
     try:
-        profil = build_profile_from_cv(chemin_temporaire, candidat_id)
+        profil_brut = build_profile_from_cv(chemin_temporaire, candidat_id)
     finally:
         os.remove(chemin_temporaire)
 
-    return {"status": "success", "profil": profil}
+    return {
+        "status": "success",
+        "profil": adapter_profil_vers_contrat(profil_brut, governorate_code),
+    }
 
 
 @app.post("/api/v1/match")
