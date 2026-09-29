@@ -3,20 +3,31 @@ import shutil
 import tempfile
 
 from fastapi import FastAPI, UploadFile, File, HTTPException
+from pydantic import BaseModel
 import uvicorn
 
 from cv_parser import build_profile_from_cv
 from cv_adapter import adapter_profil_vers_contrat
+from scoring import classer_offres, generer_roadmap
 
 app = FastAPI(title="WP3 - Skill Matching Engine API")
+
+EXTENSIONS_AUTORISEES = {".pdf", ".docx"}
+
+
+class MatchRequest(BaseModel):
+    profil: dict          # profil candidat au format WP1
+    offres: list[dict]    # offres au format WP1
+
+
+class RoadmapRequest(BaseModel):
+    profil: dict
+    offre: dict
 
 
 @app.get("/")
 def home():
     return {"message": "WP3 Skill Matching Engine API est operationnel"}
-
-
-EXTENSIONS_AUTORISEES = {".pdf", ".docx"}
 
 
 @app.post("/api/v1/parse-cv")
@@ -25,10 +36,7 @@ async def parser_cv(
     governorate_code: str | None = None,
     fichier: UploadFile = File(...),
 ):
-    """
-    Recoit un CV (PDF ou DOCX), extrait le profil et le renvoie
-    au format du contrat WP1 (sans donnees personnelles).
-    """
+    """Recoit un CV (PDF ou DOCX) et renvoie le profil au format WP1 (sans PII)."""
     extension = os.path.splitext(fichier.filename)[1].lower()
     if extension not in EXTENSIONS_AUTORISEES:
         raise HTTPException(
@@ -52,36 +60,20 @@ async def parser_cv(
 
 
 @app.post("/api/v1/match")
-def match_candidat_offres(candidat_id: str):
-    return {
-        "status": "success",
-        "candidat_id": candidat_id,
-        "matches": [
-            {
-                "offre_id": "OFFRE_101",
-                "titre": "Technicien Agricole",
-                "score_global": 85.5,
-                "detail_scores": {
-                    "hard_skills": 90,
-                    "experience": 80,
-                    "soft_skills": 85,
-                    "localisation": 80,
-                },
-            }
-        ],
-    }
+def match_candidat_offres(req: MatchRequest):
+    """Classe les offres pour un candidat (meilleur score en premier), avec les gaps."""
+    if not req.offres:
+        raise HTTPException(status_code=400, detail="La liste d'offres est vide")
+    return classer_offres(req.profil, req.offres)
 
 
-@app.get("/api/v1/roadmap/{candidat_id}/{offre_id}")
-def obtenir_roadmap_formation(candidat_id: str, offre_id: str):
-    return {
-        "candidat_id": candidat_id,
-        "offre_id": offre_id,
-        "gaps_detectes": ["Irrigation automatique", "Gestion des sols"],
-        "roadmap_recommandee": [
-            {"module": "Formation Irrigation Nivelee", "duree": "3 jours", "prestataire": "WP1 Catalog"}
-        ],
-    }
+@app.post("/api/v1/roadmap")
+def obtenir_roadmap_formation(req: RoadmapRequest):
+    """Genere la roadmap de formation pour combler les gaps d'une offre."""
+    roadmap = generer_roadmap(req.profil, req.offre)
+    if roadmap is None:
+        return {"status": "no_gap", "message": "Le candidat couvre deja toutes les competences de l'offre"}
+    return roadmap
 
 
 if __name__ == "__main__":
