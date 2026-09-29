@@ -1,0 +1,96 @@
+{
+  "$defs": {
+    "IngestionSource": {
+      "enum": [
+        "cv_upload",
+        "conversation",
+        "employer_offer",
+        "ministry_market",
+        "training_catalog"
+      ],
+      "title": "IngestionSource",
+      "type": "string"
+    },
+    "SkillType": {
+      "enum": [
+        "hard",
+        "soft",
+        "language"
+      ],
+      "title": "SkillType",
+      "type": "string"
+    },
+    "SuggestionStatus": {
+      "enum": [
+        "pending",
+        "approved",
+        "rejected",
+        "merged"
+      ],
+      "title": "SuggestionStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "suggestion_id": {
+      "format": "uuid",
+      "title": "Suggestion Id",
+      "type": "string"
+    },
+    "proposed_label": {
+      "title": "Proposed Label",
+      "type": "string"
+    },
+    "normalized_label": {
+      "title": "Normalized Label",
+      "type": "string"
+    },
+    "skill_type": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SkillType"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "source": {
+      "$ref": "#/$defs/IngestionSource"
+    },
+    "occurrences": {
+      "minimum": 1,
+      "title": "Occurrences",
+      "type": "integer"
+    },
+    "status": {
+      "$ref": "#/$defs/SuggestionStatus"
+    },
+    "resolved_skill_code": {
+      "anyOf": [
+        {
+          "maxLength": 32,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Resolved Skill Code"
+    }
+  },
+  "required": [
+    "suggestion_id",
+    "proposed_label",
+    "normalized_label",
+    "source",
+    "occurrences",
+    "status"
+  ],
+  "title": "SkillSuggestionRead",
+  "type": "object"
+}

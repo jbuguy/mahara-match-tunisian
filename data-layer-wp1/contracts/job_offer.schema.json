@@ -1,0 +1,372 @@
+{
+  "$defs": {
+    "ContractType": {
+      "enum": [
+        "cdi",
+        "cdd",
+        "sivp",
+        "karama",
+        "internship",
+        "freelance",
+        "seasonal",
+        "daily_work"
+      ],
+      "title": "ContractType",
+      "type": "string"
+    },
+    "EducationLevel": {
+      "enum": [
+        "none",
+        "primary",
+        "lower_secondary",
+        "baccalaureate",
+        "vocational_cap",
+        "vocational_btp",
+        "vocational_bts",
+        "licence",
+        "master",
+        "engineer",
+        "doctorate"
+      ],
+      "title": "EducationLevel",
+      "type": "string"
+    },
+    "LanguageSkill": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "examples": [
+            "ar-TN",
+            "fr",
+            "en"
+          ],
+          "maxLength": 8,
+          "minLength": 2,
+          "title": "Code",
+          "type": "string"
+        },
+        "level": {
+          "maximum": 4,
+          "minimum": 1,
+          "title": "Level",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "code",
+        "level"
+      ],
+      "title": "LanguageSkill",
+      "type": "object"
+    },
+    "Location": {
+      "additionalProperties": false,
+      "properties": {
+        "governorate_code": {
+          "title": "Governorate Code",
+          "type": "string"
+        },
+        "delegation": {
+          "anyOf": [
+            {
+              "maxLength": 80,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Delegation"
+        }
+      },
+      "required": [
+        "governorate_code"
+      ],
+      "title": "Location",
+      "type": "object"
+    },
+    "OfferSkill": {
+      "additionalProperties": false,
+      "properties": {
+        "skill_code": {
+          "maxLength": 32,
+          "minLength": 1,
+          "title": "Skill Code",
+          "type": "string"
+        },
+        "requirement": {
+          "$ref": "#/$defs/RequirementLevel"
+        },
+        "min_level": {
+          "default": 1,
+          "maximum": 4,
+          "minimum": 1,
+          "title": "Min Level",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "skill_code",
+        "requirement"
+      ],
+      "title": "OfferSkill",
+      "type": "object"
+    },
+    "OfferSource": {
+      "enum": [
+        "employer_form",
+        "ministry_feed",
+        "bulk_import"
+      ],
+      "title": "OfferSource",
+      "type": "string"
+    },
+    "OfferStatus": {
+      "enum": [
+        "draft",
+        "pending_review",
+        "published",
+        "closed",
+        "filled"
+      ],
+      "title": "OfferStatus",
+      "type": "string"
+    },
+    "RequirementLevel": {
+      "enum": [
+        "required",
+        "preferred"
+      ],
+      "title": "RequirementLevel",
+      "type": "string"
+    },
+    "SalaryRange": {
+      "additionalProperties": false,
+      "properties": {
+        "min_tnd": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Min Tnd"
+        },
+        "max_tnd": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Tnd"
+        },
+        "period": {
+          "default": "month",
+          "pattern": "^(hour|day|month)$",
+          "title": "Period",
+          "type": "string"
+        }
+      },
+      "title": "SalaryRange",
+      "type": "object"
+    },
+    "WorkMode": {
+      "enum": [
+        "on_site",
+        "remote",
+        "hybrid"
+      ],
+      "title": "WorkMode",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "offer_id": {
+      "anyOf": [
+        {
+          "format": "uuid",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Null on creation; assigned by WP1",
+      "title": "Offer Id"
+    },
+    "employer_id": {
+      "anyOf": [
+        {
+          "format": "uuid",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Null for ministry-feed offers",
+      "title": "Employer Id"
+    },
+    "title": {
+      "maxLength": 200,
+      "minLength": 3,
+      "title": "Title",
+      "type": "string"
+    },
+    "description": {
+      "minLength": 10,
+      "title": "Description",
+      "type": "string"
+    },
+    "occupation_code": {
+      "anyOf": [
+        {
+          "maxLength": 32,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Occupation Code"
+    },
+    "sector_code": {
+      "anyOf": [
+        {
+          "maxLength": 32,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Sector Code"
+    },
+    "contract_type": {
+      "$ref": "#/$defs/ContractType"
+    },
+    "work_mode": {
+      "$ref": "#/$defs/WorkMode",
+      "default": "on_site"
+    },
+    "location": {
+      "$ref": "#/$defs/Location"
+    },
+    "positions_count": {
+      "default": 1,
+      "maximum": 1000,
+      "minimum": 1,
+      "title": "Positions Count",
+      "type": "integer"
+    },
+    "min_years_experience": {
+      "default": 0,
+      "maximum": 40,
+      "minimum": 0,
+      "title": "Min Years Experience",
+      "type": "number"
+    },
+    "education_level_min": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/EducationLevel"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "salary": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SalaryRange"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "skills": {
+      "items": {
+        "$ref": "#/$defs/OfferSkill"
+      },
+      "minItems": 1,
+      "title": "Skills",
+      "type": "array"
+    },
+    "languages_required": {
+      "items": {
+        "$ref": "#/$defs/LanguageSkill"
+      },
+      "title": "Languages Required",
+      "type": "array"
+    },
+    "status": {
+      "$ref": "#/$defs/OfferStatus",
+      "default": "draft"
+    },
+    "source": {
+      "$ref": "#/$defs/OfferSource",
+      "default": "employer_form"
+    },
+    "published_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Published At"
+    },
+    "expires_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Expires At"
+    }
+  },
+  "required": [
+    "title",
+    "description",
+    "contract_type",
+    "location",
+    "skills"
+  ],
+  "title": "NormalizedJobOffer",
+  "type": "object"
+}

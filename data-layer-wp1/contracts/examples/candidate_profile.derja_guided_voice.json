@@ -1,0 +1,20 @@
+{
+  "schema_version": "1.0",
+  "onboarding_path": "derja_guided_voice",
+  "literacy_level": "non_literate",
+  "preferred_language": "ar-TN",
+  "languages": [{"code": "ar-TN", "level": 4}],
+  "location": {"governorate_code": "TN-43", "delegation": "Regueb"},
+  "mobility": {"radius_km": 20, "governorates": []},
+  "education_level": "primary",
+  "years_experience": 8,
+  "experiences": [
+    {"job_title_raw": "بنّاي", "occupation_code": "OC-7112", "is_informal": true, "duration_months": 96, "governorate_code": "TN-43"}
+  ],
+  "skills": [
+    {"skill_code": "SK-0301", "label_raw": "نبني حيوط", "skill_type": "hard", "level": 3, "source": "dialogue", "confidence": 0.8},
+    {"skill_code": "SK-0302", "skill_type": "hard", "level": 2, "source": "dialogue", "confidence": 0.65}
+  ],
+  "desired_occupation_codes": ["OC-7112"],
+  "conversation_session_id": "7a9e0c11-2b3d-4e5f-8a6b-7c8d9e0f1a2b"
+}

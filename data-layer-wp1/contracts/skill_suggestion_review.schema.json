@@ -1,0 +1,40 @@
+{
+  "$defs": {
+    "SuggestionStatus": {
+      "enum": [
+        "pending",
+        "approved",
+        "rejected",
+        "merged"
+      ],
+      "title": "SuggestionStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "status": {
+      "$ref": "#/$defs/SuggestionStatus"
+    },
+    "resolved_skill_code": {
+      "anyOf": [
+        {
+          "maxLength": 32,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Required when status is merged",
+      "title": "Resolved Skill Code"
+    }
+  },
+  "required": [
+    "status"
+  ],
+  "title": "SkillSuggestionReview",
+  "type": "object"
+}
