@@ -1,0 +1,165 @@
+{
+  "$defs": {
+    "CourseModality": {
+      "enum": [
+        "in_person",
+        "online",
+        "blended"
+      ],
+      "title": "CourseModality",
+      "type": "string"
+    },
+    "CourseSkill": {
+      "additionalProperties": false,
+      "properties": {
+        "skill_code": {
+          "maxLength": 32,
+          "minLength": 1,
+          "title": "Skill Code",
+          "type": "string"
+        },
+        "target_level": {
+          "maximum": 4,
+          "minimum": 1,
+          "title": "Target Level",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "skill_code",
+        "target_level"
+      ],
+      "title": "CourseSkill",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "course_id": {
+      "anyOf": [
+        {
+          "format": "uuid",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Course Id"
+    },
+    "provider_id": {
+      "format": "uuid",
+      "title": "Provider Id",
+      "type": "string"
+    },
+    "title": {
+      "maxLength": 200,
+      "minLength": 3,
+      "title": "Title",
+      "type": "string"
+    },
+    "description": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Description"
+    },
+    "modality": {
+      "$ref": "#/$defs/CourseModality"
+    },
+    "duration_hours": {
+      "anyOf": [
+        {
+          "maximum": 5000,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Duration Hours"
+    },
+    "cost_tnd": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cost Tnd"
+    },
+    "governorate_code": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Governorate Code"
+    },
+    "language": {
+      "default": "fr",
+      "maxLength": 8,
+      "title": "Language",
+      "type": "string"
+    },
+    "certification_name": {
+      "anyOf": [
+        {
+          "maxLength": 200,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Certification Name"
+    },
+    "skills": {
+      "items": {
+        "$ref": "#/$defs/CourseSkill"
+      },
+      "minItems": 1,
+      "title": "Skills",
+      "type": "array"
+    },
+    "external_ref": {
+      "anyOf": [
+        {
+          "maxLength": 64,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "External Ref"
+    }
+  },
+  "required": [
+    "provider_id",
+    "title",
+    "modality",
+    "skills"
+  ],
+  "title": "TrainingCourseRecord",
+  "type": "object"
+}

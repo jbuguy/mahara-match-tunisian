@@ -1,0 +1,39 @@
+{
+  "schema_version": "1.0",
+  "candidate_id": null,
+  "onboarding_path": "cv_upload",
+  "literacy_level": "literate",
+  "preferred_language": "fr",
+  "languages": [
+    {"code": "ar-TN", "level": 4},
+    {"code": "fr", "level": 3},
+    {"code": "en", "level": 2}
+  ],
+  "location": {"governorate_code": "TN-51", "delegation": "Sousse Médina"},
+  "mobility": {"radius_km": 50, "governorates": ["TN-52", "TN-53"]},
+  "education_level": "licence",
+  "educations": [
+    {"level": "licence", "field_of_study": "Informatique de gestion", "institution": "ISG Sousse", "graduation_year": 2023}
+  ],
+  "years_experience": 2,
+  "experiences": [
+    {
+      "job_title_raw": "Développeur web junior",
+      "occupation_code": "OC-2512",
+      "employer_name": "Startup locale",
+      "start_date": "2023-09-01",
+      "end_date": "2025-08-31",
+      "governorate_code": "TN-51"
+    }
+  ],
+  "skills": [
+    {"skill_code": "SK-0101", "skill_type": "hard", "level": 3, "source": "cv", "confidence": 0.92},
+    {"skill_code": "SK-0102", "skill_type": "hard", "level": 2, "source": "cv", "confidence": 0.85},
+    {"skill_code": "SK-0501", "skill_type": "soft", "level": 3, "source": "cv", "confidence": 0.7},
+    {"label_raw": "Odoo", "skill_type": "hard", "level": 2, "source": "cv", "confidence": 0.6}
+  ],
+  "desired_occupation_codes": ["OC-2512"],
+  "available_from": "2026-10-01",
+  "summary": "Développeur web avec 2 ans d'expérience en PHP et JavaScript.",
+  "source_document_ids": ["3f1c2a4e-9b7d-4c1e-8a2f-5d6e7f8a9b01"]
+}

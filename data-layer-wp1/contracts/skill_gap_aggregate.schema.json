@@ -1,0 +1,62 @@
+{
+  "additionalProperties": false,
+  "description": "Skill-gap cartography cell served to the ministry dashboard.",
+  "properties": {
+    "skill_code": {
+      "maxLength": 32,
+      "minLength": 1,
+      "title": "Skill Code",
+      "type": "string"
+    },
+    "governorate_code": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Governorate Code"
+    },
+    "demand_count": {
+      "description": "Published offers requiring the skill",
+      "minimum": 0,
+      "title": "Demand Count",
+      "type": "integer"
+    },
+    "supply_count": {
+      "description": "Candidates holding the skill at the required level",
+      "minimum": 0,
+      "title": "Supply Count",
+      "type": "integer"
+    },
+    "gap_ratio": {
+      "description": "demand / max(supply, 1)",
+      "minimum": 0,
+      "title": "Gap Ratio",
+      "type": "number"
+    },
+    "period_start": {
+      "format": "date",
+      "title": "Period Start",
+      "type": "string"
+    },
+    "period_end": {
+      "format": "date",
+      "title": "Period End",
+      "type": "string"
+    }
+  },
+  "required": [
+    "skill_code",
+    "demand_count",
+    "supply_count",
+    "gap_ratio",
+    "period_start",
+    "period_end"
+  ],
+  "title": "SkillGapAggregate",
+  "type": "object"
+}

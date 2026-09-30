@@ -1,0 +1,78 @@
+{
+  "$defs": {
+    "ConversationChannel": {
+      "enum": [
+        "text",
+        "audio"
+      ],
+      "title": "ConversationChannel",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Structured output of a conversation (Vecteur d'Appétence), scores in [0, 1].",
+  "properties": {
+    "conversation_session_id": {
+      "format": "uuid",
+      "title": "Conversation Session Id",
+      "type": "string"
+    },
+    "candidate_id": {
+      "anyOf": [
+        {
+          "format": "uuid",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Candidate Id"
+    },
+    "channel": {
+      "$ref": "#/$defs/ConversationChannel"
+    },
+    "detected_intents": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Detected Intents",
+      "type": "array"
+    },
+    "occupation_interests": {
+      "additionalProperties": {
+        "type": "number"
+      },
+      "propertyNames": {
+        "maxLength": 32,
+        "minLength": 1
+      },
+      "title": "Occupation Interests",
+      "type": "object"
+    },
+    "sector_interests": {
+      "additionalProperties": {
+        "type": "number"
+      },
+      "propertyNames": {
+        "maxLength": 32,
+        "minLength": 1
+      },
+      "title": "Sector Interests",
+      "type": "object"
+    },
+    "computed_at": {
+      "format": "date-time",
+      "title": "Computed At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "conversation_session_id",
+    "channel",
+    "computed_at"
+  ],
+  "title": "AppetenceVector",
+  "type": "object"
+}

@@ -1,0 +1,142 @@
+{
+  "$defs": {
+    "RoadmapItemStatus": {
+      "enum": [
+        "todo",
+        "in_progress",
+        "done",
+        "skipped"
+      ],
+      "title": "RoadmapItemStatus",
+      "type": "string"
+    },
+    "RoadmapStatus": {
+      "enum": [
+        "active",
+        "completed",
+        "abandoned"
+      ],
+      "title": "RoadmapStatus",
+      "type": "string"
+    },
+    "RoadmapStep": {
+      "additionalProperties": false,
+      "properties": {
+        "position": {
+          "minimum": 1,
+          "title": "Position",
+          "type": "integer"
+        },
+        "skill_code": {
+          "maxLength": 32,
+          "minLength": 1,
+          "title": "Skill Code",
+          "type": "string"
+        },
+        "training_course_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Training Course Id"
+        },
+        "status": {
+          "$ref": "#/$defs/RoadmapItemStatus",
+          "default": "todo"
+        }
+      },
+      "required": [
+        "position",
+        "skill_code"
+      ],
+      "title": "RoadmapStep",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "roadmap_id": {
+      "anyOf": [
+        {
+          "format": "uuid",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Roadmap Id"
+    },
+    "candidate_id": {
+      "format": "uuid",
+      "title": "Candidate Id",
+      "type": "string"
+    },
+    "target_job_offer_id": {
+      "anyOf": [
+        {
+          "format": "uuid",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Target Job Offer Id"
+    },
+    "target_occupation_code": {
+      "anyOf": [
+        {
+          "maxLength": 32,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Target Occupation Code"
+    },
+    "status": {
+      "$ref": "#/$defs/RoadmapStatus",
+      "default": "active"
+    },
+    "progress_pct": {
+      "default": 0,
+      "maximum": 100,
+      "minimum": 0,
+      "title": "Progress Pct",
+      "type": "integer"
+    },
+    "steps": {
+      "items": {
+        "$ref": "#/$defs/RoadmapStep"
+      },
+      "minItems": 1,
+      "title": "Steps",
+      "type": "array"
+    },
+    "model_version": {
+      "maxLength": 32,
+      "minLength": 1,
+      "title": "Model Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "candidate_id",
+    "steps",
+    "model_version"
+  ],
+  "title": "Roadmap",
+  "type": "object"
+}

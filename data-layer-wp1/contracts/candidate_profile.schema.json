@@ -1,0 +1,551 @@
+{
+  "$defs": {
+    "EducationLevel": {
+      "enum": [
+        "none",
+        "primary",
+        "lower_secondary",
+        "baccalaureate",
+        "vocational_cap",
+        "vocational_btp",
+        "vocational_bts",
+        "licence",
+        "master",
+        "engineer",
+        "doctorate"
+      ],
+      "title": "EducationLevel",
+      "type": "string"
+    },
+    "LanguageSkill": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "examples": [
+            "ar-TN",
+            "fr",
+            "en"
+          ],
+          "maxLength": 8,
+          "minLength": 2,
+          "title": "Code",
+          "type": "string"
+        },
+        "level": {
+          "maximum": 4,
+          "minimum": 1,
+          "title": "Level",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "code",
+        "level"
+      ],
+      "title": "LanguageSkill",
+      "type": "object"
+    },
+    "LiteracyLevel": {
+      "enum": [
+        "non_literate",
+        "basic",
+        "literate"
+      ],
+      "title": "LiteracyLevel",
+      "type": "string"
+    },
+    "Location": {
+      "additionalProperties": false,
+      "properties": {
+        "governorate_code": {
+          "title": "Governorate Code",
+          "type": "string"
+        },
+        "delegation": {
+          "anyOf": [
+            {
+              "maxLength": 80,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Delegation"
+        }
+      },
+      "required": [
+        "governorate_code"
+      ],
+      "title": "Location",
+      "type": "object"
+    },
+    "Mobility": {
+      "additionalProperties": false,
+      "properties": {
+        "radius_km": {
+          "anyOf": [
+            {
+              "maximum": 1000,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Radius Km"
+        },
+        "governorates": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Governorates",
+          "type": "array"
+        }
+      },
+      "title": "Mobility",
+      "type": "object"
+    },
+    "OnboardingPath": {
+      "enum": [
+        "cv_upload",
+        "derja_guided_voice",
+        "derja_detailed"
+      ],
+      "title": "OnboardingPath",
+      "type": "string"
+    },
+    "ProfileEducation": {
+      "additionalProperties": false,
+      "properties": {
+        "level": {
+          "$ref": "#/$defs/EducationLevel"
+        },
+        "field_of_study": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Field Of Study"
+        },
+        "institution": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Institution"
+        },
+        "graduation_year": {
+          "anyOf": [
+            {
+              "maximum": 2100,
+              "minimum": 1950,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Graduation Year"
+        },
+        "country_code": {
+          "default": "TN",
+          "maxLength": 2,
+          "minLength": 2,
+          "title": "Country Code",
+          "type": "string"
+        }
+      },
+      "required": [
+        "level"
+      ],
+      "title": "ProfileEducation",
+      "type": "object"
+    },
+    "ProfileExperience": {
+      "additionalProperties": false,
+      "properties": {
+        "job_title_raw": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Job Title Raw",
+          "type": "string"
+        },
+        "occupation_code": {
+          "anyOf": [
+            {
+              "maxLength": 32,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Occupation Code"
+        },
+        "employer_name": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Employer Name"
+        },
+        "is_informal": {
+          "default": false,
+          "title": "Is Informal",
+          "type": "boolean"
+        },
+        "start_date": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Start Date"
+        },
+        "end_date": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "End Date"
+        },
+        "duration_months": {
+          "anyOf": [
+            {
+              "maximum": 720,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Duration Months"
+        },
+        "governorate_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Governorate Code"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        }
+      },
+      "required": [
+        "job_title_raw"
+      ],
+      "title": "ProfileExperience",
+      "type": "object"
+    },
+    "ProfileSkill": {
+      "additionalProperties": false,
+      "properties": {
+        "skill_code": {
+          "anyOf": [
+            {
+              "maxLength": 32,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Skill Code"
+        },
+        "label_raw": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Label as heard/read, any language",
+          "title": "Label Raw"
+        },
+        "skill_type": {
+          "$ref": "#/$defs/SkillType"
+        },
+        "level": {
+          "maximum": 4,
+          "minimum": 1,
+          "title": "Level",
+          "type": "integer"
+        },
+        "source": {
+          "$ref": "#/$defs/SkillSource"
+        },
+        "confidence": {
+          "default": 1.0,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Confidence",
+          "type": "number"
+        }
+      },
+      "required": [
+        "skill_type",
+        "level",
+        "source"
+      ],
+      "title": "ProfileSkill",
+      "type": "object"
+    },
+    "SkillSource": {
+      "enum": [
+        "cv",
+        "dialogue",
+        "certification",
+        "self_declared",
+        "employer_feedback"
+      ],
+      "title": "SkillSource",
+      "type": "string"
+    },
+    "SkillType": {
+      "enum": [
+        "hard",
+        "soft",
+        "language"
+      ],
+      "title": "SkillType",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "candidate_id": {
+      "anyOf": [
+        {
+          "format": "uuid",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Null on first submission; assigned by WP1",
+      "title": "Candidate Id"
+    },
+    "onboarding_path": {
+      "$ref": "#/$defs/OnboardingPath"
+    },
+    "literacy_level": {
+      "$ref": "#/$defs/LiteracyLevel"
+    },
+    "preferred_language": {
+      "default": "ar-TN",
+      "maxLength": 8,
+      "title": "Preferred Language",
+      "type": "string"
+    },
+    "languages": {
+      "items": {
+        "$ref": "#/$defs/LanguageSkill"
+      },
+      "title": "Languages",
+      "type": "array"
+    },
+    "location": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Location"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "mobility": {
+      "$ref": "#/$defs/Mobility"
+    },
+    "education_level": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/EducationLevel"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "educations": {
+      "items": {
+        "$ref": "#/$defs/ProfileEducation"
+      },
+      "title": "Educations",
+      "type": "array"
+    },
+    "years_experience": {
+      "anyOf": [
+        {
+          "maximum": 60,
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Years Experience"
+    },
+    "experiences": {
+      "items": {
+        "$ref": "#/$defs/ProfileExperience"
+      },
+      "title": "Experiences",
+      "type": "array"
+    },
+    "skills": {
+      "items": {
+        "$ref": "#/$defs/ProfileSkill"
+      },
+      "title": "Skills",
+      "type": "array"
+    },
+    "desired_occupation_codes": {
+      "items": {
+        "maxLength": 32,
+        "minLength": 1,
+        "type": "string"
+      },
+      "maxItems": 5,
+      "title": "Desired Occupation Codes",
+      "type": "array"
+    },
+    "available_from": {
+      "anyOf": [
+        {
+          "format": "date",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Available From"
+    },
+    "summary": {
+      "anyOf": [
+        {
+          "maxLength": 2000,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Summary"
+    },
+    "service_offer": {
+      "anyOf": [
+        {
+          "maxLength": 4000,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Offre de service (derja_detailed)",
+      "title": "Service Offer"
+    },
+    "source_document_ids": {
+      "items": {
+        "format": "uuid",
+        "type": "string"
+      },
+      "title": "Source Document Ids",
+      "type": "array"
+    },
+    "conversation_session_id": {
+      "anyOf": [
+        {
+          "format": "uuid",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Conversation Session Id"
+    }
+  },
+  "required": [
+    "onboarding_path",
+    "literacy_level"
+  ],
+  "title": "CandidateProfile",
+  "type": "object"
+}

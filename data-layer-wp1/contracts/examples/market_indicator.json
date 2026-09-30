@@ -1,0 +1,10 @@
+{
+  "indicator_type": "skill_demand",
+  "skill_code": "SK-0301",
+  "governorate_code": "TN-43",
+  "period_start": "2026-01-01",
+  "period_end": "2026-06-30",
+  "value": 420,
+  "unit": "count",
+  "extra": {"source_sheet": "BTP_2026_S1"}
+}

@@ -1,0 +1,26 @@
+{
+  "schema_version": "1.0",
+  "employer_id": "0b4f6c1a-7e2d-4a9b-9c3e-1f2a3b4c5d6e",
+  "title": "Développeur web PHP/JavaScript",
+  "description": "PME basée à Sousse recherche un développeur web pour maintenir et faire évoluer ses applications métiers.",
+  "occupation_code": "OC-2512",
+  "sector_code": "SEC-IT",
+  "contract_type": "cdi",
+  "work_mode": "hybrid",
+  "location": {"governorate_code": "TN-51"},
+  "positions_count": 2,
+  "min_years_experience": 1,
+  "education_level_min": "licence",
+  "salary": {"min_tnd": 1400, "max_tnd": 2000, "period": "month"},
+  "skills": [
+    {"skill_code": "SK-0101", "requirement": "required", "min_level": 3},
+    {"skill_code": "SK-0102", "requirement": "required", "min_level": 2},
+    {"skill_code": "SK-0103", "requirement": "preferred", "min_level": 2},
+    {"skill_code": "SK-0501", "requirement": "preferred", "min_level": 2}
+  ],
+  "languages_required": [{"code": "fr", "level": 3}],
+  "status": "published",
+  "source": "employer_form",
+  "published_at": "2026-09-21T09:00:00Z",
+  "expires_at": "2026-10-21T09:00:00Z"
+}
