@@ -96,7 +96,7 @@ No new names. `APP_ENV` now matters: the seed only runs when it's `dev` or `deve
 
 ## Known issues
 
-- **Secret rotation** (Google OAuth client secret, database password) is still not confirmed done. Carried over from Sessions 1 and 2.
+- **Secret rotation:** done. The Google OAuth client secret and the database password were rotated at the end of this session.
 - **Filled profile not seen:** it can't be reached from the UI until Session 4's form exists. Only the empty state was checked in the browser. The filled view was built against the API types and passes `tsc`.
 - **Test speed:** the database tests take about 30 s over the session pooler.
 - **Stale backend:** a `uvicorn --reload` process left over from Session 2 was still on port 8006 but didn't serve the new routes (404). It was killed and restarted. If new routes return 404, restart the backend.
@@ -105,7 +105,7 @@ No new names. `APP_ENV` now matters: the seed only runs when it's `dev` or `deve
 ## What Session 4 should do first
 
 1. Read CLAUDE.md and all files in `docs/sessions/`.
-2. Ask whether the secrets have been rotated.
+2. Check that sign-in still works with the rotated Google secret, and that `/health` still works with the new database password.
 3. Build the 3-step form at `/profil/modifier`:
    - load with `getProfile()` (null → empty form)
    - search with `/reference/skills?q=` and `/reference/occupations?q=`, and fill the governorate list from `/reference/governorates`

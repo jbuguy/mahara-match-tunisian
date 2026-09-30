@@ -184,5 +184,5 @@ Each session's details come in its prompt; don't build ahead.
   unknown codes → 422 in FastAPI's own error shape (`loc` + `input`); frontend types + `getProfile()` in `src/lib/api.ts`,
   French labels in `src/lib/labels.ts`; search with `GET /api/v1/reference/{governorates,skills,occupations}?q=`
 - Tests: 28; profile and reference tests use the real database inside a rolled-back transaction (skipped if unreachable)
-- Known issues / TODO: rotate the Google OAuth client secret (shared in chat in Session 2) and the database password
-  (shared in chat in Session 1, possibly again in Session 2), not confirmed done yet; keep `%` encoded as `%25` in `DATABASE_URL`
+- Secrets: the Google OAuth client secret and the database password were rotated after Session 3
+- Known issues / TODO: keep `%` encoded as `%25` in `DATABASE_URL`
