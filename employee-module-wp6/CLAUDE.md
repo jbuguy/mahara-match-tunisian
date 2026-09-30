@@ -1,4 +1,3 @@
-
 # CLAUDE.md: Mahara WP6 Employee Module, project memory
 
 This file lives at `employee-module-wp6/CLAUDE.md` (uppercase name, so Claude Code finds it on any OS). Read it first, every session, before doing anything else. Then read **all** files in
@@ -9,13 +8,17 @@ Scope and sequencing are already decided in this file and in each session prompt
 
 Mahara Match: Tunisian national employment platform. The team shares one GitHub repo
 (`jbuguy/mahara-match-tunisian`); each person works independently on their own branch.
-This branch builds the candidate side (WP6, Employee Module). **Current scope is only two things:**
+This branch builds the candidate side (WP6, Employee Module). **Current scope:**
 
 1. **Authentication**: sign in with Google.
 2. **Candidate profile**: the candidate creates it by filling a form **or** by importing a CV (PDF/DOCX),
    then can view and edit it.
-   Everything else (offers, applications, roadmap) waits until this is done. UI is in French; users may have
-   low literacy, so keep copy short, buttons big, and a text label on every icon.
+3. **Profile assistant**: an AI chat agent ("Assistant Mahara") that asks one question at a time, understands
+   answers in French, Tunisian Derja (Latin or Arabic letters) or Arabic, typed or spoken, and fills the profile
+   form for the candidate to review and save.
+
+Everything else (offers, applications, roadmap) waits until this is done. UI is in French; users may have
+low literacy, so keep copy short, buttons big, and a text label on every icon.
 
 ## Constraints
 
@@ -26,7 +29,7 @@ This branch builds the candidate side (WP6, Employee Module). **Current scope is
 - **Own Supabase project for now**, set up with our own `employee-module-wp6/db/schema.sql`. Its table and column
   names match the team's so a later switch is mostly env vars. Don't add tables or columns beyond the ones listed
   in the Data model below without asking.
-- Local only: no deploy config, no Docker, no CI. Free services only.
+- Local only: no deploy config, no Docker, no CI. Free services only (Groq's free plan is the only external AI).
 - Context is cleared between sessions. Every session ends with the app **working locally**. If a session
   runs long, cut scope, not the test-and-document step at the end.
 
@@ -40,6 +43,10 @@ This branch builds the candidate side (WP6, Employee Module). **Current scope is
   state or form libraries. Packages that shadcn installs itself are approved too (clsx, tailwind-merge,
   class-variance-authority, radix-ui, tw-animate-css).
 - **Auth + DB:** Supabase. Google OAuth only: no passwords, no SMS, no signup form.
+- **AI (Session 6+):** Groq API (free plan) through the official `groq` Python package, called **only from the
+  backend**. Chat model from `GROQ_MODEL` (default `openai/gpt-oss-120b`, an open-weights model), speech-to-text
+  `whisper-large-v3-turbo`. Free-plan limits: about 30 requests and 8,000 tokens per minute for the chat model,
+  so keep each request small. Voice recording uses the browser's built-in MediaRecorder (no extra package).
 
 ### Version traps (your training data is older than these)
 
@@ -67,6 +74,14 @@ This branch builds the candidate side (WP6, Employee Module). **Current scope is
 - **CV import** is done inside this backend: read the text with pypdf / python-docx, pull out email, phone,
   skills that match the `skills` table, education and experience lines, and return a **draft** the candidate
   reviews in the form. Nothing is saved and the file isn't stored until they press "Enregistrer".
+- **Profile assistant** (`app/services/assistant.py`, `app/routers/assistant.py`): stateless. The frontend sends the
+  recent conversation + the current form draft; the backend asks Groq for JSON `{reply, updates, asking, done}`, validates it,
+  maps skill/job/governorate names to codes with the same matching as the CV import, and returns the reply and the
+  field updates. A skill or job that isn't in our lists triggers one more small Groq call whose reply stays on it
+  (close items from our lists as suggestions, or "Ignorer"), so the chat doesn't move on. The assistant **never saves
+  the profile and never ticks consent**: the candidate reviews the form and presses "Enregistrer". The AI key and the
+  prompts stay on the backend. If Groq is down, missing a key or rate-limited, the assistant says so politely and the
+  form keeps working.
 
 ## Data model (our `db/schema.sql`; names match the team's schema so we can switch later)
 
@@ -129,8 +144,9 @@ occupations     id, code (unique), title_fr                                     
     so it works whatever folder you start from.
   - Frontend reads it through Vite with `envDir: '..'` in `frontend/vite.config.ts`. Vite only exposes `VITE_` variables to
     the browser, so `DATABASE_URL` never reaches the frontend.
-  - Names: `DATABASE_URL`, `SUPABASE_URL`, `CORS_ORIGINS`, `APP_ENV` (backend); `VITE_SUPABASE_URL`,
-    `VITE_SUPABASE_PUBLISHABLE_KEY`, `VITE_API_BASE_URL` (frontend).
+  - Names: `DATABASE_URL`, `SUPABASE_URL`, `CORS_ORIGINS`, `APP_ENV`, `GROQ_API_KEY`, `GROQ_MODEL` (backend);
+    `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `VITE_API_BASE_URL` (frontend). `GROQ_API_KEY` must never
+    get a `VITE_` prefix: it would leak to the browser.
 - Google Client ID/Secret are not env vars: they live in the Supabase dashboard (Authentication → Providers).
 - **Commit messages:** `type(wp6): short summary` (team style, e.g. `feat(wp6): add google login`).
   Types: `feat`, `fix`, `test`, `docs`, `refactor`, `chore`. Never mention "session" in a commit message.
@@ -148,7 +164,9 @@ occupations     id, code (unique), title_fr                                     
 3. Profile API + Profil page (seed skills and occupations).
 4. Profile form (3 steps, create + edit).
 5. CV import (PDF/DOCX → prefilled form).
-6. Later: switch to the team Supabase project.
+6. Profile assistant, text chat (AI agent fills the form).
+7. Profile assistant, voice input (speak instead of typing).
+8. Later: switch to the team Supabase project.
 
 Each session's details come in its prompt; don't build ahead.
 
@@ -175,19 +193,30 @@ Each session's details come in its prompt; don't build ahead.
   skills, educations, experiences; unmatched Compétences/Langues words), `POST /api/v1/me/cv` (415/413/422, saves
   nothing, file not kept), 2 sample CVs in `tests/fixtures/`, `/profil/importer-cv` (drop zone, progress, prefilled
   form with `fromCv` → `cv_upload`), 14 tech skills added to the seed. See `docs/sessions/05-cv-import.md`.
+- 2026-09-30 · Session 6, profile assistant (text): `app/services/assistant.py` + `POST /api/v1/me/assistant/chat`
+  (Groq `openai/gpt-oss-120b`, JSON mode, `{reply, updates, asking, done}`, names → codes, unknown skills/jobs clarified
+  with suggestions or "Ignorer", French errors 503/429/502, saves nothing); "Remplir avec l'assistant" on the Profil
+  empty state and `/profil/modifier`: side panel from 1280px, bottom sheet below, fields fill in with a gold highlight
+  and the form follows the question's step. See `docs/sessions/06-assistant-chat.md`.
 
 ## Current status
 
 *(overwrite this section each session; it's the single source of truth for "where are we")*
 
-- Last completed: Session 5, CV import (PDF/DOCX → prefilled form, saved as `cv_upload`), checked in the browser;
-  its docs and this update were written afterwards
-- Next up: Session 6 (see its prompt; it updates the Session plan)
+- Last completed: Session 6, profile assistant text chat ("Assistant Mahara" fills the form from French, Derja or
+  Arabic answers; unknown skills/jobs are clarified or skipped), checked in the browser with the real Groq model
+- Next up: Session 7, voice input for the assistant (MediaRecorder → backend → Groq `whisper-large-v3-turbo`)
 - Supabase: my own project with `db/schema.sql` applied (including `candidate_pii.photo`, added in Session 4), Google
   provider enabled, and `seed_dev.py` run (SK-9001…SK-9046, OC-9001…OC-9012); Redirect URLs include
-  `http://localhost:5173/auth/callback`
-- `.env` has all names from `.env.example` set; no new names in Sessions 3-5. `APP_ENV` must be `dev` or `development`
-  for the seed script to run
+  `http://localhost:5173/auth/callback`. Switch to the team project in Session 8
+- `.env` has all names from `.env.example` set, including `GROQ_API_KEY` and `GROQ_MODEL` (added in Session 6;
+  backend only). `APP_ENV` must be `dev` or `development` for the seed script to run
+- Assistant pieces to reuse (Session 7 feeds the transcribed text into the same chat):
+  - backend `app/services/assistant.py`: `assistant_turn()` (one chat turn), `_complete()` (one JSON-mode Groq call with
+    the French error messages), `get_groq_client` (FastAPI dependency, 503 without a key), `candidate_language()`
+  - frontend: `useAssistantChat(formRef)` (`send(text)`, `retry()`) and `<AssistantChat>` in `src/components/assistant/`;
+    `ProfileFormHandle` (`getValues`, `applyUpdates(updates, asking)`, `focusForm`) on `ProfileForm`'s `ref`;
+    `src/components/profile/assistant-updates.ts` (draft for the AI, merging its updates)
 - Auth pieces to reuse: backend `Depends(get_current_user)` → `CurrentUser(user, name)` (needs the users row), or
   `Depends(get_token_claims)` when only a valid login is needed (no database); frontend `api<T>(path)` in `src/lib/api.ts`,
   `useAuth()` in `src/lib/auth-context.ts`
@@ -201,7 +230,10 @@ Each session's details come in its prompt; don't build ahead.
     `src/lib/photo.ts`, `<UserAvatar>` in `src/components/Avatar.tsx`; French labels in `src/lib/labels.ts`
 - Speed: every database round trip costs ~150-190 ms (network distance to the pooler), so keep statements per request
   low (one-query reads, batched writes) and don't refetch what a previous page already has
-- Tests: 52; profile, photo, reference and CV-endpoint tests use the real database inside a rolled-back transaction (skipped if
-  unreachable)
+- Tests: 124; profile, photo, reference and CV-endpoint tests use the real database inside a rolled-back transaction (skipped if
+  unreachable); assistant tests mock Groq (no network, no key needed)
+- Groq free plan: a chat turn is ~1,000 tokens (~1,700 when a name isn't in our lists), so about 7 turns a minute under
+  the 8,000 tokens/minute limit; past it the chat shows "Un instant, réessayez dans quelques secondes." with "Réessayer"
 - Known issues / TODO: keep `%` encoded as `%25` in `DATABASE_URL`; consent wording (now lists the photo) still needs
-  a team check; uvicorn `--reload` on Windows can hang (touch `app/main.py` or restart)
+  a team check; uvicorn `--reload` on Windows often misses changes (new routes/fields missing): restart the backend
+  after backend edits

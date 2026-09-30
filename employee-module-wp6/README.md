@@ -17,11 +17,14 @@ cp .env.example .env   # then fill in the values
 | `SUPABASE_URL` | backend | Supabase → Project Settings → API (`https://<ref>.supabase.co`) |
 | `CORS_ORIGINS` | backend | `http://localhost:5173` (comma-separated if several) |
 | `APP_ENV` | backend | `development` |
+| `GROQ_API_KEY` | backend | [console.groq.com](https://console.groq.com) → API Keys (free plan, `gsk_...`). Never give it a `VITE_` prefix |
+| `GROQ_MODEL` | backend | `openai/gpt-oss-120b` (the default when left empty) |
 | `VITE_SUPABASE_URL` | frontend | same value as `SUPABASE_URL` |
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | frontend | Supabase → Project Settings → API keys (`sb_publishable_...`) |
 | `VITE_API_BASE_URL` | frontend | `http://localhost:8006` |
 
-Only `VITE_*` names reach the browser, so `DATABASE_URL` never does.
+Only `VITE_*` names reach the browser, so `DATABASE_URL` and `GROQ_API_KEY` never do. Without `GROQ_API_KEY` the
+app still works; only the profile assistant says it isn't available.
 
 ## 2. Database (once)
 
