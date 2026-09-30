@@ -100,7 +100,7 @@ occupations     id, code (unique), title_fr                                     
   `literacy_level` is required: default `literate`.
 - Consent: the form has a required checkbox; on save set `consent_version='1.0'` and `consent_given_at=now()`.
 - Saving a profile replaces the candidate's skills, experiences, educations and desired occupations in one transaction.
-- A fresh Supabase project has no skills or occupations: `scripts/seed_dev.py` adds ~30 skills (`SK-9001`...)
+- A fresh Supabase project has no skills or occupations: `scripts/seed_dev.py` adds ~45 skills (`SK-9001`...)
   and ~10 occupations (`OC-9001`...). The `9xxx` codes never collide with the team's real list.
 
 ## Design system (approved Mahara mockups)
@@ -171,18 +171,22 @@ Each session's details come in its prompt; don't build ahead.
   CV import; Google photo by default + own photo (`candidate_pii.photo`, `/api/v1/me/photo`); speed work (profile read in
   1 query, fewer save statements, no reloads between Profil and the form, cached reference data).
   See `docs/sessions/04-profile-form.md`.
+- 2026-09-30 · Session 5, CV import: `app/services/cv_import.py` (pypdf / python-docx → name, email, phone, catalog
+  skills, educations, experiences; unmatched Compétences/Langues words), `POST /api/v1/me/cv` (415/413/422, saves
+  nothing, file not kept), 2 sample CVs in `tests/fixtures/`, `/profil/importer-cv` (drop zone, progress, prefilled
+  form with `fromCv` → `cv_upload`), 14 tech skills added to the seed. See `docs/sessions/05-cv-import.md`.
 
 ## Current status
 
 *(overwrite this section each session; it's the single source of truth for "where are we")*
 
-- Last completed: Session 4, profile form + photo + speed work, checked in the browser (create, edit, remove a skill,
-  change photo and back to Google)
-- Next up: Session 5, CV import (PDF/DOCX → draft) opening `ProfileForm` with `initialValues` and `fromCv`
+- Last completed: Session 5, CV import (PDF/DOCX → prefilled form, saved as `cv_upload`), checked in the browser;
+  its docs and this update were written afterwards
+- Next up: Session 6 (see its prompt; it updates the Session plan)
 - Supabase: my own project with `db/schema.sql` applied (including `candidate_pii.photo`, added in Session 4), Google
-  provider enabled, and `seed_dev.py` run (SK-9001…SK-9032, OC-9001…OC-9012); Redirect URLs include
-  `http://localhost:5173/auth/callback` (switch to the team project in Session 6)
-- `.env` has all names from `.env.example` set; no new names in Sessions 3-4. `APP_ENV` must be `dev` or `development`
+  provider enabled, and `seed_dev.py` run (SK-9001…SK-9046, OC-9001…OC-9012); Redirect URLs include
+  `http://localhost:5173/auth/callback`
+- `.env` has all names from `.env.example` set; no new names in Sessions 3-5. `APP_ENV` must be `dev` or `development`
   for the seed script to run
 - Auth pieces to reuse: backend `Depends(get_current_user)` → `CurrentUser(user, name)` (needs the users row), or
   `Depends(get_token_claims)` when only a valid login is needed (no database); frontend `api<T>(path)` in `src/lib/api.ts`,
@@ -190,12 +194,14 @@ Each session's details come in its prompt; don't build ahead.
 - Profile pieces to reuse:
   - backend: `ProfileIn` / `ProfileOut` (now with `has_photo`) in `app/schemas.py`; unknown codes → 422 in FastAPI's
     own shape (`loc` + `input`)
+  - CV import (`app/services/cv_import.py`): `fold()` / `words()` for accent-free matching, `load_skills()` (catalog in
+    one query), `find_skills()`; the draft (`CvDraft`) uses the form's shape
   - frontend: `ProfileForm` (`src/components/profile/`), `ProfileFormStart` (starting values; experiences and languages
-    may leave out `key`/`mode`), `profileToFormValues`, `toProfileIn`; photo via `useUserPhoto()` / `setCustomPhoto()` in
+    may leave out `key`/`mode`), `profileToFormValues`, `toProfileIn`, `draftToFormStart` (CV draft + saved profile); photo via `useUserPhoto()` / `setCustomPhoto()` in
     `src/lib/photo.ts`, `<UserAvatar>` in `src/components/Avatar.tsx`; French labels in `src/lib/labels.ts`
 - Speed: every database round trip costs ~150-190 ms (network distance to the pooler), so keep statements per request
   low (one-query reads, batched writes) and don't refetch what a previous page already has
-- Tests: 38; profile, photo and reference tests use the real database inside a rolled-back transaction (skipped if
+- Tests: 52; profile, photo, reference and CV-endpoint tests use the real database inside a rolled-back transaction (skipped if
   unreachable)
 - Known issues / TODO: keep `%` encoded as `%25` in `DATABASE_URL`; consent wording (now lists the photo) still needs
   a team check; uvicorn `--reload` on Windows can hang (touch `app/main.py` or restart)
