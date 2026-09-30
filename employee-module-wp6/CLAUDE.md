@@ -45,7 +45,7 @@ low literacy, so keep copy short, buttons big, and a text label on every icon.
 - **Auth + DB:** Supabase. Google OAuth only: no passwords, no SMS, no signup form.
 - **AI (Session 6+):** Groq API (free plan) through the official `groq` Python package, called **only from the
   backend**. Chat model from `GROQ_MODEL` (default `openai/gpt-oss-120b`, an open-weights model), speech-to-text
-  `whisper-large-v3-turbo`. Free-plan limits: about 30 requests and 8,000 tokens per minute for the chat model,
+  `whisper-large-v3-turbo` (same `GROQ_API_KEY`, no extra env var). Free-plan limits: about 30 requests and 8,000 tokens per minute for the chat model,
   so keep each request small. Voice recording uses the browser's built-in MediaRecorder (no extra package).
 
 ### Version traps (your training data is older than these)
@@ -82,6 +82,9 @@ low literacy, so keep copy short, buttons big, and a text label on every icon.
   the profile and never ticks consent**: the candidate reviews the form and presses "Enregistrer". The AI key and the
   prompts stay on the backend. If Groq is down, missing a key or rate-limited, the assistant says so politely and the
   form keeps working.
+- **Voice input** (Session 7): the browser records with MediaRecorder, the backend sends the audio to Groq's
+  `whisper-large-v3-turbo` (same `GROQ_API_KEY`, no forced language so French and Derja both work) and returns the text.
+  The transcript always goes into the chat's text box first, for the candidate to fix and send; the audio is never stored.
 
 ## Data model (our `db/schema.sql`; names match the team's schema so we can switch later)
 
@@ -198,20 +201,26 @@ Each session's details come in its prompt; don't build ahead.
   with suggestions or "Ignorer", French errors 503/429/502, saves nothing); "Remplir avec l'assistant" on the Profil
   empty state and `/profil/modifier`: side panel from 1280px, bottom sheet below, fields fill in with a gold highlight
   and the form follows the question's step. See `docs/sessions/06-assistant-chat.md`.
+- 2026-09-30 · Session 7, assistant voice input: `POST /api/v1/me/assistant/transcribe` (Groq `whisper-large-v3-turbo`,
+  no forced language, webm/ogg/mp4/wav read from the first bytes, 2 MB max → 413, 415, French errors, audio not stored);
+  "Parler" in the chat (MediaRecorder, red button with pulsing dot and counter, stops at 60 s, "Annuler"), transcript
+  added to a full-width growing text box for the candidate to fix and send. See `docs/sessions/07-assistant-voice.md`.
 
 ## Current status
 
 *(overwrite this section each session; it's the single source of truth for "where are we")*
 
-- Last completed: Session 6, profile assistant text chat ("Assistant Mahara" fills the form from French, Derja or
-  Arabic answers; unknown skills/jobs are clarified or skipped), checked in the browser with the real Groq model
-- Next up: Session 7, voice input for the assistant (MediaRecorder → backend → Groq `whisper-large-v3-turbo`)
+- Last completed: Session 7, voice input for the assistant ("Parler" → MediaRecorder → Groq `whisper-large-v3-turbo`
+  → text in the chat's text box, never sent by itself); marked done by me
+- Next up: Session 8 (later), switch to the team Supabase project
+- Voice pieces to reuse: backend `app/services/voice.py` (`audio_kind()` from the first bytes, `transcribe()`),
+  `POST /api/v1/me/assistant/transcribe`; frontend `useVoiceRecorder(onText)` in `src/components/assistant/`
 - Supabase: my own project with `db/schema.sql` applied (including `candidate_pii.photo`, added in Session 4), Google
   provider enabled, and `seed_dev.py` run (SK-9001…SK-9046, OC-9001…OC-9012); Redirect URLs include
   `http://localhost:5173/auth/callback`. Switch to the team project in Session 8
 - `.env` has all names from `.env.example` set, including `GROQ_API_KEY` and `GROQ_MODEL` (added in Session 6;
   backend only). `APP_ENV` must be `dev` or `development` for the seed script to run
-- Assistant pieces to reuse (Session 7 feeds the transcribed text into the same chat):
+- Assistant pieces to reuse (voice feeds the transcribed text into the same chat):
   - backend `app/services/assistant.py`: `assistant_turn()` (one chat turn), `_complete()` (one JSON-mode Groq call with
     the French error messages), `get_groq_client` (FastAPI dependency, 503 without a key), `candidate_language()`
   - frontend: `useAssistantChat(formRef)` (`send(text)`, `retry()`) and `<AssistantChat>` in `src/components/assistant/`;
@@ -230,8 +239,8 @@ Each session's details come in its prompt; don't build ahead.
     `src/lib/photo.ts`, `<UserAvatar>` in `src/components/Avatar.tsx`; French labels in `src/lib/labels.ts`
 - Speed: every database round trip costs ~150-190 ms (network distance to the pooler), so keep statements per request
   low (one-query reads, batched writes) and don't refetch what a previous page already has
-- Tests: 124; profile, photo, reference and CV-endpoint tests use the real database inside a rolled-back transaction (skipped if
-  unreachable); assistant tests mock Groq (no network, no key needed)
+- Tests: 144; profile, photo, reference and CV-endpoint tests use the real database inside a rolled-back transaction (skipped if
+  unreachable); assistant and voice tests mock Groq (no network, no key needed)
 - Groq free plan: a chat turn is ~1,000 tokens (~1,700 when a name isn't in our lists), so about 7 turns a minute under
   the 8,000 tokens/minute limit; past it the chat shows "Un instant, réessayez dans quelques secondes." with "Réessayer"
 - Known issues / TODO: keep `%` encoded as `%25` in `DATABASE_URL`; consent wording (now lists the photo) still needs
