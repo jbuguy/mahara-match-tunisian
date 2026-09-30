@@ -51,6 +51,33 @@ class CsvStoreTests(unittest.TestCase):
         with self.assertRaisesRegex(KeyError, "Session introuvable"):
             enregistrer_reponse("missing", "date", "2 octobre", self.csv_path)
 
+    def test_removes_free_text_column_and_preserves_other_data(self):
+        with self.csv_path.open("w", newline="", encoding="utf-8") as fichier:
+            writer = csv.DictWriter(
+                fichier,
+                fieldnames=["session_id", "horodatage", "metier", "texte_libre", "custom"],
+            )
+            writer.writeheader()
+            writer.writerow(
+                {
+                    "session_id": "existing-session",
+                    "horodatage": "2026-09-30T10:00:00+00:00",
+                    "metier": "menuisier",
+                    "texte_libre": "à supprimer",
+                    "custom": "à conserver",
+                }
+            )
+
+        creer_session(self.csv_path)
+
+        with self.csv_path.open("r", newline="", encoding="utf-8") as fichier:
+            reader = csv.DictReader(fichier)
+            self.assertNotIn("texte_libre", reader.fieldnames)
+            self.assertIn("custom", reader.fieldnames)
+            existing = next(reader)
+        self.assertEqual(existing["metier"], "menuisier")
+        self.assertEqual(existing["custom"], "à conserver")
+
 
 if __name__ == "__main__":
     unittest.main()

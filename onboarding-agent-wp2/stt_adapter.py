@@ -1,3 +1,9 @@
+def initialiser_moteur_stt():
+    import transcription
+
+    return transcription
+
+
 def transcrire_et_extraire(chemin_audio, type_reponse):
     types_existants = {
         "métier": "job",

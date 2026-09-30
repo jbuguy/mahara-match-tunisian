@@ -26,10 +26,13 @@ def _initialiser_csv(chemin_csv):
         colonnes_existantes = lecteur.fieldnames or []
         lignes = list(lecteur)
 
-    colonnes = colonnes_existantes + [
-        colonne for colonne in CSV_COLUMNS if colonne not in colonnes_existantes
+    colonnes = [
+        colonne for colonne in colonnes_existantes if colonne != "texte_libre"
     ]
+    colonnes += [colonne for colonne in CSV_COLUMNS if colonne not in colonnes]
     if colonnes != colonnes_existantes:
+        for ligne in lignes:
+            ligne.pop("texte_libre", None)
         with chemin.open("w", newline="", encoding="utf-8") as fichier:
             redacteur = csv.DictWriter(fichier, fieldnames=colonnes)
             redacteur.writeheader()

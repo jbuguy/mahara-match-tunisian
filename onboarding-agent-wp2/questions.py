@@ -1,7 +1,7 @@
 from pathlib import Path
 
 
-AUDIO_DIR = Path(__file__).resolve().parent / "audio_questions"
+AUDIO_DIR = Path("audio_questions")
 
 QUESTIONS = [
     {
@@ -31,12 +31,5 @@ QUESTIONS = [
         "chemin_audio": AUDIO_DIR / "num phone question .aac",
         "colonne_csv": "telephone",
         "type_reponse": "téléphone",
-    },
-    {
-        "id": "texte_libre",
-        "texte": "Avez-vous une autre information à ajouter ?",
-        "chemin_audio": None,
-        "colonne_csv": "texte_libre",
-        "type_reponse": "texte libre",
     },
 ]
