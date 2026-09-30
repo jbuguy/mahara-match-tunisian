@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.auth import get_jwks_client
 from app.config import get_settings
 from app.db import get_engine
-from app.routers import health, me, photo, profile, reference
+from app.routers import cv, health, me, photo, profile, reference
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -50,4 +50,5 @@ app.include_router(health.router, prefix="/api/v1")
 app.include_router(me.router, prefix="/api/v1")
 app.include_router(profile.router, prefix="/api/v1")
 app.include_router(photo.router, prefix="/api/v1")
+app.include_router(cv.router, prefix="/api/v1")
 app.include_router(reference.router, prefix="/api/v1")

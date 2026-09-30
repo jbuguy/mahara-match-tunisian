@@ -218,3 +218,48 @@ class ProfileOut(BaseModel):
     experiences: list[ExperienceOut]
     educations: list[EducationOut]
     desired_occupations: list[ProfileOccupationOut]
+
+
+# ---------------------------------------------------------------------------
+# CV import: POST /me/cv response, in the profile form's own shape ('' = not found)
+# ---------------------------------------------------------------------------
+
+class CvSkill(BaseModel):
+    code: str
+    label_fr: str
+    level: int = 2
+    source: SkillSource = "cv"
+    confidence: float | None = None
+
+
+class CvExperience(BaseModel):
+    job_title_raw: str
+    employer_name: str = ""
+    start_date: str = ""  # YYYY-MM-DD
+    end_date: str = ""
+    duration_months: str = ""
+    description: str = ""
+
+
+class CvEducation(BaseModel):
+    """Same as EducationIn: the form sends educations back unchanged."""
+
+    level: EducationLevel | None = None
+    field_of_study: str | None = None
+    institution: str | None = None
+    graduation_year: int | None = None
+
+
+class CvDraft(BaseModel):
+    full_name: str = ""
+    email: str = ""
+    phone: str = ""
+    education_level: EducationLevel | Literal[""] = ""
+    skills: list[CvSkill] = Field(default_factory=list)
+    experiences: list[CvExperience] = Field(default_factory=list)
+    educations: list[CvEducation] = Field(default_factory=list)
+
+
+class CvImportOut(BaseModel):
+    draft: CvDraft
+    unmatched_words: list[str]  # items of the CV's Compétences / Langues sections that match no known skill

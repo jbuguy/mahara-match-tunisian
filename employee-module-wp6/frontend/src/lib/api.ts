@@ -196,3 +196,49 @@ export async function uploadPhoto(photo: Blob): Promise<void> {
 export async function deletePhoto(): Promise<void> {
   await request('/me/photo', { method: 'DELETE' })
 }
+
+/** A profile draft read from a CV, in the profile form's shape ('' = not found). Nothing is saved yet. */
+export type CvDraft = {
+  full_name: string
+  email: string
+  phone: string
+  education_level: string
+  skills: Omit<ProfileSkill, 'skill_type'>[]
+  experiences: {
+    job_title_raw: string
+    employer_name: string
+    start_date: string
+    end_date: string
+    duration_months: string
+    description: string
+  }[]
+  educations: Omit<Education, 'id'>[]
+}
+export type CvImport = { draft: CvDraft; unmatched_words: string[] }
+
+export const MAX_CV_BYTES = 5 * 1024 * 1024
+
+/**
+ * Sends a PDF or DOCX CV and returns the draft read from it. The file isn't kept and nothing is saved.
+ * Uses XMLHttpRequest because fetch can't report upload progress (`onProgress` gets 0..1).
+ */
+export async function importCv(file: File, onProgress: (sent: number) => void): Promise<CvImport> {
+  const { data } = await supabase.auth.getSession()
+  const body = new FormData()
+  body.append('file', file)
+  const xhr = new XMLHttpRequest()
+  await new Promise<void>((resolve, reject) => {
+    xhr.open('POST', `${API_BASE_URL}/api/v1/me/cv`)
+    if (data.session) xhr.setRequestHeader('Authorization', `Bearer ${data.session.access_token}`)
+    xhr.responseType = 'json'
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) onProgress(event.loaded / event.total)
+    }
+    xhr.onload = () => resolve()
+    xhr.onerror = () => reject(new Error('network error'))
+    xhr.send(body)
+  })
+  if (xhr.status === 401) await supabase.auth.signOut({ scope: 'local' })
+  if (xhr.status < 200 || xhr.status >= 300) throw new ApiError(xhr.status, xhr.response?.detail ?? null)
+  return xhr.response
+}

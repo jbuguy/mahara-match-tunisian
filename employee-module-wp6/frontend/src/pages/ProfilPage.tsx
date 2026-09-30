@@ -118,7 +118,7 @@ function EmptyProfile() {
             </Link>
           </Button>
           <Button asChild variant="outline" size="lg">
-            <Link to="/profil/importer-cv">
+            <Link to="/profil/importer-cv" state={{ profile: null }}>
               <FileUp aria-hidden />
               Importer mon CV
             </Link>
@@ -142,12 +142,20 @@ function ProfileView({ profile, saved, photoFailed }: { profile: Profile; saved:
     <section className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <PageTitle>Mon profil</PageTitle>
-        <Button asChild variant="gold">
-          <Link to="/profil/modifier" state={{ profile }}>
-            <Pencil aria-hidden />
-            Modifier
-          </Link>
-        </Button>
+        <div className="flex flex-wrap gap-3">
+          <Button asChild variant="outline">
+            <Link to="/profil/importer-cv" state={{ profile }}>
+              <FileUp aria-hidden />
+              Importer mon CV
+            </Link>
+          </Button>
+          <Button asChild variant="gold">
+            <Link to="/profil/modifier" state={{ profile }}>
+              <Pencil aria-hidden />
+              Modifier
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {saved && (

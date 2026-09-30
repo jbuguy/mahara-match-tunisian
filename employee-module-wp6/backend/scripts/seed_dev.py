@@ -1,4 +1,4 @@
-"""Dev-only reference data: ~30 skills (SK-9001...) and ~12 occupations (OC-9001...).
+"""Dev-only reference data: ~45 skills (SK-9001...) and ~12 occupations (OC-9001...).
 
 Run from backend/:  python -m scripts.seed_dev
 Only runs when APP_ENV is dev/development. Safe to run again: rows are upserted by code.
@@ -50,6 +50,21 @@ SKILLS = [
     ("SK-9030", "Anglais", "language", ["anglais", "english"]),
     ("SK-9031", "Allemand", "language", ["allemand", "german", "deutsch"]),
     ("SK-9032", "Italien", "language", ["italien", "italian"]),
+    # Tech skills (added with CV import, so developer CVs match too)
+    ("SK-9033", "JavaScript", "hard", ["javascript", "ecmascript"]),
+    ("SK-9034", "TypeScript", "hard", ["typescript"]),
+    ("SK-9035", "Python", "hard", ["python", "django", "flask"]),
+    ("SK-9036", "Java", "hard", ["java", "jee", "j2ee"]),
+    ("SK-9037", "PHP", "hard", ["php", "laravel", "symfony"]),
+    ("SK-9038", "React", "hard", ["react", "react js", "reactjs"]),
+    ("SK-9039", "Node.js", "hard", ["node js", "nodejs", "express js", "expressjs"]),
+    ("SK-9040", "Spring Boot", "hard", ["spring boot", "spring"]),
+    ("SK-9041", "Bases de données SQL", "hard", ["sql", "mysql", "postgresql", "sqlite", "oracle", "base de donnees"]),
+    ("SK-9042", "MongoDB", "hard", ["mongodb", "mongo", "nosql"]),
+    ("SK-9043", "Git", "hard", ["git", "github", "gitlab"]),
+    ("SK-9044", "API REST", "hard", ["api rest", "rest api", "restful"]),
+    ("SK-9045", "Développement mobile", "hard", ["developpement mobile", "android", "flutter", "react native", "kotlin"]),
+    ("SK-9046", "Intelligence artificielle", "hard", ["intelligence artificielle", "machine learning", "deep learning"]),
 ]
 
 OCCUPATIONS = [
