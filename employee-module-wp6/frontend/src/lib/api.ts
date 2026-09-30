@@ -256,6 +256,18 @@ export function askAssistant(messages: ChatMessage[], draft: AssistantDraft): Pr
   })
 }
 
+export const MAX_AUDIO_BYTES = 2 * 1024 * 1024
+
+/** A voice answer as text ('' when nothing was understood). The audio isn't kept. */
+export async function transcribeAudio(audio: Blob): Promise<string> {
+  const type = audio.type.split(';')[0]
+  const extension = type.includes('ogg') ? 'ogg' : type.includes('mp4') ? 'mp4' : type.includes('wav') ? 'wav' : 'webm'
+  const body = new FormData()
+  body.append('file', audio, `voix.${extension}`) // the backend reads the real format from the bytes
+  const { text } = await api<{ text: string }>('/me/assistant/transcribe', { method: 'POST', body })
+  return text
+}
+
 /** A profile draft read from a CV, in the profile form's shape ('' = not found). Nothing is saved yet. */
 export type CvDraft = {
   full_name: string

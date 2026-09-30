@@ -2,7 +2,9 @@ import {
   CircleAlert,
   CircleCheck,
   ClipboardCheck,
+  LoaderCircle,
   MessageCircle,
+  Mic,
   RotateCcw,
   SendHorizontal,
   SkipForward,
@@ -14,8 +16,9 @@ import { inputClass } from '@/components/profile/field-attrs'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { IGNORE, type AssistantChatState, type ChatEntry } from './use-assistant-chat'
+import { useVoiceRecorder, type VoiceState } from './use-voice-recorder'
 
-const MAX_MESSAGE = 500
+const MAX_MESSAGE = 1000 // the backend's limit for one message (a minute of speech fits)
 
 /**
  * The "Assistant Mahara" chat: messages, a text box and Send. Used in the side panel (large screens) and in
@@ -34,12 +37,29 @@ export function AssistantChat({
   autoFocus?: boolean
 }) {
   const [text, setText] = useState('')
-  const inputRef = useRef<HTMLInputElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
   const logRef = useRef<HTMLDivElement>(null)
+  const focusAfterTranscript = useRef(false)
+  // A voice answer lands in the text box (after what's already typed), never sent by itself: the candidate
+  // checks it, fixes it if needed, and presses "Envoyer".
+  const voice = useVoiceRecorder((spoken) => {
+    setText((current) => (current.trim() ? `${current.trimEnd()} ${spoken}` : spoken).slice(0, MAX_MESSAGE))
+    focusAfterTranscript.current = autoFocus // large screens: ready to fix or press Enter (phones: no keyboard)
+  })
+  const voiceBusy = voice.state.status === 'recording' || voice.state.status === 'transcribing'
 
   useEffect(() => {
     if (autoFocus) inputRef.current?.focus()
   }, [autoFocus])
+
+  // After a transcript on a large screen: focus the text box (back in place of the status line), cursor at the end.
+  useEffect(() => {
+    if (voiceBusy || !focusAfterTranscript.current) return
+    focusAfterTranscript.current = false
+    const input = inputRef.current
+    input?.focus()
+    input?.setSelectionRange(input.value.length, input.value.length)
+  }, [voiceBusy])
 
   // Keep the newest message in view.
   useEffect(() => {
@@ -47,12 +67,13 @@ export function AssistantChat({
     log?.scrollTo({ top: log.scrollHeight, behavior: 'smooth' })
   }, [chat.entries.length, chat.waiting, chat.done])
 
-  function submit(event: FormEvent) {
-    event.preventDefault()
+  function submit(event?: FormEvent) {
+    event?.preventDefault()
     const message = text.trim()
-    if (!message || chat.waiting) return
+    if (!message || chat.waiting || voiceBusy) return
     chat.send(message)
     setText('')
+    voice.clearError()
     inputRef.current?.focus()
   }
 
@@ -100,32 +121,105 @@ export function AssistantChat({
         )}
       </div>
 
-      <form
-        onSubmit={submit}
-        className="flex shrink-0 items-center gap-2 border-t bg-surface p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
-      >
-        <label htmlFor="assistant-message" className="sr-only">
-          Votre réponse
-        </label>
-        <input
-          ref={inputRef}
-          id="assistant-message"
-          type="text"
-          dir="auto"
-          autoComplete="off"
-          enterKeyHint="send"
-          maxLength={MAX_MESSAGE}
-          placeholder="Écrivez votre réponse…"
-          value={text}
-          onChange={(event) => setText(event.target.value)}
-          className={cn(inputClass, 'h-11')}
-        />
-        <Button type="submit" className="shrink-0" disabled={chat.waiting || !text.trim()}>
-          <SendHorizontal aria-hidden />
-          Envoyer
-        </Button>
-      </form>
+      <div className="shrink-0 space-y-2 border-t bg-surface p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        {voice.error && (
+          <p role="alert" className="flex items-start gap-1.5 text-[14px] text-danger">
+            <CircleAlert aria-hidden className="mt-0.5 size-4 shrink-0" />
+            {voice.error}
+          </p>
+        )}
+        <form onSubmit={submit} className="space-y-2">
+          <label htmlFor="assistant-message" className="sr-only">
+            Votre réponse
+          </label>
+          {/* Full width and growing up to ~4 lines, so a spoken answer can be read in full and fixed. Enter sends. */}
+          <textarea
+            ref={inputRef}
+            id="assistant-message"
+            rows={1}
+            dir="auto"
+            autoComplete="off"
+            enterKeyHint="send"
+            maxLength={MAX_MESSAGE}
+            placeholder="Écrivez votre réponse…" // the box sizes to it too: keep it on one line
+            value={text}
+            onChange={(event) => {
+              setText(event.target.value)
+              voice.clearError()
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+                event.preventDefault()
+                submit()
+              }
+            }}
+            className={cn(inputClass, 'field-sizing-content h-auto max-h-32 min-h-11 resize-none py-2.5 leading-snug')}
+          />
+          <div className="flex items-center justify-end gap-2">
+            {voiceBusy && (
+              <p role="status" className="flex min-w-0 flex-1 items-center gap-2 text-[15px] text-ink">
+                {voice.state.status === 'transcribing' ? (
+                  <>
+                    <LoaderCircle aria-hidden className="size-5 shrink-0 animate-spin text-teal" />
+                    <span className="truncate">Transcription…</span>
+                  </>
+                ) : (
+                  <span className="truncate">
+                    Parlez… <span className="text-ink-secondary">(1 min max)</span>
+                  </span>
+                )}
+              </p>
+            )}
+            {voice.state.status === 'recording' && (
+              <Button type="button" variant="ghost" onClick={voice.cancel} className="shrink-0 px-3">
+                Annuler
+              </Button>
+            )}
+            <MicButton state={voice.state} onStart={() => void voice.start()} onStop={voice.stop} />
+            {!voiceBusy && (
+              <Button type="submit" className="shrink-0" disabled={chat.waiting || !text.trim()}>
+                <SendHorizontal aria-hidden />
+                Envoyer
+              </Button>
+            )}
+          </div>
+        </form>
+      </div>
     </div>
+  )
+}
+
+/** "Parler": starts recording; while recording it's red with a pulsing dot and the time, and stops it. */
+function MicButton({ state, onStart, onStop }: { state: VoiceState; onStart: () => void; onStop: () => void }) {
+  if (state.status === 'recording') {
+    const minutes = Math.floor(state.seconds / 60)
+    const seconds = String(state.seconds % 60).padStart(2, '0')
+    return (
+      <Button
+        type="button"
+        onClick={onStop}
+        aria-label={`Arrêter l'enregistrement (${minutes} min ${seconds} s)`}
+        className="h-11 shrink-0 gap-2 bg-danger px-3.5 text-white hover:bg-danger/90"
+      >
+        <span aria-hidden className="size-2.5 animate-pulse rounded-full bg-white" />
+        <span aria-hidden className="tabular-nums">
+          {minutes}:{seconds}
+        </span>
+      </Button>
+    )
+  }
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      aria-label="Parler"
+      disabled={state.status !== 'idle'}
+      onClick={onStart}
+      className="shrink-0 text-teal"
+    >
+      <Mic aria-hidden />
+      Parler
+    </Button>
   )
 }
 
