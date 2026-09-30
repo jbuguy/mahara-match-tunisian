@@ -1,11 +1,14 @@
-import { Clock } from 'lucide-react'
+import { ArrowLeft, Clock } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { Link } from 'react-router'
+
+import { Button } from '@/components/ui/button'
 
 export function PageTitle({ children }: { children: ReactNode }) {
   return <h1 className="text-2xl text-ink lg:text-3xl">{children}</h1>
 }
 
-function ComingSoon({ title }: { title: string }) {
+function ComingSoon({ title, backTo }: { title: string; backTo?: { to: string; label: string } }) {
   return (
     <section className="space-y-4">
       <PageTitle>{title}</PageTitle>
@@ -13,6 +16,14 @@ function ComingSoon({ title }: { title: string }) {
         <Clock aria-hidden className="size-5 shrink-0 text-teal" />
         <p>Bientôt disponible</p>
       </div>
+      {backTo && (
+        <Button asChild variant="outline">
+          <Link to={backTo.to}>
+            <ArrowLeft aria-hidden />
+            {backTo.label}
+          </Link>
+        </Button>
+      )}
     </section>
   )
 }
@@ -29,11 +40,10 @@ export function FormationPage() {
   return <ComingSoon title="Formation" />
 }
 
-export function ProfilPage() {
-  return (
-    <section className="space-y-4">
-      <PageTitle>Mon profil</PageTitle>
-      <p className="text-ink-secondary">Votre profil apparaîtra ici.</p>
-    </section>
-  )
+export function ProfilFormPage() {
+  return <ComingSoon title="Mon profil" backTo={{ to: '/profil', label: 'Retour au profil' }} />
+}
+
+export function CvImportPage() {
+  return <ComingSoon title="Importer mon CV" backTo={{ to: '/profil', label: 'Retour au profil' }} />
 }

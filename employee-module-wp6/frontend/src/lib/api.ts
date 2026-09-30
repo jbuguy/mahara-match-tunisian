@@ -38,3 +38,58 @@ export type Me = { id: string; email: string; name: string | null; has_profile: 
 export function getMe(): Promise<Me> {
   return api<Me>('/me')
 }
+
+export type Governorate = { code: string; name_fr: string; name_ar: string }
+export type ProfileSkill = {
+  code: string
+  label_fr: string
+  skill_type: 'hard' | 'soft' | 'language'
+  level: number
+  source: 'self_declared' | 'cv'
+  confidence: number | null
+}
+export type Experience = {
+  id: string
+  job_title_raw: string
+  employer_name: string | null
+  start_date: string | null
+  end_date: string | null
+  duration_months: number | null
+  description: string | null
+}
+export type Education = {
+  id: string
+  level: string | null
+  field_of_study: string | null
+  institution: string | null
+  graduation_year: number | null
+}
+export type Profile = {
+  full_name: string | null
+  email: string | null
+  phone: string | null
+  onboarding_path: 'cv_upload' | 'derja_detailed'
+  literacy_level: string
+  governorate: Governorate | null
+  education_level: string | null
+  years_experience: number | null
+  languages: { code: string; level: string }[]
+  summary: string | null
+  available_from: string | null
+  consent_version: string | null
+  consent_given_at: string | null
+  skills: ProfileSkill[]
+  experiences: Experience[]
+  educations: Education[]
+  desired_occupations: { code: string; title_fr: string; priority: number | null }[]
+}
+
+/** The candidate's profile, or null when it hasn't been created yet (404). */
+export async function getProfile(): Promise<Profile | null> {
+  try {
+    return await api<Profile>('/me/profile')
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) return null
+    throw error
+  }
+}

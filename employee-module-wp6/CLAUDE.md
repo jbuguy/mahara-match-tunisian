@@ -161,18 +161,28 @@ Each session's details come in its prompt; don't build ahead.
 - 2026-09-30 · Session 2, Google login: PKCE sign-in with supabase-js, `/auth/callback`, route guard, sign-out in
   sidebar/drawer/top-bar menu, `api()` helper (Bearer token, 401 → sign out); backend `app/auth.py` (ES256 via JWKS,
   users row by lower-cased email) and `GET /api/v1/me`. See `docs/sessions/02-auth.md`.
+- 2026-09-30 · Session 3, profile API: `scripts/seed_dev.py` (32 skills, 12 occupations), `/reference/*` search,
+  `GET/PUT /api/v1/me/profile` (one transaction, 422 per unknown code), DB tests in rolled-back transactions,
+  Profil page (empty state + full view), placeholders `/profil/modifier` and `/profil/importer-cv`.
+  See `docs/sessions/03-profile-api.md`.
 
 ## Current status
 
 *(overwrite this section each session; it's the single source of truth for "where are we")*
 
-- Last completed: Session 2, Google login (sign-in, sign-out, route guard, `GET /api/v1/me`), checked in the browser
-- Next up: Session 3, profile API + Profil page (seed skills and occupations)
-- Supabase: my own project with `db/schema.sql` applied and Google provider enabled; Redirect URLs include
-  `http://localhost:5173/auth/callback` (switch to the team project in Session 6)
-- `.env` has all names from `.env.example` set (`DATABASE_URL`, `SUPABASE_URL`, `VITE_SUPABASE_URL`,
-  `VITE_SUPABASE_PUBLISHABLE_KEY`, `VITE_API_BASE_URL`); no new names in Session 2
+- Last completed: Session 3, profile API + Profil page, checked in the browser (empty state for my account)
+- Next up: Session 4, profile form (3 steps, create + edit) at `/profil/modifier`, saving with `PUT /api/v1/me/profile`
+- Supabase: my own project with `db/schema.sql` applied, Google provider enabled, and `seed_dev.py` run
+  (SK-9001…SK-9032, OC-9001…OC-9012); Redirect URLs include `http://localhost:5173/auth/callback`
+  (switch to the team project in Session 6)
+- `.env` has all names from `.env.example` set; no new names in Session 3. `APP_ENV` must be `dev` or `development`
+  for the seed script to run
 - Auth pieces to reuse: backend `Depends(get_current_user)` → `CurrentUser(user, name)`; frontend `api<T>(path)`
   in `src/lib/api.ts`, `useAuth()` in `src/lib/auth-context.ts`
+- Profile pieces to reuse: request model `ProfileIn` in `backend/app/schemas.py` (`consent: true` required, `from_cv`,
+  codes for governorate/skills/occupations, `languages` as `[{code: ISO 639-1, level: basic|intermediate|fluent|native}]`);
+  unknown codes → 422 in FastAPI's own error shape (`loc` + `input`); frontend types + `getProfile()` in `src/lib/api.ts`,
+  French labels in `src/lib/labels.ts`; search with `GET /api/v1/reference/{governorates,skills,occupations}?q=`
+- Tests: 28; profile and reference tests use the real database inside a rolled-back transaction (skipped if unreachable)
 - Known issues / TODO: rotate the Google OAuth client secret (shared in chat in Session 2) and the database password
-  (shared in chat in Session 1, possibly again in Session 2); keep `%` encoded as `%25` in `DATABASE_URL`
+  (shared in chat in Session 1, possibly again in Session 2), not confirmed done yet; keep `%` encoded as `%25` in `DATABASE_URL`

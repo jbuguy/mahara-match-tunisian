@@ -49,9 +49,15 @@ Python 3.14 is what's installed on the dev machine. The code needs 3.12 or newer
 cd backend
 py -m venv .venv                          # Windows (macOS/Linux: python3 -m venv .venv)
 .venv/Scripts/python -m pip install -r requirements.txt   # macOS/Linux: .venv/bin/python
+.venv/Scripts/python -m scripts.seed_dev  # dev skills (SK-9001...) and occupations (OC-9001...), once
 .venv/Scripts/python -m uvicorn app.main:app --reload --port 8006
-.venv/Scripts/python -m pytest            # tests, no database needed
+.venv/Scripts/python -m pytest -rs        # tests
 ```
+
+The seed script only runs when `APP_ENV` is `dev` or `development`. Running it again is safe.
+
+The profile and reference tests use the database from `DATABASE_URL`. Each test runs inside a transaction that is rolled back,
+so nothing is kept. They are skipped when the database can't be reached (`-rs` shows why).
 
 Check it: <http://localhost:8006/api/v1/health> should return `{"status":"ok","governorates":24}`.
 
