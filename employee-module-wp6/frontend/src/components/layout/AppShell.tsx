@@ -7,6 +7,7 @@ import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/
 import { cn } from '@/lib/utils'
 import { Logo } from './Logo'
 import { NAV_ITEMS } from './nav'
+import { SidebarUser, TopBarUserMenu } from './UserBits'
 
 /** Nav links on teal. Active: light fill + 3px gold right border. */
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
@@ -46,6 +47,7 @@ export function AppShell() {
           <Logo inverted />
         </div>
         <NavLinks />
+        <SidebarUser />
       </aside>
 
       <div className="lg:pl-60">
@@ -63,8 +65,9 @@ export function AppShell() {
         </header>
 
         {/* 1024px and up: 72px top bar */}
-        <header className="sticky top-0 z-30 hidden h-18 items-center border-b bg-surface px-8 lg:flex">
+        <header className="sticky top-0 z-30 hidden h-18 items-center justify-between border-b bg-surface px-8 lg:flex">
           <span className="font-heading text-lg font-semibold text-ink">{current?.label ?? 'Mahara'}</span>
+          <TopBarUserMenu />
         </header>
 
         <main className="mx-auto w-full max-w-5xl px-4 py-6 lg:px-8 lg:py-8">
@@ -80,6 +83,7 @@ export function AppShell() {
           <SheetTitle className="sr-only">Menu</SheetTitle>
           <SheetDescription className="sr-only">Pages de l'espace candidat</SheetDescription>
           <NavLinks onNavigate={() => setDrawerOpen(false)} />
+          <SidebarUser />
         </SheetContent>
       </Sheet>
     </div>

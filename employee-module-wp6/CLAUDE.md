@@ -158,14 +158,21 @@ Each session's details come in its prompt; don't build ahead.
 - 2026-09-30 · Session 1, foundation: `db/schema.sql` (10 tables, 24 governorates, run on my project), FastAPI
   `/api/v1/health` + models, Vite/React app shell (sidebar ≥1024px, drawer below) with placeholder pages.
   See `docs/sessions/01-foundation.md`.
+- 2026-09-30 · Session 2, Google login: PKCE sign-in with supabase-js, `/auth/callback`, route guard, sign-out in
+  sidebar/drawer/top-bar menu, `api()` helper (Bearer token, 401 → sign out); backend `app/auth.py` (ES256 via JWKS,
+  users row by lower-cased email) and `GET /api/v1/me`. See `docs/sessions/02-auth.md`.
 
 ## Current status
 
 *(overwrite this section each session; it's the single source of truth for "where are we")*
 
-- Last completed: Session 1, foundation (schema, `/health`, app shell, placeholder pages)
-- Next up: Session 2, Google login
-- Supabase: my own project with `db/schema.sql` applied, incl. role/status checks (switch to the team project in Session 6)
-- `.env` currently has only `DATABASE_URL`; Session 2 needs `SUPABASE_URL`, `VITE_SUPABASE_URL`,
-  `VITE_SUPABASE_PUBLISHABLE_KEY` added by me, and Google enabled in Supabase (Authentication → Providers)
-- Known issues / TODO: database password was shared in a chat once; rotate it (keep `%` encoded as `%25` in the URL)
+- Last completed: Session 2, Google login (sign-in, sign-out, route guard, `GET /api/v1/me`), checked in the browser
+- Next up: Session 3, profile API + Profil page (seed skills and occupations)
+- Supabase: my own project with `db/schema.sql` applied and Google provider enabled; Redirect URLs include
+  `http://localhost:5173/auth/callback` (switch to the team project in Session 6)
+- `.env` has all names from `.env.example` set (`DATABASE_URL`, `SUPABASE_URL`, `VITE_SUPABASE_URL`,
+  `VITE_SUPABASE_PUBLISHABLE_KEY`, `VITE_API_BASE_URL`); no new names in Session 2
+- Auth pieces to reuse: backend `Depends(get_current_user)` → `CurrentUser(user, name)`; frontend `api<T>(path)`
+  in `src/lib/api.ts`, `useAuth()` in `src/lib/auth-context.ts`
+- Known issues / TODO: rotate the Google OAuth client secret (shared in chat in Session 2) and the database password
+  (shared in chat in Session 1, possibly again in Session 2); keep `%` encoded as `%25` in `DATABASE_URL`

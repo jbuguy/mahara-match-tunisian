@@ -28,6 +28,19 @@ Only `VITE_*` names reach the browser, so `DATABASE_URL` never does.
 Open your Supabase project → **SQL Editor** → **New query**. Paste all of [db/schema.sql](db/schema.sql) and click **Run**.
 It creates the tables (row level security on, no policies) and inserts the 24 governorates. Running it again is safe.
 
+## 2b. Google login (once)
+
+1. Google Cloud Console → APIs & Services → Credentials → create an **OAuth client ID** of type **Web application**.
+   - Authorized JavaScript origin: `http://localhost:5173`
+   - Authorized redirect URI: the **Callback URL** shown in Supabase's Google provider panel (`https://<ref>.supabase.co/auth/v1/callback`)
+2. Supabase → Authentication → Sign In / Providers → **Google**: enable it, paste the Client ID and Client Secret
+   (clear the field first; nothing before or after `GOCSPX-…`), and save.
+3. Supabase → Authentication → URL Configuration: **Site URL** `http://localhost:5173`, and add
+   `http://localhost:5173/auth/callback` to **Redirect URLs**.
+
+If sign-in fails, `/auth/callback` shows a grey "Détail : …" line. "Unable to exchange external code" means Google
+rejected the Client ID/Secret saved in Supabase.
+
 ## 3. Backend
 
 Python 3.14 is what's installed on the dev machine. The code needs 3.12 or newer.
@@ -51,4 +64,5 @@ npm run dev      # http://localhost:5173
 npm run build    # type-check + production build
 ```
 
-The Accueil page shows an **API : ok / erreur** badge, which comes from the health endpoint above.
+Every page except `/login` and `/auth/callback` needs a Google sign-in. The Accueil page shows an
+**API : ok / erreur** badge, which comes from the health endpoint above.
