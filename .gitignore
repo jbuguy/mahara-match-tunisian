@@ -5,3 +5,4 @@ __pycache__/
 .pytest_cache/
 .venv/
 venv/
+employer-agent-wp4/employer_agent_wp4/static/
