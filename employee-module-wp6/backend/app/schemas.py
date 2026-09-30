@@ -263,3 +263,83 @@ class CvDraft(BaseModel):
 class CvImportOut(BaseModel):
     draft: CvDraft
     unmatched_words: list[str]  # items of the CV's Compétences / Langues sections that match no known skill
+
+
+# ---------------------------------------------------------------------------
+# Profile assistant: POST /me/assistant/chat (nothing is saved)
+# ---------------------------------------------------------------------------
+
+DraftText = Annotated[str, StringConstraints(max_length=5000)]
+
+
+class ChatMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=1000)]
+
+
+class DraftSkill(BaseModel):
+    code: DraftText = ""
+    label_fr: DraftText = ""
+    level: int | None = None
+
+
+class DraftExperience(BaseModel):
+    job_title_raw: DraftText = ""
+    employer_name: DraftText = ""
+    start_date: DraftText = ""
+    end_date: DraftText = ""
+    duration_months: DraftText = ""
+
+
+class DraftOccupation(BaseModel):
+    code: DraftText = ""
+    title_fr: DraftText = ""
+
+
+class DraftLanguage(BaseModel):
+    code: DraftText = ""
+    level: DraftText = ""
+
+
+class AssistantDraft(BaseModel):
+    """The profile form as it is now. The frontend sends its form values; keys not listed here are ignored."""
+
+    full_name: DraftText = ""
+    phone: DraftText = ""
+    governorate_code: DraftText = ""
+    education_level: DraftText = ""
+    skills: list[DraftSkill] = Field(default_factory=list, max_length=100)
+    experiences: list[DraftExperience] = Field(default_factory=list, max_length=50)
+    desired_occupations: list[DraftOccupation] = Field(default_factory=list, max_length=10)
+    languages: list[DraftLanguage] = Field(default_factory=list, max_length=20)
+    summary: DraftText = ""
+
+
+class AssistantChatIn(BaseModel):
+    messages: list[ChatMessage] = Field(min_length=1, max_length=100)  # only the last 8 go to the model
+    draft: AssistantDraft = Field(default_factory=AssistantDraft)
+
+
+class AssistantUpdates(BaseModel):
+    """Fields to merge into the form, in its own shape (like the CV draft). A field left out is unchanged."""
+
+    full_name: str | None = None
+    phone: str | None = None
+    governorate_code: str | None = None
+    education_level: EducationLevel | None = None
+    skills: list[CvSkill] | None = None
+    experiences: list[CvExperience] | None = None
+    desired_occupations: list[OccupationOut] | None = None
+    languages: list[LanguageOut] | None = None
+    summary: str | None = None
+
+
+class AssistantChatOut(BaseModel):
+    reply: str
+    updates: AssistantUpdates
+    unmatched: list[str]  # skills and jobs the candidate named that aren't in our lists
+    # When something didn't match: close items of our lists the candidate can pick instead (labels).
+    suggestions: list[str] = []
+    # The form field the reply asks about (full_name, governorate_code, skills...), so the form can show it.
+    asking: str | None = None
+    done: bool

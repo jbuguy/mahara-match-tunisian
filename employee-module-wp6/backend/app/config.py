@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     supabase_url: str | None = None
     cors_origins: str = "http://localhost:5173"
     app_env: str = "development"
+    # Profile assistant (Groq free plan). Read only here, on the backend: never sent to the browser.
+    groq_api_key: str | None = None
+    groq_model: str = "openai/gpt-oss-120b"
 
     @property
     def cors_origin_list(self) -> list[str]:

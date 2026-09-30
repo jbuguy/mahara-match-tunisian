@@ -7,5 +7,6 @@ PyJWT[crypto]
 python-multipart
 pypdf
 python-docx
+groq
 pytest
 httpx2
