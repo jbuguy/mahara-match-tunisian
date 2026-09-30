@@ -1,132 +1,617 @@
-# WP3 - Skill Matching Engine
+WP3 - Skill Matching Engine API
+ 0.1.0 
+OAS 3.1
+/openapi.json
+CV → profil au format WP1 → offres → matching → roadmap.
 
-Module de la Plateforme Intelligente d'Emploi (Tunisie) qui calcule la pertinence
-entre un profil candidat et des offres d'emploi, détecte les compétences manquantes
-(gaps) et génère une roadmap de formation.
+1 · Parser le CV (format WP1)
 
-**Responsables :** Siwar (1ère), Shayma (2ème)
 
-## Rôle dans l'architecture
+POST
+/api/v1/parse-cv
+Parser Cv
 
-| | Détail |
-|---|---|
-| **Consomme** | WP2 (profils candidats JSON), WP1 (offres, taxonomie, formats) |
-| **Alimente** | WP4 (candidats scorés), WP6 (offres triées et roadmaps) |
-| **Contrats de données** | `data-layer-wp1/contracts/` (voir `MatchResult`, `RankedMatches`, `Roadmap`) |
 
-## Structure
+CV (PDF ou DOCX) -> profil au format WP1, sans donnees personnelles.
 
-```
-skill-matching-wp3/
-├── main.py            # API FastAPI (endpoints)
-├── cv_parser.py       # Lecture d'un CV (PDF/DOCX) -> dictionnaire brut
-├── cv_adapter.py      # Brut -> profil au format du contrat WP1 (sans PII)
-├── scoring.py         # Scores, gaps, classement, roadmap
-├── test_adapter.py    # Vérifie parser + adaptateur + contrat WP1
-├── test_scoring.py    # Vérifie scoring + contrat WP1
-├── data/              # CV d'exemple (cv_exemple.docx)
-└── requirements.txt
-```
+Parameters
+Cancel
+Reset
+Name	Description
+candidat_id *
+string
+(query)
+demo
+governorate_code
+string | (string | null)
+(query)
+emo
+Request body
 
-## Installation
+multipart/form-data
+fichier *
+string
+cv_exemple.docx
+Execute
+Clear
+Responses
+Curl
 
-Depuis le dossier `skill-matching-wp3` :
+curl -X 'POST' \
+  'http://localhost:8000/api/v1/parse-cv?candidat_id=demo&governorate_code=emo' \
+  -H 'accept: */*' \
+  -H 'Content-Type: multipart/form-data' \
+  -F 'fichier=@cv_exemple.docx;type=application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+Request URL
+http://localhost:8000/api/v1/parse-cv?candidat_id=demo&governorate_code=emo
+Server response
+Code	Details
+200	
+Response body
+Download
+{
+  "status": "success",
+  "candidat_id": "demo",
+  "profil": {
+    "schema_version": "1.0",
+    "candidate_id": null,
+    "onboarding_path": "cv_upload",
+    "literacy_level": "literate",
+    "preferred_language": "fr",
+    "location": {
+      "governorate_code": "emo"
+    },
+    "mobility": {
+      "radius_km": 0,
+      "governorates": []
+    },
+    "years_experience": 5,
+    "skills": [
+      {
+        "label_raw": "Python",
+        "skill_type": "hard",
+        "level": 2,
+        "source": "cv",
+        "confidence": 0.6
+      },
+      {
+        "label_raw": "Django",
+        "skill_type": "hard",
+        "level": 2,
+        "source": "cv",
+        "confidence": 0.6
+      },
+      {
+        "label_raw": "SQL",
+        "skill_type": "hard",
+        "level": 2,
+        "source": "cv",
+        "confidence": 0.6
+      },
+      {
+        "label_raw": "Docker",
+        "skill_type": "hard",
+        "level": 2,
+        "source": "cv",
+        "confidence": 0.6
+      },
+      {
+        "label_raw": "AWS",
+        "skill_type": "hard",
+        "level": 2,
+        "source": "cv",
+        "confidence": 0.6
+      },
+      {
+        "label_raw": "Git",
+        "skill_type": "hard",
+        "level": 2,
+        "source": "cv",
+        "confidence": 0.6
+      },
+      {
+        "label_raw": "Communication",
+        "skill_type": "soft",
+        "level": 2,
+        "source": "cv",
+        "confidence": 0.6
+      },
+      {
+        "label_raw": "Autonomie",
+        "skill_type": "soft",
+        "level": 2,
+        "source": "cv",
+        "confidence": 0.6
+      },
+      {
+        "label_raw": "Leadership",
+        "skill_type": "soft",
+        "level": 2,
+        "source": "cv",
+        "confidence": 0.6
+      }
+    ],
+    "summary": "Developpeur backend avec 5 ans d'experience dans la conception d'applications web et le deploiement cloud. Passionne par les architectures scalables et le travail en equipe.",
+    "source_document_ids": [
+      "b5c4a791-d2ca-432c-93e0-bb2b27970d82"
+    ]
+  }
+}
+Response headers
+ content-length: 1304 
+ content-type: application/json 
+ date: Wed,30 Sep 2026 20:20:09 GMT 
+ server: uvicorn 
+Responses
+Code	Description	Links
+200	
+Successful Response
 
-```powershell
-python -m venv venv
-.\venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-pip install -e ..\data-layer-wp1     # contrats WP1 (nécessaire pour les tests)
-```
+Media type
 
-## Lancer l'API
+application/json
+Controls Accept header.
+Example Value
+Schema
+"string"
+No links
+422	
+Validation Error
 
-```powershell
-python main.py
-```
+Media type
 
-Documentation interactive : http://localhost:8000/docs
+application/json
+Example Value
+Schema
+{
+  "detail": [
+    {
+      "loc": [
+        "string",
+        0
+      ],
+      "msg": "string",
+      "type": "string",
+      "input": "string",
+      "ctx": {}
+    }
+  ]
+}
+No links
+2 · Lire les offres
 
-## Endpoints
 
-| Méthode | URL | Entrée | Sortie |
-|---|---|---|---|
-| GET | `/` | - | message de santé |
-| POST | `/api/v1/parse-cv` | fichier `.pdf`/`.docx`, `candidat_id`, `governorate_code` (optionnel) | profil au format WP1 |
-| POST | `/api/v1/match` | `{ "profil": {...}, "offres": [...] }` | offres classées, scores, gaps |
-| POST | `/api/v1/roadmap` | `{ "profil": {...}, "offre": {...} }` | roadmap de formation |
+GET
+/api/v1/offres
+Lister Offres
 
-Note : pour l'instant, les offres sont envoyées dans la requête. Elles viendront de
-la base de données WP1 quand elle sera disponible.
 
-## Formule de scoring
+Lit les offres dans data/offres_exemple.json.
 
-```
-score_global = 0.50 x hard_skills
-             + 0.20 x experience
-             + 0.15 x soft_skills
-             + 0.15 x localisation
-```
+Parameters
+Cancel
+No parameters
 
-Chaque critère est noté sur 100 :
+Execute
+Clear
+Responses
+Curl
 
-- **Hard skills / soft skills** : pour chaque compétence de l'offre,
-  `crédit = min(niveau_candidat / niveau_requis, 1)`. Moyenne pondérée : compétence
-  obligatoire = poids 1, facultative = poids 0.5. Une compétence absente vaut 0.
-  Si l'offre ne demande aucune compétence de la catégorie, le score est 100.
-- **Expérience** : `min(années_candidat / années_requises, 1) x 100` (100 si aucune exigence).
-- **Localisation** : 100 si même gouvernorat, 70 si le gouvernorat de l'offre est dans
-  la mobilité du candidat, 0 sinon, 50 si l'information manque.
+curl -X 'GET' \
+  'http://localhost:8000/api/v1/offres' \
+  -H 'accept: */*'
+Request URL
+http://localhost:8000/api/v1/offres
+Server response
+Code	Details
+200	
+Response body
+Download
+[
+  {
+    "job_offer_id": "offre-backend",
+    "min_years_experience": 3,
+    "location": {
+      "governorate_code": "TN-71"
+    },
+    "skills": [
+      {
+        "label_raw": "Python",
+        "requirement": "required",
+        "min_level": 3
+      },
+      {
+        "label_raw": "Django",
+        "requirement": "required",
+        "min_level": 3
+      },
+      {
+        "label_raw": "SQL",
+        "requirement": "required",
+        "min_level": 2
+      },
+      {
+        "label_raw": "Kubernetes",
+        "requirement": "preferred",
+        "min_level": 2
+      }
+    ]
+  },
+  {
+    "job_offer_id": "offre-devops",
+    "min_years_experience": 4,
+    "location": {
+      "governorate_code": "TN-71"
+    },
+    "skills": [
+      {
+        "label_raw": "Docker",
+        "requirement": "required",
+        "min_level": 2
+      },
+      {
+        "label_raw": "AWS",
+        "requirement": "required",
+        "min_level": 2
+      },
+      {
+        "label_raw": "Git",
+        "requirement": "required",
+        "min_level": 2
+      },
+      {
+        "label_raw": "Kubernetes",
+        "requirement": "required",
+        "min_level": 3
+      }
+    ]
+  },
+  {
+    "job_offer_id": "offre-backend-tunis",
+    "min_years_experience": 2,
+    "location": {
+      "governorate_code": "TN-11"
+    },
+    "skills": [
+      {
+        "label_raw": "Python",
+        "requirement": "required",
+        "min_level": 2
+      },
+      {
+        "label_raw": "SQL",
+        "requirement": "required",
+        "min_level": 2
+      },
+      {
+        "label_raw": "Communication",
+        "requirement": "preferred",
+        "min_level": 2
+      }
+    ]
+  },
+  {
+    "job_offer_id": "offre-agricole",
+    "min_years_experience": 2,
+    "location": {
+      "governorate_code": "TN-51"
+    },
+    "skills": [
+      {
+        "label_raw": "Irrigation",
+        "requirement": "required",
+        "min_level": 2
+      }
+    ]
+  }
+]
+Response headers
+ content-length: 1196 
+ content-type: application/json 
+ date: Wed,30 Sep 2026 20:20:19 GMT 
+ server: uvicorn 
+Responses
+Code	Description	Links
+200	
+Successful Response
 
-### Exemple
+Media type
 
-Profil : Python 2, Django 2, SQL 2, 5 ans d'expérience, TN-71.
-Offre : Python 3 (oblig.), Django 3 (oblig.), SQL 2 (oblig.), Kubernetes 2 (facult.), 3 ans, TN-71.
+application/json
+Controls Accept header.
+Example Value
+Schema
+"string"
+No links
+3 · Matching (scores)
 
-```
-hard_skills = (0.67 + 0.67 + 1 + 0) / 3.5 = 66.7
-experience  = 100   |   soft_skills = 100   |   localisation = 100
-score_global = 0.5x66.7 + 0.2x100 + 0.15x100 + 0.15x100 = 83.3
-```
 
-## Gaps et roadmap
+POST
+/api/v1/match
+Match Candidat Offres
 
-- **Gap `missing`** : compétence de l'offre absente du profil.
-- **Gap `insufficient_level`** : compétence présente mais niveau inférieur au niveau requis.
-- **Roadmap** : un pas par gap, numérotés de 1 à n ; obligatoires d'abord, puis
-  manquantes avant niveau insuffisant.
 
-## Comparaison des compétences
+Score du candidat pour chaque offre, classe du meilleur au moins bon, avec le detail et les gaps.
 
-Une compétence est identifiée par son `skill_code` (taxonomie WP1) si elle en a un,
-sinon par son `label_raw` normalisé (minuscules, sans accents).
+Parameters
+Cancel
+Name	Description
+candidat_id *
+string
+(query)
+demo
+Execute
+Clear
+Responses
+Curl
 
-## Tests
+curl -X 'POST' \
+  'http://localhost:8000/api/v1/match?candidat_id=demo' \
+  -H 'accept: */*' \
+  -d ''
+Request URL
+http://localhost:8000/api/v1/match?candidat_id=demo
+Server response
+Code	Details
+200	
+Response body
+Download
+{
+  "subject_id": null,
+  "subject_type": "candidate",
+  "items": [
+    {
+      "candidate_id": null,
+      "job_offer_id": "offre-backend-tunis",
+      "score_global": 85,
+      "breakdown": {
+        "hard_skills": 100,
+        "experience": 100,
+        "soft_skills": 100,
+        "location": 0
+      },
+      "weights": {
+        "hard_skills": 0.5,
+        "experience": 0.2,
+        "soft_skills": 0.15,
+        "location": 0.15
+      },
+      "gaps": [],
+      "model_version": "wp3-hybrid-0.1",
+      "computed_at": "2026-09-30T20:20:36.047373+00:00"
+    },
+    {
+      "candidate_id": null,
+      "job_offer_id": "offre-devops",
+      "score_global": 72.5,
+      "breakdown": {
+        "hard_skills": 75,
+        "experience": 100,
+        "soft_skills": 100,
+        "location": 0
+      },
+      "weights": {
+        "hard_skills": 0.5,
+        "experience": 0.2,
+        "soft_skills": 0.15,
+        "location": 0.15
+      },
+      "gaps": [
+        {
+          "gap_type": "missing",
+          "requirement": "required",
+          "required_level": 3,
+          "label_raw": "Kubernetes"
+        }
+      ],
+      "model_version": "wp3-hybrid-0.1",
+      "computed_at": "2026-09-30T20:20:36.047021+00:00"
+    },
+    {
+      "candidate_id": null,
+      "job_offer_id": "offre-backend",
+      "score_global": 68.3,
+      "breakdown": {
+        "hard_skills": 66.7,
+        "experience": 100,
+        "soft_skills": 100,
+        "location": 0
+      },
+      "weights": {
+        "hard_skills": 0.5,
+        "experience": 0.2,
+        "soft_skills": 0.15,
+        "location": 0.15
+      },
+      "gaps": [
+        {
+          "gap_type": "insufficient_level",
+          "requirement": "required",
+          "required_level": 3,
+          "label_raw": "Python",
+          "current_level": 2
+        },
+        {
+          "gap_type": "insufficient_level",
+          "requirement": "required",
+          "required_level": 3,
+          "label_raw": "Django",
+          "current_level": 2
+        },
+        {
+          "gap_type": "missing",
+          "requirement": "preferred",
+          "required_level": 2,
+          "label_raw": "Kubernetes"
+        }
+      ],
+      "model_version": "wp3-hybrid-0.1",
+      "computed_at": "2026-09-30T20:20:36.046655+00:00"
+    },
+    {
+      "candidate_id": null,
+      "job_offer_id": "offre-agricole",
+      "score_global": 35,
+      "breakdown": {
+        "hard_skills": 0,
+        "experience": 100,
+        "soft_skills": 100,
+        "location": 0
+      },
+      "weights": {
+        "hard_skills": 0.5,
+        "experience": 0.2,
+        "soft_skills": 0.15,
+        "location": 0.15
+      },
+      "gaps": [
+        {
+          "gap_type": "missing",
+          "requirement": "required",
+          "required_level": 2,
+          "label_raw": "Irrigation"
+        }
+      ],
+      "model_version": "wp3-hybrid-0.1",
+      "computed_at": "2026-09-30T20:20:36.047644+00:00"
+    }
+  ],
+  "generated_at": "2026-09-30T20:20:36.047671+00:00"
+}
+Response headers
+ content-length: 1956 
+ content-type: application/json 
+ date: Wed,30 Sep 2026 20:20:35 GMT 
+ server: uvicorn 
+Responses
+Code	Description	Links
+200	
+Successful Response
 
-Avec le venv activé :
+Media type
 
-```powershell
-python test_adapter.py    # CV -> profil -> validation par CandidateProfile (WP1)
-python test_scoring.py    # scoring -> validation par MatchResult, RankedMatches, Roadmap
-```
+application/json
+Controls Accept header.
+Example Value
+Schema
+"string"
+No links
+422	
+Validation Error
 
-Les tests ne sont pas utilisés par l'API : ils servent à vérifier que le module
-respecte les contrats du WP1.
+Media type
 
-## Limites actuelles
+application/json
+Example Value
+Schema
+{
+  "detail": [
+    {
+      "loc": [
+        "string",
+        0
+      ],
+      "msg": "string",
+      "type": "string",
+      "input": "string",
+      "ctx": {}
+    }
+  ]
+}
+No links
+4 · Roadmap (compétences manquantes)
 
-- Taxonomie WP1 non disponible : les compétences du CV n'ont pas de `skill_code`
-  (elles sont envoyées avec `label_raw`).
-- Niveau de compétence par défaut = 2 et confiance = 0.6 (un CV ne donne pas le niveau).
-- Pas de catalogue de formations : les étapes de roadmap n'ont pas de `training_course_id`.
-- Pas de recherche sémantique : "JS" et "JavaScript" ne sont pas rapprochés.
-- Le parser reconnaît les sections d'un CV par leurs titres (voir `TITRES_SECTIONS`
-  dans `cv_parser.py`).
 
-## Prochaines étapes
+GET
+/api/v1/roadmap/{candidat_id}/{offre_id}
+Obtenir Roadmap
 
-- [ ] Embeddings et recherche sémantique (dimension 768, RAG) - SCRUM-36, SCRUM-37
-- [ ] Brancher la taxonomie WP1 (`skill_code`) dans l'adaptateur
-- [ ] Brancher le catalogue de formations dans la roadmap
-- [ ] Récupérer les offres depuis la base WP1
-- [ ] Neutralisation des biais (genre, âge, origine) dans le scoring
+
+Competences a acquerir (obligatoires d'abord) pour viser cette offre.
+
+Parameters
+Cancel
+Name	Description
+candidat_id *
+string
+(path)
+demo
+offre_id *
+string
+(path)
+offre-devops
+Execute
+Clear
+Responses
+Curl
+
+curl -X 'GET' \
+  'http://localhost:8000/api/v1/roadmap/demo/offre-devops' \
+  -H 'accept: */*'
+Request URL
+http://localhost:8000/api/v1/roadmap/demo/offre-devops
+Server response
+Code	Details
+200	
+Response body
+Download
+{
+  "candidate_id": null,
+  "target_job_offer_id": "offre-devops",
+  "status": "active",
+  "progress_pct": 0,
+  "steps": [
+    {
+      "position": 1,
+      "status": "todo",
+      "label_raw": "Kubernetes"
+    }
+  ],
+  "model_version": "wp3-roadmap-0.1"
+}
+Response headers
+ content-length: 193 
+ content-type: application/json 
+ date: Wed,30 Sep 2026 20:23:00 GMT 
+ server: uvicorn 
+Responses
+Code	Description	Links
+200	
+Successful Response
+
+Media type
+
+application/json
+Controls Accept header.
+Example Value
+Schema
+"string"
+No links
+422	
+Validation Error
+
+Media type
+
+application/json
+Example Value
+Schema
+{
+  "detail": [
+    {
+      "loc": [
+        "string",
+        0
+      ],
+      "msg": "string",
+      "type": "string",
+      "input": "string",
+      "ctx": {}
+    }
+  ]
+}
+No links
+
+Schemas
+Body_parser_cv_api_v1_parse_cv_postExpand allobject
+HTTPValidationErrorExpand allobject
+ValidationErrorExpand allobject
