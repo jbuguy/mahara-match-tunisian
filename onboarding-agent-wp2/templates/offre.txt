@@ -1,0 +1,8 @@
+Demande d'offre d'emploi ou de service
+
+Métier recherché : {metier}
+Date de disponibilité : {date}
+Gouvernorat : {gouvernorat}
+Téléphone : {telephone}
+
+Nous recherchons une offre correspondant au métier indiqué, disponible à la date précisée et située dans le gouvernorat mentionné. Pour proposer une opportunité, veuillez contacter le candidat au numéro indiqué.

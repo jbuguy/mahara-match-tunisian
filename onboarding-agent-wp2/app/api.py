@@ -4,11 +4,13 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, PlainTextResponse
 from pydub import AudioSegment
 
 import csv_store
+from offre_generator import generer_offre_ecrite
 from questions import QUESTIONS
+from recap_audio import generer_recap_audio
 from stt_adapter import initialiser_moteur_stt, transcrire_et_extraire
 
 
@@ -79,6 +81,23 @@ def creer_session():
 def obtenir_question(session_id: str):
     session = _session_ou_404(session_id)
     return _reponse_question(_question_courante(session))
+
+
+@app.get("/api/v1/sessions/{session_id}/offre")
+def obtenir_offre(session_id: str):
+    session = _session_ou_404(session_id)
+    if _question_courante(session) is not None:
+        raise HTTPException(status_code=409, detail="La session doit être terminée")
+    return PlainTextResponse(generer_offre_ecrite(session_id), media_type="text/plain")
+
+
+@app.get("/api/v1/sessions/{session_id}/recap-audio")
+def obtenir_recap_audio(session_id: str):
+    session = _session_ou_404(session_id)
+    if _question_courante(session) is not None:
+        raise HTTPException(status_code=409, detail="La session doit être terminée")
+    chemin_recap = generer_recap_audio(session_id)
+    return FileResponse(chemin_recap, media_type="audio/wav", filename=chemin_recap.name)
 
 
 @app.post("/api/v1/sessions/{session_id}/reponse")
@@ -161,6 +180,11 @@ def envoyer_reponse(session_id: str, audio: UploadFile = File(...)):
         )
     except KeyError as erreur:
         raise HTTPException(status_code=404, detail="Session introuvable") from erreur
+
+    chemin_audio_accepte = dossier_session / f"{question['id']}.wav"
+    chemin_audio.replace(chemin_audio_accepte)
+    if chemin_source != chemin_audio and chemin_source.exists():
+        chemin_source.unlink()
 
     session_apres_reponse = _session_ou_404(session_id)
     suivante = _question_courante(session_apres_reponse)

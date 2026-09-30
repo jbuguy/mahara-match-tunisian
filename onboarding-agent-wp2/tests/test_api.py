@@ -51,6 +51,15 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         return response.json()
 
+    def complete_session(self, session_id):
+        for question in QUESTIONS:
+            api.csv_store.enregistrer_reponse(
+                session_id,
+                question["id"],
+                "reponse de test",
+                api.SESSIONS_CSV,
+            )
+
     def test_creates_session_and_returns_current_question(self):
         created = self.create_session()
 
@@ -112,7 +121,7 @@ class ApiTests(unittest.TestCase):
         )
         self.assertEqual(current.json()["question"]["id"], "metier")
 
-    def test_empty_transcription_returns_retryable_error_without_saving(self):
+    def test_empty_transcription_retry_promotes_only_the_accepted_audio(self):
         session = self.create_session()
         with patch.object(
             api,
@@ -130,6 +139,17 @@ class ApiTests(unittest.TestCase):
             f"/api/v1/sessions/{session['session_id']}/question"
         )
         self.assertEqual(current.json()["question"]["id"], "metier")
+        accepted_audio = api.REPONSES_DIR / session["session_id"] / "metier.wav"
+        self.assertFalse(accepted_audio.exists())
+
+        retry = self.client.post(
+            f"/api/v1/sessions/{session['session_id']}/reponse",
+            files={"audio": ("answer.wav", wav_bytes(), "audio/wav")},
+        )
+
+        self.assertEqual(retry.status_code, 200)
+        self.assertEqual(retry.json()["question_suivante"]["id"], "date")
+        self.assertTrue(accepted_audio.is_file())
 
     def test_success_stores_answer_and_returns_next_question(self):
         session = self.create_session()
@@ -146,11 +166,14 @@ class ApiTests(unittest.TestCase):
         self.assertFalse(body["termine"])
         saved = api.csv_store.lire_session(session["session_id"], api.SESSIONS_CSV)
         self.assertEqual(saved["metier"], "نجار")
+        recordings = api.REPONSES_DIR / session["session_id"]
+        self.assertEqual([path.name for path in recordings.iterdir()], ["metier.wav"])
 
     def test_webm_upload_is_converted_before_transcription(self):
         session = self.create_session()
         decoded = Mock()
         decoded.__len__ = Mock(return_value=1000)
+        decoded.export.side_effect = lambda path, format: Path(path).write_bytes(wav_bytes())
 
         with patch.object(api.AudioSegment, "from_file", return_value=decoded):
             response = self.client.post(
@@ -167,6 +190,51 @@ class ApiTests(unittest.TestCase):
         response = self.client.get("/api/v1/sessions/missing/question")
 
         self.assertEqual(response.status_code, 404)
+
+    def test_offer_and_recap_reject_incomplete_sessions(self):
+        offer_session = self.create_session()
+        recap_session = self.create_session()
+
+        offer = self.client.get(
+            f"/api/v1/sessions/{offer_session['session_id']}/offre"
+        )
+        recap = self.client.get(
+            f"/api/v1/sessions/{recap_session['session_id']}/recap-audio"
+        )
+
+        self.assertEqual(offer.status_code, 409)
+        self.assertIn("terminée", offer.json()["detail"])
+        self.assertEqual(recap.status_code, 409)
+        self.assertIn("terminée", recap.json()["detail"])
+
+    def test_offer_and_recap_return_404_for_unknown_sessions(self):
+        for endpoint in ("offre", "recap-audio"):
+            with self.subTest(endpoint=endpoint):
+                response = self.client.get(
+                    f"/api/v1/sessions/missing/{endpoint}"
+                )
+                self.assertEqual(response.status_code, 404)
+
+    def test_offer_and_recap_return_success_for_completed_sessions(self):
+        session = self.create_session()
+        self.complete_session(session["session_id"])
+
+        with patch.object(api, "generer_offre_ecrite", return_value="Offre de test"):
+            offer = self.client.get(
+                f"/api/v1/sessions/{session['session_id']}/offre"
+            )
+        self.assertEqual(offer.status_code, 200)
+        self.assertEqual(offer.text, "Offre de test")
+
+        recap_path = Path(self.temp_dir.name) / "recap.wav"
+        recap_path.write_bytes(wav_bytes())
+        with patch.object(api, "generer_recap_audio", return_value=recap_path):
+            recap = self.client.get(
+                f"/api/v1/sessions/{session['session_id']}/recap-audio"
+            )
+        self.assertEqual(recap.status_code, 200)
+        self.assertEqual(recap.headers["content-type"], "audio/wav")
+        self.assertEqual(recap.content, wav_bytes())
 
 
 if __name__ == "__main__":
