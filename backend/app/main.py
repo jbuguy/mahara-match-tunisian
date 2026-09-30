@@ -1,16 +1,47 @@
+from contextlib import asynccontextmanager
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from shared_llm import LLMSettings, OpenAICompatibleClient
+
+from .config import get_settings
 from .database import get_db
-from .models import Employer
+from .models import Employer, EmployerDraftSession
 from .schemas import EmployerLogin, EmployerProfile, EmployerSignup, EmployerUpdate, Token
 from .security import create_access_token, get_current_employer, hash_password, verify_password
 
+from employer_agent_wp4 import create_employer_agent_router
 
-app = FastAPI(title="Mahara Match Employer API", version="0.1.0")
+
+settings = get_settings()
+llm_client = OpenAICompatibleClient(
+    LLMSettings(
+        base_url=settings.llm_base_url,
+        model=settings.llm_model,
+        api_key=settings.llm_api_key,
+        timeout_seconds=settings.llm_timeout_seconds,
+    )
+)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    yield
+    await llm_client.close()
+
+
+app = FastAPI(title="Mahara Match Employer API", version="0.1.0", lifespan=lifespan)
+app.include_router(
+    create_employer_agent_router(
+        get_db,
+        get_current_employer,
+        EmployerDraftSession,
+        llm_client=llm_client,
+    )
+)
 
 
 @app.post("/employers/signup", response_model=EmployerProfile, status_code=status.HTTP_201_CREATED)
