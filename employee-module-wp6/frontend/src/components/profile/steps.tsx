@@ -17,6 +17,7 @@ import {
   type FormErrors,
   type ProfileFormValues,
 } from './form-values'
+import type { Change } from './assistant-updates'
 import { PhotoPicker, type PhotoChange } from './PhotoPicker'
 import { ReferenceSearch } from './ReferenceSearch'
 
@@ -24,6 +25,13 @@ export type StepProps = {
   values: ProfileFormValues
   errors: FormErrors
   change: (patch: Partial<ProfileFormValues>) => void
+  /** What the assistant just filled (`phone`, `skill:SK-9006`...): highlighted for a moment. */
+  flash: ReadonlySet<Change>
+}
+
+/** data-flash for a card the assistant just added or changed. */
+function flashCard(flash: ReadonlySet<Change>, change: Change) {
+  return flash.has(change) ? 'card' : undefined
 }
 
 export type GovernorateList = Governorate[] | 'loading' | 'error'
@@ -93,6 +101,7 @@ export function StepInfos({
   values,
   errors,
   change,
+  flash,
   governorates,
   retryGovernorates,
   photo,
@@ -111,7 +120,7 @@ export function StepInfos({
     <div className="space-y-5 rounded-[10px] border bg-surface p-4 sm:p-5">
       <PhotoPicker name={values.full_name} change={photo} onChange={onPhotoChange} />
 
-      <Field id="full_name" label="Nom complet" error={errors.full_name}>
+      <Field id="full_name" label="Nom complet" error={errors.full_name} flash={flash.has('full_name')}>
         <input
           {...describe('full_name', errors.full_name)}
           type="text"
@@ -122,7 +131,13 @@ export function StepInfos({
         />
       </Field>
 
-      <Field id="phone" label="Téléphone" hint="Exemple : 22 123 456" error={errors.phone}>
+      <Field
+        id="phone"
+        label="Téléphone"
+        hint="Exemple : 22 123 456"
+        error={errors.phone}
+        flash={flash.has('phone')}
+      >
         <input
           {...describe('phone', errors.phone, true)}
           type="tel"
@@ -134,7 +149,12 @@ export function StepInfos({
         />
       </Field>
 
-      <Field id="governorate_code" label="Gouvernorat" error={errors.governorate_code}>
+      <Field
+        id="governorate_code"
+        label="Gouvernorat"
+        error={errors.governorate_code}
+        flash={flash.has('governorate_code')}
+      >
         <Select
           {...describe('governorate_code', errors.governorate_code)}
           value={values.governorate_code}
@@ -158,7 +178,13 @@ export function StepInfos({
         )}
       </Field>
 
-      <Field id="education_level" label="Niveau d'études" optional error={errors.education_level}>
+      <Field
+        id="education_level"
+        label="Niveau d'études"
+        optional
+        error={errors.education_level}
+        flash={flash.has('education_level')}
+      >
         <Select
           {...describe('education_level', errors.education_level)}
           value={values.education_level}
@@ -182,7 +208,7 @@ export function StepInfos({
 
 const SKILL_LEVEL_OPTIONS = [1, 2, 3, 4].map((level) => ({ value: level, label: SKILL_LEVELS[level] }))
 
-export function StepSkills({ values, errors, change }: StepProps) {
+export function StepSkills({ values, errors, change, flash }: StepProps) {
   const { skills } = values
 
   return (
@@ -216,7 +242,11 @@ export function StepSkills({ values, errors, change }: StepProps) {
               const error =
                 errors[`skills.${index}.code`] ?? errors[`skills.${index}.level`] ?? errors[`skills.${index}`]
               return (
-                <li key={skill.code} className="space-y-3 rounded-[10px] border border-line p-3.5">
+                <li
+                  key={skill.code}
+                  data-flash={flashCard(flash, `skill:${skill.code}`)}
+                  className="space-y-3 rounded-[10px] border border-line p-3.5"
+                >
                   <div className="flex items-start justify-between gap-3">
                     <p className="pt-2.5 font-medium text-ink">{skill.label_fr}</p>
                     <RemoveButton
@@ -257,12 +287,14 @@ function ExperienceRow({
   experience,
   index,
   errors,
+  flash,
   onChange,
   onRemove,
 }: {
   experience: ExperienceValue
   index: number
   errors: FormErrors
+  flash: ReadonlySet<Change>
   onChange: (patch: Partial<ExperienceValue>) => void
   onRemove: () => void
 }) {
@@ -275,7 +307,10 @@ function ExperienceRow({
   const name = experience.job_title_raw.trim() || `l'expérience ${index + 1}`
 
   return (
-    <li className="space-y-4 rounded-[10px] border border-line p-3.5">
+    <li
+      data-flash={flashCard(flash, `experience:${experience.key}`)}
+      className="space-y-4 rounded-[10px] border border-line p-3.5"
+    >
       <div className="flex items-center justify-between gap-3">
         <h4 className="font-medium text-ink">Expérience {index + 1}</h4>
         <RemoveButton what={name} onClick={onRemove} />
@@ -352,7 +387,7 @@ function ExperienceRow({
   )
 }
 
-export function StepExperience({ values, errors, change }: StepProps) {
+export function StepExperience({ values, errors, change, flash }: StepProps) {
   const { experiences, desired_occupations: occupations, languages } = values
 
   function updateExperience(key: string, patch: Partial<ExperienceValue>) {
@@ -372,6 +407,7 @@ export function StepExperience({ values, errors, change }: StepProps) {
                 experience={experience}
                 index={index}
                 errors={errors}
+                flash={flash}
                 onChange={(patch) => updateExperience(experience.key, patch)}
                 onRemove={() => change({ experiences: experiences.filter((item) => item.key !== experience.key) })}
               />
@@ -410,7 +446,11 @@ export function StepExperience({ values, errors, change }: StepProps) {
         ) : (
           <ul className="divide-y divide-line rounded-[10px] border border-line">
             {occupations.map((occupation, index) => (
-              <li key={occupation.code} className="space-y-1 py-1 pr-1 pl-3.5">
+              <li
+                key={occupation.code}
+                data-flash={flashCard(flash, `occupation:${occupation.code}`)}
+                className="space-y-1 py-1 pr-1 pl-3.5"
+              >
                 <div className="flex items-center justify-between gap-3">
                   <span className="font-medium text-ink">{occupation.title_fr}</span>
                   <RemoveButton
@@ -463,7 +503,11 @@ export function StepExperience({ values, errors, change }: StepProps) {
                   languages: languages.map((item) => (item.key === language.key ? { ...item, ...patch } : item)),
                 })
               return (
-                <li key={language.key} className="rounded-[10px] border border-line p-3.5">
+                <li
+                  key={language.key}
+                  data-flash={flashCard(flash, `language:${language.key}`)}
+                  className="rounded-[10px] border border-line p-3.5"
+                >
                   <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
                     <Field id={codeId} label="Langue" error={codeError}>
                       <Select
@@ -525,6 +569,7 @@ export function StepExperience({ values, errors, change }: StepProps) {
           optional
           hint="Ce que vous savez faire, ce que vous aimez, ce que vous cherchez."
           error={errors.summary}
+          flash={flash.has('summary')}
         >
           <textarea
             {...describe('summary', errors.summary, true)}

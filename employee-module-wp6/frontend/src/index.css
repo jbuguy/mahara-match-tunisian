@@ -69,6 +69,31 @@
     --radius: 10px;
 }
 
+/* A field the assistant just filled: a short gold glow (cards flash whole, fields flash their input). */
+@keyframes assistant-flash {
+    0%, 35% {
+        background-color: #F7EEDF;
+        box-shadow: 0 0 0 3px rgb(198 146 63 / 0.6);
+    }
+    100% {
+        background-color: transparent;
+        box-shadow: 0 0 0 3px rgb(198 146 63 / 0);
+    }
+}
+
+[data-flash='card'],
+[data-flash='field'] :is(input, select, textarea) {
+    animation: assistant-flash 2.4s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    [data-flash='card'],
+    [data-flash='field'] :is(input, select, textarea) {
+        animation: none;
+        box-shadow: 0 0 0 3px rgb(198 146 63 / 0.6);
+    }
+}
+
 @layer base {
     * {
         @apply border-border outline-ring/50;

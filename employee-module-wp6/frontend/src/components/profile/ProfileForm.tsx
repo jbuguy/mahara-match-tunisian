@@ -1,10 +1,19 @@
 import { ArrowLeft, ArrowRight, CircleAlert, Save } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useImperativeHandle, useRef, useState, type FormEvent, type Ref } from 'react'
 import { Link } from 'react-router'
 
 import { Button } from '@/components/ui/button'
-import { ApiError, deletePhoto, getGovernorates, saveProfile, uploadPhoto, type Profile } from '@/lib/api'
+import {
+  ApiError,
+  deletePhoto,
+  getGovernorates,
+  saveProfile,
+  uploadPhoto,
+  type AssistantUpdates,
+  type Profile,
+} from '@/lib/api'
 import { setCustomPhoto } from '@/lib/photo'
+import { changedFields, mergeAssistantUpdates, stepOfChanges, stepOfField, type Change } from './assistant-updates'
 import {
   STEPS,
   normalizeValues,
@@ -21,17 +30,35 @@ import { StepIndicator } from './StepIndicator'
 import { StepExperience, StepInfos, StepSkills, type GovernorateList } from './steps'
 
 const LAST_STEP = STEPS.length - 1
+const FLASH_MS = 2600 // how long a field the assistant filled stays highlighted
+const SHOW_FILLED_MS = 1500 // a filled field stays in view this long before the form moves to the next question
+
+/** What the profile assistant can do with the form (through `ref`). */
+export type ProfileFormHandle = {
+  /** The values as they are now. */
+  getValues: () => ProfileFormValues
+  /**
+   * Merges the assistant's updates and highlights them, then shows the step of the field its reply asks
+   * about (`asking`). Returns what changed.
+   */
+  applyUpdates: (updates: AssistantUpdates, asking: string | null) => Change[]
+  /** Scrolls to the top of the form and moves focus to the step title. */
+  focusForm: () => void
+}
 
 /**
  * The 3-step profile form. Used to create and to edit a profile; `initialValues` prefills it
- * (the saved profile, or later a CV draft with `fromCv`). Saves with PUT /me/profile.
+ * (the saved profile, or a CV draft with `fromCv`). Saves with PUT /me/profile.
+ * The profile assistant fills it through `ref`; it never saves or ticks consent.
  */
 export function ProfileForm({
+  ref,
   initialValues,
   fromCv = false,
   cancelTo = '/profil',
   onSaved,
 }: {
+  ref?: Ref<ProfileFormHandle>
   initialValues?: ProfileFormStart
   fromCv?: boolean
   cancelTo?: string
@@ -55,6 +82,16 @@ export function ProfileForm({
   const formRef = useRef<HTMLFormElement>(null)
   const headingRef = useRef<HTMLHeadingElement>(null)
   const shownStep = useRef(step)
+  // Fields the assistant just filled (highlighted for a moment), and whether it changed the step:
+  // then the step change must not take focus away from the chat.
+  const [flash, setFlash] = useState<ReadonlySet<Change>>(() => new Set())
+  const quietStepChange = useRef(false)
+  const nextStepTimer = useRef<number | undefined>(undefined) // the assistant's move to the asked step
+  useEffect(() => () => window.clearTimeout(nextStepTimer.current), [])
+  const valuesRef = useRef(values)
+  useEffect(() => {
+    valuesRef.current = values
+  }, [values])
 
   const loadGovernorates = useCallback(() => {
     let ignore = false
@@ -72,13 +109,30 @@ export function ProfileForm({
 
   useEffect(loadGovernorates, [loadGovernorates])
 
-  // New step: back to the top, and move focus to its title for screen readers.
+  // New step: back to the top, and move focus to its title for screen readers
+  // (unless the assistant changed it: the candidate is typing in the chat).
   useEffect(() => {
     if (shownStep.current === step) return
     shownStep.current = step
+    if (quietStepChange.current) {
+      quietStepChange.current = false
+      // Bring the new step's top into view if the page was scrolled past it; focus stays in the chat.
+      if ((formRef.current?.getBoundingClientRect().top ?? 0) < 0) {
+        formRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+      }
+      return
+    }
     window.scrollTo({ top: 0 })
     headingRef.current?.focus({ preventScroll: true })
   }, [step])
+
+  // Fields the assistant filled: bring the first one into view, then stop highlighting after a moment.
+  useEffect(() => {
+    if (flash.size === 0) return
+    formRef.current?.querySelector('[data-flash]')?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    const timer = window.setTimeout(() => setFlash(new Set()), FLASH_MS)
+    return () => window.clearTimeout(timer)
+  }, [flash])
 
   // After a failed check: focus the first field in error (or scroll to the first message).
   useEffect(() => {
@@ -106,6 +160,46 @@ export function ProfileForm({
     setFormError(null)
   }
 
+  /** Shows another step for the assistant, without moving focus (the candidate is typing in the chat). */
+  function showStepQuietly(target: number) {
+    if (target === shownStep.current) return
+    quietStepChange.current = true
+    setStep(target)
+  }
+
+  /** The candidate moves through the form themselves: cancel the assistant's pending move. */
+  function stopAssistantMoves() {
+    window.clearTimeout(nextStepTimer.current)
+    quietStepChange.current = false
+  }
+
+  useImperativeHandle(ref, () => ({
+    getValues: () => valuesRef.current,
+    applyUpdates(updates, asking) {
+      window.clearTimeout(nextStepTimer.current)
+      const merged = mergeAssistantUpdates(valuesRef.current, updates)
+      const askedStep = asking ? stepOfField(asking) : null
+      if (merged.changed.length === 0) {
+        if (askedStep !== null) showStepQuietly(askedStep)
+        return []
+      }
+      valuesRef.current = merged.values // a second reply before the next render builds on this one
+      change(Object.fromEntries(changedFields(merged.changed).map((field) => [field, merged.values[field]])))
+      setFlash(new Set(merged.changed))
+      // Show what was filled first, then follow the question ("niveau d'études" filled → on to the skills).
+      const filledStep = stepOfChanges(merged.changed)
+      showStepQuietly(filledStep)
+      if (askedStep !== null && askedStep !== filledStep) {
+        nextStepTimer.current = window.setTimeout(() => showStepQuietly(askedStep), SHOW_FILLED_MS)
+      }
+      return merged.changed
+    },
+    focusForm() {
+      formRef.current?.scrollIntoView({ block: 'start' })
+      headingRef.current?.focus({ preventScroll: true })
+    },
+  }))
+
   function markChecked(steps: number[]) {
     setChecked((current) => current.map((value, index) => value || steps.includes(index)))
   }
@@ -124,12 +218,14 @@ export function ProfileForm({
   }
 
   function goTo(target: number) {
+    stopAssistantMoves()
     if (target > step && !passes(step, target)) return
     if (target > step) markChecked([step])
     setStep(target)
   }
 
   async function save() {
+    stopAssistantMoves()
     markChecked([LAST_STEP])
     if (!passes(0, STEPS.length)) return
     setSaving(true)
@@ -172,10 +268,10 @@ export function ProfileForm({
     else void save()
   }
 
-  const stepProps = { values, errors, change }
+  const stepProps = { values, errors, change, flash }
 
   return (
-    <form ref={formRef} noValidate onSubmit={submit} className="mx-auto max-w-2xl space-y-5">
+    <form ref={formRef} noValidate onSubmit={submit} className="mx-auto max-w-2xl scroll-mt-20 space-y-5 lg:scroll-mt-24">
       <StepIndicator step={step} onGo={goTo} />
 
       <h2 ref={headingRef} tabIndex={-1} className="text-xl text-ink outline-none">

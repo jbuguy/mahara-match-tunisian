@@ -197,6 +197,65 @@ export async function deletePhoto(): Promise<void> {
   await request('/me/photo', { method: 'DELETE' })
 }
 
+export type ChatMessage = { role: 'user' | 'assistant'; content: string }
+
+/** The profile form as the assistant sees it (the backend ignores anything else). */
+export type AssistantDraft = {
+  full_name: string
+  phone: string
+  governorate_code: string
+  education_level: string
+  skills: { code: string; label_fr: string; level: number }[]
+  experiences: {
+    job_title_raw: string
+    employer_name: string
+    start_date: string
+    end_date: string
+    duration_months: string
+  }[]
+  desired_occupations: OccupationOption[]
+  languages: { code: string; level: string }[]
+  summary: string
+}
+
+/** Fields to merge into the profile form, in its own shape; null = unchanged. */
+export type AssistantUpdates = {
+  full_name: string | null
+  phone: string | null
+  governorate_code: string | null
+  education_level: string | null
+  skills: CvDraft['skills'] | null
+  experiences: CvDraft['experiences'] | null
+  desired_occupations: OccupationOption[] | null
+  languages: { code: string; level: string }[] | null
+  summary: string | null
+}
+
+export type AssistantReply = {
+  reply: string
+  updates: AssistantUpdates
+  /** Skills and jobs the candidate named that aren't in our lists: the reply stays on them. */
+  unmatched: string[]
+  /** Close items of our lists the candidate can pick instead (labels). */
+  suggestions: string[]
+  /** The form field the reply asks about, so the form can show its step. */
+  asking: keyof AssistantUpdates | null
+  /** The assistant thinks the profile is complete (or the candidate said they're done). */
+  done: boolean
+}
+
+/** The backend only sends the last 8 messages to the AI; no need to send more. */
+const ASSISTANT_HISTORY = 8
+
+/** One turn of the profile assistant. Nothing is saved: the updates are for the form. */
+export function askAssistant(messages: ChatMessage[], draft: AssistantDraft): Promise<AssistantReply> {
+  return api<AssistantReply>('/me/assistant/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ messages: messages.slice(-ASSISTANT_HISTORY), draft }),
+  })
+}
+
 /** A profile draft read from a CV, in the profile form's shape ('' = not found). Nothing is saved yet. */
 export type CvDraft = {
   full_name: string

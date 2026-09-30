@@ -20,6 +20,7 @@ export function Field({
   optional,
   hint,
   error,
+  flash,
   children,
   className,
 }: {
@@ -28,11 +29,13 @@ export function Field({
   optional?: boolean
   hint?: string
   error?: string
+  /** The assistant just filled it: its input glows gold for a moment. */
+  flash?: boolean
   children: ReactNode
   className?: string
 }) {
   return (
-    <div className={cn('space-y-1.5', className)}>
+    <div className={cn('space-y-1.5', className)} data-flash={flash ? 'field' : undefined}>
       <label htmlFor={id} className="block text-[15px] font-medium text-ink">
         {label}
         {optional && <span className="font-normal text-ink-secondary"> (facultatif)</span>}

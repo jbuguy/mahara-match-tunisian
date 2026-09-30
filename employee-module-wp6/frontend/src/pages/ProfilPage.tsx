@@ -9,6 +9,7 @@ import {
   Languages,
   Mail,
   MapPin,
+  MessageCircle,
   Pencil,
   Phone,
   Sparkles,
@@ -115,6 +116,12 @@ function EmptyProfile() {
             <Link to="/profil/modifier" state={{ profile: null }}>
               <Pencil aria-hidden />
               Créer mon profil
+            </Link>
+          </Button>
+          <Button asChild variant="outline" size="lg">
+            <Link to="/profil/modifier" state={{ profile: null, assistant: true }}>
+              <MessageCircle aria-hidden />
+              Remplir avec l'assistant
             </Link>
           </Button>
           <Button asChild variant="outline" size="lg">
