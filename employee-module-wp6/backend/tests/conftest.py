@@ -4,7 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from app.auth import CurrentUser, get_current_user
+from app.auth import CurrentUser, get_current_user, get_token_claims
 from app.db import get_db, get_engine
 from app.main import app
 from app.models import User
@@ -45,6 +45,7 @@ def signed_in(client, db) -> User:
     db.flush()
     app.dependency_overrides[get_db] = lambda: db
     app.dependency_overrides[get_current_user] = lambda: CurrentUser(user=user, name="Test Candidat")
+    app.dependency_overrides[get_token_claims] = lambda: {"email": user.email}
     return user
 
 

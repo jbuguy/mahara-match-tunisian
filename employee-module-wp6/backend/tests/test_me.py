@@ -1,5 +1,6 @@
 import time
 import uuid
+from datetime import UTC, datetime, timedelta
 
 import jwt
 import pytest
@@ -151,3 +152,15 @@ def test_me_without_token_returns_401(client, session):
     response = get_me(client, None)
     assert response.status_code == 401
     assert response.headers["www-authenticate"] == "Bearer"
+
+
+def test_me_skips_last_login_write_when_recent(client, session):
+    seen = datetime.now(UTC) - timedelta(minutes=2)
+    user = User(id=uuid.uuid4(), email="amira.ben@example.com", role="candidate", last_login_at=seen)
+    db = session(FakeSession(user, None))
+
+    response = get_me(client, make_token())
+
+    assert response.status_code == 200
+    assert user.last_login_at == seen
+    assert not db.committed

@@ -1,10 +1,15 @@
-"""Candidate profile: read it back as one object, save it as one transaction."""
+"""Candidate profile: read it back as one object, save it as one transaction.
+
+The database is far away (~200 ms per round trip), so both paths keep the number of statements low:
+reading is a single query, saving batches what it can.
+"""
 
 import uuid
 from datetime import UTC, datetime
 
 from fastapi import HTTPException, status
-from sqlalchemy import delete, nulls_last, select
+from sqlalchemy import literal_column, null, select, text, union_all
+from sqlalchemy.dialects.postgresql import UUID, insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -20,82 +25,75 @@ from app.models import (
     Skill,
     User,
 )
-from app.schemas import (
-    EducationOut,
-    ExperienceOut,
-    GovernorateOut,
-    LanguageOut,
-    ProfileIn,
-    ProfileOccupationOut,
-    ProfileOut,
-    ProfileSkillOut,
-)
+from app.schemas import ProfileIn, ProfileOut
 
 CONSENT_VERSION = "1.0"
 
+# The whole profile as one JSON object, in one round trip. Same shape and order as ProfileOut.
+PROFILE_QUERY = text("""
+select json_build_object(
+    'full_name', p.full_name,
+    'email', p.email,
+    'phone', p.phone,
+    'has_photo', p.photo is not null,
+    'onboarding_path', c.onboarding_path,
+    'literacy_level', c.literacy_level,
+    'governorate', case when g.code is null then null
+                   else json_build_object('code', g.code, 'name_fr', g.name_fr, 'name_ar', g.name_ar) end,
+    'education_level', c.education_level,
+    'years_experience', c.years_experience,
+    'languages', c.languages,
+    'summary', c.summary,
+    'available_from', c.available_from,
+    'consent_version', c.consent_version,
+    'consent_given_at', c.consent_given_at,
+    'skills', coalesce((
+        select json_agg(json_build_object(
+                   'code', s.code, 'label_fr', s.label_fr, 'skill_type', s.skill_type,
+                   'level', cs.level, 'source', cs.source, 'confidence', cs.confidence)
+               order by cs.level desc, s.label_fr)
+        from candidate_skills cs join skills s on s.id = cs.skill_id
+        where cs.candidate_id = c.id), '[]'),
+    'experiences', coalesce((
+        select json_agg(json_build_object(
+                   'id', e.id, 'job_title_raw', e.job_title_raw, 'employer_name', e.employer_name,
+                   'start_date', e.start_date, 'end_date', e.end_date,
+                   'duration_months', e.duration_months, 'description', e.description)
+               order by e.start_date desc nulls last, e.job_title_raw)
+        from candidate_experiences e
+        where e.candidate_id = c.id), '[]'),
+    'educations', coalesce((
+        select json_agg(json_build_object(
+                   'id', d.id, 'level', d.level, 'field_of_study', d.field_of_study,
+                   'institution', d.institution, 'graduation_year', d.graduation_year)
+               order by d.graduation_year desc nulls last, d.field_of_study)
+        from candidate_educations d
+        where d.candidate_id = c.id), '[]'),
+    'desired_occupations', coalesce((
+        select json_agg(json_build_object('code', o.code, 'title_fr', o.title_fr, 'priority', link.priority)
+               order by link.priority asc nulls last, o.title_fr)
+        from candidate_desired_occupations link join occupations o on o.id = link.occupation_id
+        where link.candidate_id = c.id), '[]')
+)
+from candidates c
+left join candidate_pii p on p.candidate_id = c.id
+left join governorates g on g.code = c.governorate_code
+where c.user_id = :user_id
+""")
+
+# Clears the lists a save replaces, in one statement (data-modifying CTEs always run).
+CLEAR_LISTS = text("""
+with skills as (delete from candidate_skills where candidate_id = :id),
+     experiences as (delete from candidate_experiences where candidate_id = :id),
+     educations as (delete from candidate_educations where candidate_id = :id),
+     occupations as (delete from candidate_desired_occupations where candidate_id = :id)
+select 1
+""")
+
 
 def get_profile(db: Session, user_id: uuid.UUID) -> ProfileOut | None:
-    candidate = db.scalar(select(Candidate).where(Candidate.user_id == user_id))
-    if candidate is None:
-        return None
-    pii = db.get(CandidatePii, candidate.id)
-    governorate = db.get(Governorate, candidate.governorate_code) if candidate.governorate_code else None
-
-    skills = db.execute(
-        select(CandidateSkill, Skill)
-        .join(Skill, Skill.id == CandidateSkill.skill_id)
-        .where(CandidateSkill.candidate_id == candidate.id)
-        .order_by(CandidateSkill.level.desc(), Skill.label_fr)
-    ).all()
-    experiences = db.scalars(
-        select(CandidateExperience)
-        .where(CandidateExperience.candidate_id == candidate.id)
-        .order_by(nulls_last(CandidateExperience.start_date.desc()), CandidateExperience.job_title_raw)
-    ).all()
-    educations = db.scalars(
-        select(CandidateEducation)
-        .where(CandidateEducation.candidate_id == candidate.id)
-        .order_by(nulls_last(CandidateEducation.graduation_year.desc()), CandidateEducation.field_of_study)
-    ).all()
-    occupations = db.execute(
-        select(CandidateDesiredOccupation, Occupation)
-        .join(Occupation, Occupation.id == CandidateDesiredOccupation.occupation_id)
-        .where(CandidateDesiredOccupation.candidate_id == candidate.id)
-        .order_by(nulls_last(CandidateDesiredOccupation.priority.asc()), Occupation.title_fr)
-    ).all()
-
-    return ProfileOut(
-        full_name=pii.full_name if pii else None,
-        email=pii.email if pii else None,
-        phone=pii.phone if pii else None,
-        onboarding_path=candidate.onboarding_path,
-        literacy_level=candidate.literacy_level,
-        governorate=GovernorateOut.model_validate(governorate) if governorate else None,
-        education_level=candidate.education_level,
-        years_experience=candidate.years_experience,
-        languages=[LanguageOut(**language) for language in candidate.languages or []],
-        summary=candidate.summary,
-        available_from=candidate.available_from,
-        consent_version=candidate.consent_version,
-        consent_given_at=candidate.consent_given_at,
-        skills=[
-            ProfileSkillOut(
-                code=skill.code,
-                label_fr=skill.label_fr,
-                skill_type=skill.skill_type,
-                level=link.level,
-                source=link.source,
-                confidence=link.confidence,
-            )
-            for link, skill in skills
-        ],
-        experiences=[ExperienceOut.model_validate(row) for row in experiences],
-        educations=[EducationOut.model_validate(row) for row in educations],
-        desired_occupations=[
-            ProfileOccupationOut(code=occupation.code, title_fr=occupation.title_fr, priority=link.priority)
-            for link, occupation in occupations
-        ],
-    )
+    data = db.scalar(PROFILE_QUERY, {"user_id": user_id})
+    return ProfileOut.model_validate(data) if data is not None else None
 
 
 def _unknown_code(loc: list, code: str, what: str) -> dict:
@@ -104,22 +102,33 @@ def _unknown_code(loc: list, code: str, what: str) -> dict:
 
 
 def _resolve_codes(db: Session, body: ProfileIn) -> tuple[dict[str, uuid.UUID], dict[str, uuid.UUID]]:
-    """Map the request's skill and occupation codes to ids; 422 listing every unknown code."""
+    """Map the request's skill and occupation codes to ids (one query); 422 listing every unknown code."""
     skill_codes = [item.code for item in body.skills]
     occupation_codes = [item.code for item in body.desired_occupations]
-    skill_ids: dict[str, uuid.UUID] = {}
+    lookups = []
     if skill_codes:
-        skill_ids = dict(db.execute(
-            select(Skill.code, Skill.id).where(Skill.code.in_(skill_codes), Skill.status == "validated")
-        ).all())
-    occupation_ids: dict[str, uuid.UUID] = {}
+        lookups.append(
+            select(literal_column("'skill'").label("kind"), Skill.code, Skill.id)
+            .where(Skill.code.in_(skill_codes), Skill.status == "validated")
+        )
     if occupation_codes:
-        occupation_ids = dict(db.execute(
-            select(Occupation.code, Occupation.id).where(Occupation.code.in_(occupation_codes))
-        ).all())
+        lookups.append(
+            select(literal_column("'occupation'"), Occupation.code, Occupation.id)
+            .where(Occupation.code.in_(occupation_codes))
+        )
+    if body.governorate_code:
+        lookups.append(
+            select(literal_column("'governorate'"), Governorate.code, null().cast(UUID(as_uuid=True)))
+            .where(Governorate.code == body.governorate_code)
+        )
+    found: dict[str, dict] = {"skill": {}, "occupation": {}, "governorate": {}}
+    if lookups:
+        for kind, code, id_ in db.execute(union_all(*lookups)).all():
+            found[kind][code] = id_
+    skill_ids, occupation_ids = found["skill"], found["occupation"]
 
     errors = []
-    if body.governorate_code and db.get(Governorate, body.governorate_code) is None:
+    if body.governorate_code and body.governorate_code not in found["governorate"]:
         errors.append(_unknown_code(["governorate_code"], body.governorate_code, "governorate"))
     errors += [
         _unknown_code(["skills", i, "code"], code, "skill")
@@ -141,6 +150,7 @@ def save_profile(db: Session, user: User, body: ProfileIn) -> ProfileOut:
     skill_ids, occupation_ids = _resolve_codes(db, body)
     try:
         candidate = db.scalar(select(Candidate).where(Candidate.user_id == user.id))
+        is_new = candidate is None
         if candidate is None:
             candidate = Candidate(
                 id=uuid.uuid4(),
@@ -167,14 +177,16 @@ def save_profile(db: Session, user: User, body: ProfileIn) -> ProfileOut:
         candidate.available_from = body.available_from
         db.flush()
 
-        pii = db.get(CandidatePii, candidate.id) or CandidatePii(candidate_id=candidate.id)
-        pii.full_name = body.full_name
-        pii.email = body.email or user.email
-        pii.phone = body.phone
-        db.add(pii)
+        # Upsert the identity row in one statement; the photo column is left as it is.
+        identity = {"full_name": body.full_name, "email": body.email or user.email, "phone": body.phone}
+        db.execute(
+            insert(CandidatePii)
+            .values(candidate_id=candidate.id, **identity)
+            .on_conflict_do_update(index_elements=[CandidatePii.candidate_id], set_=identity)
+        )
 
-        for table in (CandidateSkill, CandidateExperience, CandidateEducation, CandidateDesiredOccupation):
-            db.execute(delete(table).where(table.candidate_id == candidate.id))
+        if not is_new:
+            db.execute(CLEAR_LISTS, {"id": candidate.id})
         db.add_all(
             CandidateSkill(
                 candidate_id=candidate.id,

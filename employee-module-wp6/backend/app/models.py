@@ -3,9 +3,9 @@
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import ForeignKey, SmallInteger, text
+from sqlalchemy import ForeignKey, LargeBinary, SmallInteger, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import DeclarativeBase, Mapped, deferred, mapped_column
 
 ONBOARDING_PATHS = ("cv_upload", "derja_detailed")
 LITERACY_LEVELS = ("literate", "basic", "non_literate")
@@ -91,6 +91,8 @@ class CandidatePii(Base):
     full_name: Mapped[str | None]
     email: Mapped[str | None]
     phone: Mapped[str | None]
+    # The candidate's own 256x256 JPEG (null = show the Google photo). Deferred: only the photo endpoint loads it.
+    photo: Mapped[bytes | None] = deferred(mapped_column(LargeBinary))
 
 
 class CandidateSkill(Base):

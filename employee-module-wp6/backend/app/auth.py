@@ -71,16 +71,22 @@ def display_name(claims: dict[str, Any]) -> str | None:
     return metadata.get("full_name") or metadata.get("name") or None
 
 
-def get_current_user(
+def get_token_claims(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     jwks: PyJWKClient = Depends(get_jwks_client),
     settings: Settings = Depends(get_settings),
-    db: Session = Depends(get_db),
-) -> CurrentUser:
-    """FastAPI dependency for every signed-in endpoint."""
+) -> dict[str, Any]:
+    """FastAPI dependency: a valid login token, without touching the database (used by /reference/*)."""
     if credentials is None:
         raise unauthorized("missing token")
-    claims = decode_token(credentials.credentials, jwks, settings)
+    return decode_token(credentials.credentials, jwks, settings)
+
+
+def get_current_user(
+    claims: dict[str, Any] = Depends(get_token_claims),
+    db: Session = Depends(get_db),
+) -> CurrentUser:
+    """FastAPI dependency for every signed-in endpoint that needs our `users` row."""
     email = str(claims["email"]).strip().lower()
     if not email:
         raise unauthorized("token has no email")

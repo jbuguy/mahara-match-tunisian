@@ -12,7 +12,8 @@ def get_engine() -> Engine:
     url = get_settings().database_url
     if not url:
         raise RuntimeError("DATABASE_URL is not set in employee-module-wp6/.env")
-    return create_engine(url, pool_pre_ping=True)
+    # gssencmode=disable: libpq otherwise tries a GSSAPI handshake first, one wasted round trip per new connection.
+    return create_engine(url, pool_pre_ping=True, connect_args={"gssencmode": "disable"})
 
 
 @lru_cache

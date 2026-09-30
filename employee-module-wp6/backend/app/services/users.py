@@ -1,11 +1,15 @@
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models import Candidate, User
+
+
+# last_login_at is refreshed at most this often: writing it on every request cost two database round trips.
+LAST_LOGIN_EVERY = timedelta(minutes=15)
 
 
 def get_or_create_user(db: Session, email: str) -> User:
@@ -20,8 +24,10 @@ def get_or_create_user(db: Session, email: str) -> User:
             # Two first requests at once (e.g. React StrictMode): the other one created the row.
             db.rollback()
             user = db.scalars(select(User).where(User.email == email)).one()
-    user.last_login_at = datetime.now(UTC)
-    db.commit()
+    now = datetime.now(UTC)
+    if user.last_login_at is None or now - user.last_login_at >= LAST_LOGIN_EVERY:
+        user.last_login_at = now
+        db.commit()
     return user
 
 

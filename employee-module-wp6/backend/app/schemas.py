@@ -201,6 +201,7 @@ class ProfileOut(BaseModel):
     full_name: str | None
     email: str | None
     phone: str | None
+    has_photo: bool  # an uploaded photo exists (GET /me/photo); otherwise the UI shows the Google photo
 
     onboarding_path: str
     literacy_level: str

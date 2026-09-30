@@ -66,7 +66,8 @@ create table if not exists candidate_pii (
     candidate_id uuid primary key references candidates (id) on delete cascade,
     full_name    text,
     email        text,
-    phone        text
+    phone        text,
+    photo        bytea  -- the candidate's own photo (256x256 JPEG); null = use the Google photo
 );
 
 create table if not exists candidate_skills (
@@ -116,6 +117,9 @@ alter table users  add  constraint users_role_check
 alter table skills drop constraint if exists skills_status_check;
 alter table skills add  constraint skills_status_check
     check (status in ('draft', 'validated', 'deprecated'));
+
+-- Columns added after the first release.
+alter table candidate_pii add column if not exists photo bytea;
 
 -- ---------------------------------------------------------------------------
 -- Row level security: on everywhere, no policies (only the backend connects).
