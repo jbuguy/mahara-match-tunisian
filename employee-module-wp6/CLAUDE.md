@@ -78,7 +78,8 @@ users           id, email (unique), role='candidate', preferred_language='fr', l
 candidates      id, user_id (unique: one profile per user), onboarding_path, literacy_level, governorate_code, education_level,
                 years_experience, languages (jsonb [{code, level}]), summary, available_from,
                 consent_version, consent_given_at
-candidate_pii   candidate_id (pk), full_name, email, phone     (identity kept apart from the profile)
+candidate_pii   candidate_id (pk), full_name, email, phone, photo (bytea, own 256px JPEG; null = Google photo)
+                                                               (identity kept apart from the profile)
 candidate_skills        (candidate_id, skill_id) pk, level 1-4, source ('self_declared' | 'cv'), confidence
 candidate_experiences   id, candidate_id, job_title_raw, employer_name, start_date, end_date, duration_months, description
 candidate_educations    id, candidate_id, level, field_of_study, institution, graduation_year
@@ -165,24 +166,36 @@ Each session's details come in its prompt; don't build ahead.
   `GET/PUT /api/v1/me/profile` (one transaction, 422 per unknown code), DB tests in rolled-back transactions,
   Profil page (empty state + full view), placeholders `/profil/modifier` and `/profil/importer-cv`.
   See `docs/sessions/03-profile-api.md`.
+- 2026-09-30 · Session 4, profile form: 3-step `ProfileForm` at `/profil/modifier` (create + edit, plain state, French
+  errors next to fields, server 422 mapped to fields, sticky Précédent/Suivant bar), `initialValues` + `fromCv` props for
+  CV import; Google photo by default + own photo (`candidate_pii.photo`, `/api/v1/me/photo`); speed work (profile read in
+  1 query, fewer save statements, no reloads between Profil and the form, cached reference data).
+  See `docs/sessions/04-profile-form.md`.
 
 ## Current status
 
 *(overwrite this section each session; it's the single source of truth for "where are we")*
 
-- Last completed: Session 3, profile API + Profil page, checked in the browser (empty state for my account)
-- Next up: Session 4, profile form (3 steps, create + edit) at `/profil/modifier`, saving with `PUT /api/v1/me/profile`
-- Supabase: my own project with `db/schema.sql` applied, Google provider enabled, and `seed_dev.py` run
-  (SK-9001…SK-9032, OC-9001…OC-9012); Redirect URLs include `http://localhost:5173/auth/callback`
-  (switch to the team project in Session 6)
-- `.env` has all names from `.env.example` set; no new names in Session 3. `APP_ENV` must be `dev` or `development`
+- Last completed: Session 4, profile form + photo + speed work, checked in the browser (create, edit, remove a skill,
+  change photo and back to Google)
+- Next up: Session 5, CV import (PDF/DOCX → draft) opening `ProfileForm` with `initialValues` and `fromCv`
+- Supabase: my own project with `db/schema.sql` applied (including `candidate_pii.photo`, added in Session 4), Google
+  provider enabled, and `seed_dev.py` run (SK-9001…SK-9032, OC-9001…OC-9012); Redirect URLs include
+  `http://localhost:5173/auth/callback` (switch to the team project in Session 6)
+- `.env` has all names from `.env.example` set; no new names in Sessions 3-4. `APP_ENV` must be `dev` or `development`
   for the seed script to run
-- Auth pieces to reuse: backend `Depends(get_current_user)` → `CurrentUser(user, name)`; frontend `api<T>(path)`
-  in `src/lib/api.ts`, `useAuth()` in `src/lib/auth-context.ts`
-- Profile pieces to reuse: request model `ProfileIn` in `backend/app/schemas.py` (`consent: true` required, `from_cv`,
-  codes for governorate/skills/occupations, `languages` as `[{code: ISO 639-1, level: basic|intermediate|fluent|native}]`);
-  unknown codes → 422 in FastAPI's own error shape (`loc` + `input`); frontend types + `getProfile()` in `src/lib/api.ts`,
-  French labels in `src/lib/labels.ts`; search with `GET /api/v1/reference/{governorates,skills,occupations}?q=`
-- Tests: 28; profile and reference tests use the real database inside a rolled-back transaction (skipped if unreachable)
-- Secrets: the Google OAuth client secret and the database password were rotated after Session 3
-- Known issues / TODO: keep `%` encoded as `%25` in `DATABASE_URL`
+- Auth pieces to reuse: backend `Depends(get_current_user)` → `CurrentUser(user, name)` (needs the users row), or
+  `Depends(get_token_claims)` when only a valid login is needed (no database); frontend `api<T>(path)` in `src/lib/api.ts`,
+  `useAuth()` in `src/lib/auth-context.ts`
+- Profile pieces to reuse:
+  - backend: `ProfileIn` / `ProfileOut` (now with `has_photo`) in `app/schemas.py`; unknown codes → 422 in FastAPI's
+    own shape (`loc` + `input`)
+  - frontend: `ProfileForm` (`src/components/profile/`), `ProfileFormStart` (starting values; experiences and languages
+    may leave out `key`/`mode`), `profileToFormValues`, `toProfileIn`; photo via `useUserPhoto()` / `setCustomPhoto()` in
+    `src/lib/photo.ts`, `<UserAvatar>` in `src/components/Avatar.tsx`; French labels in `src/lib/labels.ts`
+- Speed: every database round trip costs ~150-190 ms (network distance to the pooler), so keep statements per request
+  low (one-query reads, batched writes) and don't refetch what a previous page already has
+- Tests: 38; profile, photo and reference tests use the real database inside a rolled-back transaction (skipped if
+  unreachable)
+- Known issues / TODO: keep `%` encoded as `%25` in `DATABASE_URL`; consent wording (now lists the photo) still needs
+  a team check; uvicorn `--reload` on Windows can hang (touch `app/main.py` or restart)

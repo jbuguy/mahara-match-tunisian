@@ -26,7 +26,8 @@ Only `VITE_*` names reach the browser, so `DATABASE_URL` never does.
 ## 2. Database (once)
 
 Open your Supabase project → **SQL Editor** → **New query**. Paste all of [db/schema.sql](db/schema.sql) and click **Run**.
-It creates the tables (row level security on, no policies) and inserts the 24 governorates. Running it again is safe.
+It creates the tables (row level security on, no policies) and inserts the 24 governorates. Running it again is safe,
+and it also adds columns that came later (for example `candidate_pii.photo`) to an existing database.
 
 ## 2b. Google login (once)
 
@@ -60,6 +61,10 @@ The profile and reference tests use the database from `DATABASE_URL`. Each test 
 so nothing is kept. They are skipped when the database can't be reached (`-rs` shows why).
 
 Check it: <http://localhost:8006/api/v1/health> should return `{"status":"ok","governorates":24}`.
+
+On start, the backend opens a few database connections in the background (each costs about a second over the
+session pooler), so the first requests aren't the slowest. On Windows, if a change doesn't seem to take effect,
+`--reload` may be stuck: touch `app/main.py` or restart the backend.
 
 ## 4. Frontend
 
