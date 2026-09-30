@@ -35,6 +35,7 @@ def test_client_sends_configured_model_and_json_mode():
     assert captured["url"] == "http://lm-studio.test/v1/chat/completions"
     assert captured["payload"]["model"] == "qwen-local"
     assert captured["payload"]["response_format"] == {"type": "json_object"}
+    assert captured["payload"]["chat_template_kwargs"] == {"enable_thinking": False}
 
 
 def test_client_wraps_http_errors():

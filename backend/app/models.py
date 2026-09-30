@@ -23,7 +23,10 @@ class Employer(Base):
     email: Mapped[str] = mapped_column(String(320), unique=True, index=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     sector: Mapped[str] = mapped_column(String(120), nullable=False)
-    company_size: Mapped[CompanySize] = mapped_column(Enum(CompanySize, name="company_size"), nullable=False)
+    company_size: Mapped[CompanySize] = mapped_column(
+        Enum(CompanySize, name="company_size", values_callable=lambda enum: [member.value for member in enum]),
+        nullable=False,
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 

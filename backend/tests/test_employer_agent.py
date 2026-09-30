@@ -11,6 +11,7 @@ from sqlalchemy.pool import StaticPool
 from app.database import Base, get_db
 from app.models import EmployerDraftSession
 from employer_agent_wp4 import create_employer_agent_router
+import employer_agent_wp4.router as employer_router
 
 
 test_engine = create_engine(
@@ -120,6 +121,22 @@ def test_session_starts_and_can_be_resumed_by_its_employer():
 
     assert resumed.status_code == 200
     assert resumed.json()["id"] == body["id"]
+    assert resumed.json()["mode"] == "chat"
+
+
+def test_form_mode_is_persisted_and_starts_without_chat_message():
+    created = client.post("/employer-agent/sessions", json={"mode": "form"})
+
+    assert created.status_code == 201
+    assert created.json()["mode"] == "form"
+    assert created.json()["messages"] == []
+    assert client.get(f"/employer-agent/sessions/{created.json()['id']}").json()["mode"] == "form"
+
+
+def test_session_rejects_unknown_mode():
+    response = client.post("/employer-agent/sessions", json={"mode": "wizard"})
+
+    assert response.status_code == 422
 
 
 def test_session_cannot_be_read_by_another_employer():
@@ -143,12 +160,22 @@ def test_session_list_is_scoped_to_the_signed_in_employer():
     app.dependency_overrides[current_employer] = current_employer
 
 
-def test_served_chat_includes_existing_employer_login():
+def test_served_ui_loads_the_built_react_app():
     response = client.get("/employer-agent/")
 
     assert response.status_code == 200
-    assert "employers/login" in response.text
-    assert "Authorization" in response.text
+    assert 'id="root"' in response.text
+    assert "/employer-agent/assets/index-" in response.text
+
+
+def test_served_ui_exposes_built_assets():
+    response = client.get("/employer-agent/")
+    asset_path = response.text.split('src="', 1)[1].split('"', 1)[0]
+
+    asset = client.get(asset_path)
+
+    assert asset.status_code == 200
+    assert "employers/login" in asset.text
 
 
 def test_sample_generation_inputs_cover_distinct_job_types():
@@ -220,6 +247,68 @@ def test_first_answer_is_extracted_and_next_question_is_returned():
     body = response.json()
     assert body["answers"]["title"] == "Développeur web"
     assert body["messages"][-1]["content"].startswith("Chnowa bech yaamel")
+
+
+def test_form_submission_requires_core_offer_fields():
+    created = client.post("/employer-agent/sessions", json={"mode": "form"}).json()
+
+    response = client.post(
+        f"/employer-agent/sessions/{created['id']}/answers",
+        json={"answers": {"title": "Développeur web"}},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"]["missing_fields"] == [
+        "responsibilities",
+        "location",
+        "contract_type",
+        "required_skills",
+    ]
+
+
+def test_form_submission_generates_draft_and_tracks_skipped_optional_fields(monkeypatch):
+    async def fake_generate_offer(client_arg, db, state, employer_id, skills_model):
+        return create_session_with_draft()[1] | {"employer_id": employer_id}, []
+
+    monkeypatch.setattr(employer_router, "generate_offer", fake_generate_offer)
+    created = client.post("/employer-agent/sessions", json={"mode": "form"}).json()
+
+    response = client.post(
+        f"/employer-agent/sessions/{created['id']}/answers",
+        json={
+            "answers": {
+                "title": "Développeur web",
+                "responsibilities": "Développer et maintenir les fonctionnalités du site web.",
+                "location": "Tunis",
+                "contract_type": "CDI",
+                "required_skills": "Python, APIs",
+            }
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["complete"] is True
+    assert response.json()["skipped"] == [
+        "preferred_skills",
+        "experience_and_education",
+        "languages_required",
+        "work_mode",
+        "positions_count",
+        "salary",
+    ]
+
+
+def test_review_endpoint_returns_grounded_candidate_summary_without_salary_data():
+    session_id, _ = create_session_with_draft()
+
+    response = client.get(f"/employer-agent/sessions/{session_id}/review")
+
+    assert response.status_code == 200
+    review = response.json()
+    assert review["salary"]["status"] == "not_provided"
+    assert review["salary"]["benchmark"] is None
+    assert review["candidate_snapshot"]["title"] == "Développeur web"
+    assert review["candidate_snapshot"]["skills"][0]["label"] == "SK-0001"
 
 
 def test_skipped_required_answers_are_reasked_instead_of_lost():

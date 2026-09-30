@@ -47,13 +47,14 @@ class OpenAICompatibleClient:
         self,
         messages: list[dict[str, str]],
         *,
-        response_format: dict[str, str] | None = None,
+        response_format: dict[str, Any] | None = None,
         temperature: float = 0.2,
     ) -> str:
         payload: dict[str, Any] = {
             "model": self.settings.model,
             "messages": messages,
             "temperature": temperature,
+            "chat_template_kwargs": {"enable_thinking": False},
         }
         if response_format is not None:
             payload["response_format"] = response_format

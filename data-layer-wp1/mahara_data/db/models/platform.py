@@ -13,7 +13,7 @@ from ..base import Base, CreatedAtMixin, JSONType, UUIDPrimaryKeyMixin, embeddin
 
 
 class Document(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
-    """A raw uploaded file. The bytes live in Supabase Storage; only metadata is here."""
+    """A raw uploaded file. The bytes live in object storage; only metadata is here."""
 
     __tablename__ = "documents"
 

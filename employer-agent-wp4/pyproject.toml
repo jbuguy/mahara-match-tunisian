@@ -20,4 +20,4 @@ build-backend = "setuptools.build_meta"
 include = ["employer_agent_wp4*"]
 
 [tool.setuptools.package-data]
-employer_agent_wp4 = ["templates/*.html"]
+employer_agent_wp4 = ["templates/*.html", "static/*.html", "static/assets/*"]

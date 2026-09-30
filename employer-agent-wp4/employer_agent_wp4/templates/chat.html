@@ -14,6 +14,11 @@
     h1 { max-width: 8ch; margin: 64px 0 18px; font-size: clamp(38px, 5vw, 62px); line-height: 0.98; font-weight: 500; }
     aside p { color: var(--muted); max-width: 30ch; }
     #start { margin-top: 24px; padding: 12px 18px; border: 0; background: var(--green); color: white; font: 600 15px system-ui, sans-serif; cursor: pointer; }
+    #show-signup { display: block; margin-top: 12px; padding: 0; border: 0; background: none; color: var(--green); text-decoration: underline; cursor: pointer; font: 600 14px system-ui, sans-serif; }
+    #signup-form { display: grid; gap: 8px; margin-top: 14px; }
+    #signup-form[hidden] { display: none; }
+    #signup-form input, #signup-form select { width: 100%; min-height: 40px; padding: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); }
+    #signup-form button { min-height: 42px; }
     section { display: flex; flex-direction: column; min-height: 100vh; padding: 28px clamp(18px, 4vw, 52px); }
     header { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding-bottom: 18px; border-bottom: 1px solid var(--line); font: 600 13px system-ui, sans-serif; }
     #login-form { display: flex; gap: 6px; }
@@ -40,6 +45,19 @@
       <h1>Votre offre, construite ensemble.</h1>
       <p>Répondez en français ou en derja. Vous pouvez passer une question; les informations manquantes resteront à compléter.</p>
       <button id="start" type="button">Commencer une offre</button>
+      <button id="show-signup" type="button">Créer un compte recruteur</button>
+      <form id="signup-form" hidden>
+        <input id="company-name" name="company_name" placeholder="Nom de l'entreprise" autocomplete="organization" required>
+        <input id="sector" name="sector" placeholder="Secteur d'activité" required>
+        <select id="company-size" name="company_size" aria-label="Taille de l'entreprise" required>
+          <option value="" disabled selected>Taille de l'entreprise</option>
+          <option value="1-10">1-10</option><option value="11-50">11-50</option>
+          <option value="51-200">51-200</option><option value="200+">200+</option>
+        </select>
+        <input id="signup-email" type="email" name="email" placeholder="E-mail professionnel" autocomplete="email" required>
+        <input id="signup-password" type="password" name="password" placeholder="Mot de passe (8 caractères, majuscule, minuscule, chiffre)" autocomplete="new-password" minlength="8" maxlength="128" pattern="(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9]).{8,128}" title="Utilisez 8 à 128 caractères avec une majuscule, une minuscule et un chiffre." required>
+        <button type="submit">Créer le compte</button>
+      </form>
     </aside>
     <section aria-label="Conversation">
       <header>
@@ -62,6 +80,20 @@
       const headers = new Headers(options.headers || {});
       headers.set('Authorization', `Bearer ${accessToken}`);
       return fetch(url, { ...options, headers });
+    }
+    async function login(email, password) {
+      const response = await fetch('/employers/login', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      if (!response.ok) return false;
+      accessToken = (await response.json()).access_token;
+      sessionStorage.setItem('employer_access_token', accessToken);
+      document.querySelector('#password').value = '';
+      document.querySelector('#signup-password').value = '';
+      document.querySelector('#status').textContent = 'Connecté';
+      await restoreSession();
+      return true;
     }
     function render(data) {
       messages.replaceChildren(...data.messages.map(item => {
@@ -141,16 +173,41 @@
     }
     document.querySelector('#login-form').addEventListener('submit', async event => {
       event.preventDefault();
-      const response = await fetch('/employers/login', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: document.querySelector('#email').value, password: document.querySelector('#password').value })
+      const email = document.querySelector('#email').value;
+      const password = document.querySelector('#password').value;
+      if (!await login(email, password)) document.querySelector('#status').textContent = 'Identifiants invalides';
+    });
+    document.querySelector('#show-signup').addEventListener('click', () => {
+      const form = document.querySelector('#signup-form');
+      form.hidden = !form.hidden;
+      document.querySelector('#show-signup').textContent = form.hidden ? 'Créer un compte recruteur' : 'Fermer l’inscription';
+    });
+    document.querySelector('#signup-form').addEventListener('submit', async event => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const payload = Object.fromEntries(new FormData(form));
+      document.querySelector('#status').textContent = 'Création du compte…';
+      const response = await fetch('/employers/signup', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
       });
-      if (!response.ok) { document.querySelector('#status').textContent = 'Identifiants invalides'; return; }
-      accessToken = (await response.json()).access_token;
-      sessionStorage.setItem('employer_access_token', accessToken);
-      document.querySelector('#password').value = '';
-      document.querySelector('#status').textContent = 'Connecté';
-      await restoreSession();
+      if (!response.ok) {
+        if (response.status === 409) {
+          document.querySelector('#status').textContent = 'Cette adresse e-mail existe déjà';
+        } else if (response.status === 422) {
+          const body = await response.json();
+          const labels = { company_name: "Nom de l'entreprise", email: 'E-mail', password: 'Mot de passe', sector: 'Secteur', company_size: "Taille de l'entreprise" };
+          const errors = Array.isArray(body.detail) ? body.detail.map(error => {
+            const field = error.loc?.at(-1);
+            return `${labels[field] || field || 'Inscription'}: ${error.msg.replace(/^Value error, /, '')}`;
+          }) : [typeof body.detail === 'string' ? body.detail : 'Vérifiez les informations saisies'];
+          document.querySelector('#status').textContent = errors.join(' · ');
+        } else {
+          document.querySelector('#status').textContent = 'Inscription impossible; réessayez plus tard';
+        }
+        return;
+      }
+      const signedIn = await login(payload.email, payload.password);
+      if (signedIn) document.querySelector('#status').textContent = 'Compte créé';
     });
     restoreSession();
   </script>

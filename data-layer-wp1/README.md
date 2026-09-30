@@ -26,6 +26,7 @@ tests/              ORM ↔ SQL sync, model and contract tests
 ## Setup
 
 ```bash
+docker compose up -d db          # from the repository root; initializes PostgreSQL + pgvector
 cd data-layer-wp1
 python -m venv .venv
 .venv/Scripts/activate        # Windows  (source .venv/bin/activate on Linux/macOS)
@@ -50,8 +51,12 @@ Teams that don't use Python can validate against `contracts/*.schema.json`.
 
 ## Applying the schema
 
+On a new database volume, Docker applies the ordered SQL files from
+`supabase/migrations/` automatically. To apply a migration added after the
+volume was initialized:
+
 ```bash
-supabase db push                 # from the repo root, with a linked Supabase project
+docker compose exec db psql -U mahara -d mahara_match -f /docker-entrypoint-initdb.d/<migration>.sql
 ```
 
 ## Changing the schema or a contract

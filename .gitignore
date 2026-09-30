@@ -5,4 +5,10 @@ __pycache__/
 .pytest_cache/
 .venv/
 venv/
+backend/*.db
+node_modules/
+**/build/
+*.tsbuildinfo
+supabase/.branches/
+supabase/.temp/
 employer-agent-wp4/employer_agent_wp4/static/

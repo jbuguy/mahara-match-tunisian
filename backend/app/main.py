@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from shared_llm import LLMSettings, OpenAICompatibleClient
 
 from .config import get_settings
-from .database import get_db
+from .database import Base, engine, get_db
 from .models import Employer, EmployerDraftSession
 from .schemas import EmployerLogin, EmployerProfile, EmployerSignup, EmployerUpdate, Token
 from .security import create_access_token, get_current_employer, hash_password, verify_password
@@ -29,6 +29,8 @@ llm_client = OpenAICompatibleClient(
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    if engine.dialect.name == "sqlite":
+        Base.metadata.create_all(bind=engine)
     yield
     await llm_client.close()
 
