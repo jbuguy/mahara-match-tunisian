@@ -7,22 +7,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { displayName, initials, useAuth } from '@/lib/auth-context'
-import { cn } from '@/lib/utils'
-
-function Avatar({ name, inverted = false }: { name: string; inverted?: boolean }) {
-  return (
-    <span
-      aria-hidden
-      className={cn(
-        'grid size-10 shrink-0 place-items-center rounded-full font-heading text-[15px] font-semibold',
-        inverted ? 'bg-white text-teal' : 'bg-teal text-white',
-      )}
-    >
-      {initials(name)}
-    </span>
-  )
-}
+import { UserAvatar } from '@/components/Avatar'
+import { displayName, useAuth } from '@/lib/auth-context'
 
 /** Bottom of the teal sidebar and drawer: who is signed in + "Se déconnecter". */
 export function SidebarUser() {
@@ -32,7 +18,7 @@ export function SidebarUser() {
   return (
     <div className="mt-auto space-y-3 border-t border-white/15 p-4">
       <div className="flex items-center gap-3">
-        <Avatar name={name} inverted />
+        <UserAvatar name={name} inverted className="size-10 text-[15px]" />
         <span className="truncate text-[15px] font-medium text-white">{name}</span>
       </div>
       <Button
@@ -47,7 +33,7 @@ export function SidebarUser() {
   )
 }
 
-/** Right side of the 72px desktop top bar: initials + name, with a small menu. */
+/** Right side of the 72px desktop top bar: photo + name, with a small menu. */
 export function TopBarUserMenu() {
   const { session, signOut } = useAuth()
   const name = displayName(session)
@@ -56,7 +42,7 @@ export function TopBarUserMenu() {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="h-12 gap-3 px-2" aria-label={`Menu du compte de ${name}`}>
-          <Avatar name={name} />
+          <UserAvatar name={name} className="size-10 text-[15px]" />
           <span className="max-w-48 truncate text-[15px] text-ink">{name}</span>
           <ChevronDown aria-hidden className="text-ink-secondary" />
         </Button>

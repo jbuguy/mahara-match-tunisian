@@ -17,7 +17,7 @@ export const EDUCATION_LEVELS: Record<string, string> = {
 export const SKILL_LEVELS: Record<number, string> = {
   1: 'Débutant',
   2: 'Intermédiaire',
-  3: 'Confirmé',
+  3: 'Avancé',
   4: 'Expert',
 }
 

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
-import { Link } from 'react-router'
+import { Link, useLocation, useNavigate } from 'react-router'
 import {
   Briefcase,
+  CircleCheck,
   CalendarDays,
   FileUp,
   GraduationCap,
@@ -18,7 +19,7 @@ import {
 
 import { Button } from '@/components/ui/button'
 import { getProfile, type Experience, type Profile } from '@/lib/api'
-import { initials } from '@/lib/auth-context'
+import { UserAvatar } from '@/components/Avatar'
 import {
   EDUCATION_LEVELS,
   LANGUAGE_LEVELS,
@@ -36,7 +37,20 @@ type State =
   | { status: 'ready'; profile: Profile }
 
 export function ProfilPage() {
-  const [state, setState] = useState<State>({ status: 'loading' })
+  const location = useLocation()
+  const navigate = useNavigate()
+  // Coming back from the form after a save: it hands over the saved profile (no need to load it again)
+  // and we show a message once, then forget it (a reload won't show it again).
+  const handedOver: Profile | undefined = location.state?.profile
+  const [state, setState] = useState<State>(() =>
+    handedOver ? { status: 'ready', profile: handedOver } : { status: 'loading' },
+  )
+  const [saved] = useState(() => Boolean(location.state?.saved))
+  const [photoFailed] = useState(() => Boolean(location.state?.photoFailed))
+
+  useEffect(() => {
+    if (location.state?.saved) navigate(location.pathname, { replace: true, state: null })
+  }, [location, navigate])
 
   const load = useCallback(() => {
     let ignore = false
@@ -52,7 +66,9 @@ export function ProfilPage() {
     }
   }, [])
 
-  useEffect(load, [load])
+  // Load once on arrival, unless the form handed the profile over.
+  const [needsLoad] = useState(!handedOver)
+  useEffect(() => (needsLoad ? load() : undefined), [load, needsLoad])
 
   function retry() {
     setState({ status: 'loading' })
@@ -79,7 +95,7 @@ export function ProfilPage() {
     )
   }
   if (state.status === 'empty') return <EmptyProfile />
-  return <ProfileView profile={state.profile} />
+  return <ProfileView profile={state.profile} saved={saved} photoFailed={photoFailed} />
 }
 
 function EmptyProfile() {
@@ -96,7 +112,7 @@ function EmptyProfile() {
         </div>
         <div className="flex w-full max-w-sm flex-col gap-3">
           <Button asChild variant="gold" size="lg">
-            <Link to="/profil/modifier">
+            <Link to="/profil/modifier" state={{ profile: null }}>
               <Pencil aria-hidden />
               Créer mon profil
             </Link>
@@ -113,7 +129,7 @@ function EmptyProfile() {
   )
 }
 
-function ProfileView({ profile }: { profile: Profile }) {
+function ProfileView({ profile, saved, photoFailed }: { profile: Profile; saved: boolean; photoFailed: boolean }) {
   const name = profile.full_name ?? profile.email ?? ''
   const languages = profile.languages
   const facts = [
@@ -127,21 +143,28 @@ function ProfileView({ profile }: { profile: Profile }) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <PageTitle>Mon profil</PageTitle>
         <Button asChild variant="gold">
-          <Link to="/profil/modifier">
+          <Link to="/profil/modifier" state={{ profile }}>
             <Pencil aria-hidden />
             Modifier
           </Link>
         </Button>
       </div>
 
+      {saved && (
+        <p role="status" className="flex items-center gap-2 rounded-[10px] bg-secondary px-4 py-3 font-medium text-teal">
+          <CircleCheck aria-hidden className="size-5 shrink-0" />
+          Profil enregistré.
+        </p>
+      )}
+      {photoFailed && (
+        <p role="alert" className="rounded-[10px] border border-danger/40 bg-surface px-4 py-3 text-danger">
+          La photo n'a pas pu être enregistrée. Réessayez depuis « Modifier ».
+        </p>
+      )}
+
       {/* Identity and contact */}
       <div className="flex flex-col gap-5 rounded-[10px] border bg-surface p-5 sm:flex-row sm:items-start">
-        <div
-          aria-hidden
-          className="flex size-16 shrink-0 items-center justify-center rounded-full bg-teal font-heading text-xl font-semibold text-white"
-        >
-          {initials(name)}
-        </div>
+        <UserAvatar name={name} className="size-20 text-2xl" />
         <div className="min-w-0 flex-1 space-y-3">
           <div className="space-y-1">
             <h2 className="text-xl text-ink">{name}</h2>

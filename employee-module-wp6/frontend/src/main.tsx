@@ -9,13 +9,8 @@ import { AppShell } from '@/components/layout/AppShell'
 import { AccueilPage } from '@/pages/AccueilPage'
 import { AuthCallbackPage } from '@/pages/AuthCallbackPage'
 import { LoginPage } from '@/pages/LoginPage'
-import {
-  CandidaturesPage,
-  CvImportPage,
-  FormationPage,
-  OffresPage,
-  ProfilFormPage,
-} from '@/pages/placeholders'
+import { CandidaturesPage, CvImportPage, FormationPage, OffresPage } from '@/pages/placeholders'
+import { ProfilFormPage } from '@/pages/ProfilFormPage'
 import { ProfilPage } from '@/pages/ProfilPage'
 
 const router = createBrowserRouter([

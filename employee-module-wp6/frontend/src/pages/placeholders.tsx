@@ -40,10 +40,6 @@ export function FormationPage() {
   return <ComingSoon title="Formation" />
 }
 
-export function ProfilFormPage() {
-  return <ComingSoon title="Mon profil" backTo={{ to: '/profil', label: 'Retour au profil' }} />
-}
-
 export function CvImportPage() {
   return <ComingSoon title="Importer mon CV" backTo={{ to: '/profil', label: 'Retour au profil' }} />
 }

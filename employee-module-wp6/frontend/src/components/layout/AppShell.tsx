@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { NavLink, Outlet, useLocation } from 'react-router'
+import { NavLink, Outlet, ScrollRestoration, useLocation } from 'react-router'
 import { Menu } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -41,6 +41,8 @@ export function AppShell() {
 
   return (
     <div className="min-h-dvh bg-background">
+      {/* New pages open at the top; Back returns to where you were. */}
+      <ScrollRestoration />
       {/* 1024px and up: fixed 240px teal sidebar */}
       <aside className="fixed inset-y-0 left-0 hidden w-60 flex-col bg-teal lg:flex">
         <div className="flex h-18 items-center px-5">
