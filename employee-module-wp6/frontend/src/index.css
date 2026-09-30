@@ -1,0 +1,85 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/* Mahara design system (see employee-module-wp6/claude.md). Fonts are loaded in index.html. */
+@theme {
+    --color-teal: #0F6E5C;
+    --color-gold: #C6923F;
+    --color-gold-foreground: #241300;
+    --color-page: #FAFAF7;
+    --color-surface: #FFFFFF;
+    --color-ink: #1A1A1A;
+    --color-ink-secondary: #5B6B66;
+    --color-line: #E4E1D8;
+    --color-danger: #C62828;
+
+    --font-sans: 'Work Sans', ui-sans-serif, system-ui, sans-serif;
+    --font-heading: 'Outfit', ui-sans-serif, system-ui, sans-serif;
+}
+
+/* shadcn/ui tokens, mapped onto the Mahara palette. */
+@theme inline {
+    --color-ring: var(--ring);
+    --color-input: var(--input);
+    --color-border: var(--border);
+    --color-destructive: var(--destructive);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-accent: var(--accent);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-muted: var(--muted);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-secondary: var(--secondary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-primary: var(--primary);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-popover: var(--popover);
+    --color-card-foreground: var(--card-foreground);
+    --color-card: var(--card);
+    --color-foreground: var(--foreground);
+    --color-background: var(--background);
+    --radius-sm: calc(var(--radius) * 0.6);
+    --radius-md: calc(var(--radius) * 0.8);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) * 1.4);
+    --radius-2xl: calc(var(--radius) * 1.8);
+    --radius-3xl: calc(var(--radius) * 2.2);
+    --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+    --background: #FAFAF7;
+    --foreground: #1A1A1A;
+    --card: #FFFFFF;
+    --card-foreground: #1A1A1A;
+    --popover: #FFFFFF;
+    --popover-foreground: #1A1A1A;
+    --primary: #0F6E5C;
+    --primary-foreground: #FFFFFF;
+    --secondary: #EEF4F2;
+    --secondary-foreground: #0F6E5C;
+    --muted: #F2F0EA;
+    --muted-foreground: #5B6B66;
+    --accent: #EEF4F2;
+    --accent-foreground: #0F6E5C;
+    --destructive: #C62828;
+    --border: #E4E1D8;
+    --input: #E4E1D8;
+    --ring: #0F6E5C;
+    --radius: 10px;
+}
+
+@layer base {
+    * {
+        @apply border-border outline-ring/50;
+    }
+    html {
+        @apply font-sans;
+    }
+    body {
+        @apply bg-background text-foreground text-[15px];
+    }
+    h1, h2, h3 {
+        @apply font-heading font-semibold;
+    }
+}
