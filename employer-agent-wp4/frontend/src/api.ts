@@ -12,6 +12,7 @@ export interface JobSkill {
 }
 
 export interface OfferDraft {
+  offer_id?: string | null;
   title: string;
   description: string;
   occupation_code: string | null;
@@ -24,6 +25,8 @@ export interface OfferDraft {
   salary: { min_tnd: number | null; max_tnd: number | null; period: 'hour' | 'day' | 'month' } | null;
   skills: JobSkill[];
   languages_required: { code: string; level: number }[];
+  status: 'draft' | 'published';
+  published_at?: string | null;
   [key: string]: unknown;
 }
 

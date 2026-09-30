@@ -344,6 +344,8 @@ function OfferReviewWorkspace({ session, initialReview, token, onNotice, onSaved
 
   useEffect(() => { setDraft(session.draft!); setReview(initialReview); }, [session.id, session.draft, initialReview]);
 
+  const published = draft.status === 'published';
+
   async function saveDraft(event: FormEvent) {
     event.preventDefault();
     setPending(true);
@@ -365,6 +367,23 @@ function OfferReviewWorkspace({ session, initialReview, token, onNotice, onSaved
     }
   }
 
+  async function publishDraft() {
+    setPending(true);
+    setSaved(false);
+    onNotice('');
+    try {
+      const updated = await apiRequest<AgentSession>(`/employer-agent/sessions/${session.id}/publish`, token, { method: 'POST' });
+      const updatedReview = review ?? await apiRequest<OfferReview>(`/employer-agent/sessions/${session.id}/review`, token);
+      setDraft(updated.draft!);
+      setReview(updatedReview);
+      onSaved(updated, updatedReview);
+    } catch (error) {
+      onNotice(explainError(error));
+    } finally {
+      setPending(false);
+    }
+  }
+
   function update<K extends keyof OfferDraft>(key: K, value: OfferDraft[K]) {
     setDraft({ ...draft, [key]: value });
   }
@@ -377,9 +396,10 @@ function OfferReviewWorkspace({ session, initialReview, token, onNotice, onSaved
   return (
     <section className="review-page">
       <div className="workspace-kicker"><span>03 / VOTRE BROUILLON</span><button className="back-link" type="button" onClick={onNewOffer}><Plus size={15} /> Nouvelle offre</button></div>
-      <div className="review-heading"><div><p className="eyebrow"><BadgeCheck size={15} /> Première version prête</p><h1>Une offre claire attire les bonnes candidatures.</h1><p>Relisez les détails et ajustez-les avant de réutiliser votre brouillon.</p></div><span className="draft-stamp">BROUILLON<br />NON PUBLIÉ</span></div>
+      <div className="review-heading"><div><p className="eyebrow"><BadgeCheck size={15} /> {published ? 'Offre publiée' : 'Première version prête'}</p><h1>Une offre claire attire les bonnes candidatures.</h1><p>{published ? 'Cette offre est maintenant visible par les candidats.' : 'Relisez les détails et ajustez-les avant de les publier.'}</p></div><span className={`draft-stamp ${published ? 'published-stamp' : ''}`}>{published ? 'PUBLIÉE' : <>BROUILLON<br />NON PUBLIÉ</>}</span></div>
       <div className="review-layout">
         <form className="offer-editor" onSubmit={saveDraft}>
+          <fieldset disabled={published || pending}>
           <div className="editor-section-heading"><span>01</span><div><h2>Le poste</h2><p>Les informations principales de l'offre</p></div></div>
           <label className="editor-field">Intitulé<input id="review-title" value={draft.title} onChange={(event) => update('title', event.target.value)} required minLength={3} /></label>
           <label className="editor-field">Missions<textarea id="review-description" value={draft.description} onChange={(event) => update('description', event.target.value)} required minLength={10} rows={4} /></label>
@@ -399,7 +419,8 @@ function OfferReviewWorkspace({ session, initialReview, token, onNotice, onSaved
           <button className="text-button salary-add" type="button" onClick={() => update('languages_required', [...draft.languages_required, { code: 'fr', level: 2 }])}><Plus size={16} /> Ajouter une langue</button>
           <div className="editor-section-heading separated"><span>04</span><div><h2>Rémunération</h2><p>Indiquez une fourchette si elle est définie</p></div></div>
           {draft.salary ? <div className="salary-editor" id="review-salary"><label className="editor-field">Minimum (TND)<input type="number" min="0" step="0.01" value={draft.salary.min_tnd ?? ''} onChange={(event) => update('salary', { ...draft.salary!, min_tnd: event.target.value ? Number(event.target.value) : null })} /></label><label className="editor-field">Maximum (TND)<input type="number" min="0" step="0.01" value={draft.salary.max_tnd ?? ''} onChange={(event) => update('salary', { ...draft.salary!, max_tnd: event.target.value ? Number(event.target.value) : null })} /></label><label className="editor-field">Période<select value={draft.salary.period} onChange={(event) => update('salary', { ...draft.salary!, period: event.target.value as 'hour' | 'day' | 'month' })}><option value="hour">Par heure</option><option value="day">Par jour</option><option value="month">Par mois</option></select></label></div> : <button className="text-button salary-add" type="button" id="review-salary" onClick={() => update('salary', { min_tnd: null, max_tnd: null, period: 'month' })}><Plus size={16} /> Ajouter une fourchette</button>}
-          <div className="save-row"><span>{saved && <><Check size={15} /> Modifications enregistrées</>}</span><button className="button-primary" type="submit" disabled={pending}>{pending ? 'Enregistrement…' : 'Enregistrer le brouillon'}<Check size={16} /></button></div>
+          <div className="save-row"><span>{saved && <><Check size={15} /> Modifications enregistrées</>}</span><div className="save-actions">{!published && <button className="text-button" type="submit" disabled={pending}>{pending ? 'Enregistrement...' : 'Enregistrer le brouillon'}<Check size={16} /></button>}{!published && <button className="button-primary" type="button" disabled={pending} onClick={() => void publishDraft()}>{pending ? 'Publication...' : "Publier l'offre"}<BadgeCheck size={16} /></button>}</div></div>
+          </fieldset>
         </form>
         <aside className="review-aside">
           {review ? <>

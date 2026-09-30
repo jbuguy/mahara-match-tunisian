@@ -145,6 +145,7 @@ button:disabled { cursor: wait; opacity: .62; }
 .review-heading h1 { max-width: 750px; font-size: 52px; }
 .review-heading > div > p:last-child { max-width: 60ch; }
 .draft-stamp { flex: 0 0 auto; padding: 9px 12px; border: 1px solid #d2a172; color: #a96a38; font-size: 8px; font-weight: 700; letter-spacing: 0; line-height: 1.6; text-align: center; transform: rotate(2deg); }
+.published-stamp { border-color: #8caf99; color: var(--green); transform: rotate(-1deg); }
 .review-layout { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(280px, .75fr); gap: 52px; align-items: start; }
 .offer-editor { min-width: 0; }
 .editor-section-heading { display: flex; gap: 12px; align-items: center; margin: 0 0 19px; }
@@ -164,6 +165,7 @@ button:disabled { cursor: wait; opacity: .62; }
 .salary-editor .editor-field input, .salary-editor .editor-field select { min-height: 41px; padding: 8px; }
 .salary-add { min-height: 39px; padding: 0 2px; }
 .save-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 19px; padding-top: 18px; border-top: 1px solid var(--line); }
+.save-actions { display: flex; align-items: center; gap: 14px; }
 .save-row > span { display: inline-flex; align-items: center; gap: 6px; color: var(--green); font-size: 10px; }
 .save-row .button-primary { min-height: 42px; }
 .review-aside { min-width: 0; border-top: 2px solid var(--green-dark); background: #eeefe8; }

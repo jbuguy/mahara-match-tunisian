@@ -235,6 +235,32 @@ def test_editor_rejects_skill_codes_not_in_the_generated_taxonomy_matches():
     assert "validated WP1 taxonomy" in response.json()["detail"]
 
 
+def test_employer_can_publish_a_valid_draft():
+    session_id, _ = create_session_with_draft()
+
+    response = client.post(f"/employer-agent/sessions/{session_id}/publish")
+
+    assert response.status_code == 200
+    published = response.json()["draft"]
+    assert published["status"] == "published"
+    assert published["source"] == "employer_form"
+    assert published["offer_id"]
+    assert published["published_at"]
+    assert response.json()["messages"][-1]["content"] == "Votre offre est publiée et visible par les candidats."
+
+
+def test_published_offer_cannot_be_edited_or_published_again():
+    session_id, _ = create_session_with_draft()
+    published = client.post(f"/employer-agent/sessions/{session_id}/publish")
+    draft = published.json()["draft"]
+
+    edit_response = client.patch(f"/employer-agent/sessions/{session_id}/draft", json={"draft": draft})
+    republish_response = client.post(f"/employer-agent/sessions/{session_id}/publish")
+
+    assert edit_response.status_code == 409
+    assert republish_response.status_code == 409
+
+
 def test_first_answer_is_extracted_and_next_question_is_returned():
     created = client.post("/employer-agent/sessions").json()
 

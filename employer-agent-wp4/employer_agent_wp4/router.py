@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Callable
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
 
@@ -184,6 +185,8 @@ def create_employer_agent_router(
         session = _owned_session(db, session_model, session_id, current.id)
         if session.draft is None:
             raise HTTPException(status_code=409, detail="This session does not have a generated draft")
+        if session.draft.get("status") == "published":
+            raise HTTPException(status_code=409, detail="Published offers cannot be edited")
         candidate = dict(payload.draft)
         original_skill_codes = {skill["skill_code"] for skill in session.draft.get("skills", [])}
         edited_skill_codes = {skill.get("skill_code") for skill in candidate.get("skills", [])}
@@ -200,6 +203,38 @@ def create_employer_agent_router(
         except ValidationError as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
         session.draft = validated.model_dump(mode="json")
+        db.commit()
+        db.refresh(session)
+        return _session_response(session)
+
+    @router.post("/sessions/{session_id}/publish")
+    def publish_draft(
+        session_id: uuid.UUID,
+        current: Any = Depends(get_current_employer),
+        db: Session = Depends(get_db),
+    ) -> dict[str, Any]:
+        session = _owned_session(db, session_model, session_id, current.id)
+        if session.draft is None:
+            raise HTTPException(status_code=409, detail="This session does not have a generated draft")
+        if session.draft.get("status") == "published":
+            raise HTTPException(status_code=409, detail="This offer has already been published")
+
+        candidate = dict(session.draft)
+        candidate["offer_id"] = candidate.get("offer_id") or str(uuid.uuid4())
+        candidate["employer_id"] = str(current.id)
+        candidate["status"] = "published"
+        candidate["source"] = "employer_form"
+        candidate["published_at"] = datetime.now(timezone.utc)
+        try:
+            validated = NormalizedJobOffer.model_validate(candidate)
+        except ValidationError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+
+        session.draft = validated.model_dump(mode="json")
+        session.messages = [
+            *session.messages,
+            {"role": "assistant", "content": "Votre offre est publiée et visible par les candidats."},
+        ]
         db.commit()
         db.refresh(session)
         return _session_response(session)
