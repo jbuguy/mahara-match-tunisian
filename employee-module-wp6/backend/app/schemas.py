@@ -343,3 +343,7 @@ class AssistantChatOut(BaseModel):
     # The form field the reply asks about (full_name, governorate_code, skills...), so the form can show it.
     asking: str | None = None
     done: bool
+
+
+class TranscriptOut(BaseModel):
+    text: str  # what the candidate said ('' when nothing was understood); goes into the chat's text box
