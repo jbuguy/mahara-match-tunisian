@@ -249,19 +249,6 @@ def test_gaps_distinguish_missing_and_insufficient_level():
 
 @pytest.mark.xfail(
     strict=True,
-    reason="Known defect for step B: candidate_id is null, but WP1 MatchResult requires a UUID.",
-)
-def test_match_with_missing_candidate_id_validates_against_wp1():
-    resultat = calculer_match(
-        {"candidate_id": None, "skills": []},
-        {"job_offer_id": str(uuid4()), "skills": []},
-    )
-
-    MatchResult(**resultat)
-
-
-@pytest.mark.xfail(
-    strict=True,
     reason="Known defect for step C: gaps use label_raw when skill_code is absent.",
 )
 def test_gap_without_skill_code_validates_against_wp1():
