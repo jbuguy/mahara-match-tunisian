@@ -8,6 +8,7 @@ from zipfile import BadZipFile
 from docx.opc.exceptions import PackageNotFoundError
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from pypdf.errors import PdfReadError
+from pydantic import BaseModel, Field
 import uvicorn
 
 from cv_parser import build_profile_from_cv
@@ -30,6 +31,11 @@ app = FastAPI(
 EXTENSIONS_AUTORISEES = {".pdf", ".docx"}
 FICHIER_OFFRES = os.path.join(os.path.dirname(__file__), "data", "offres_exemple.json")
 FICHIER_PROFILS = Path(__file__).resolve().parent / "data" / "wp3.sqlite3"
+
+
+class RoadmapRequest(BaseModel):
+    candidate_id: str = Field(min_length=1)
+    job_offer_id: str = Field(min_length=1)
 
 
 def charger_offres():
@@ -61,6 +67,24 @@ def create_app(database_path: str | Path | None = None) -> FastAPI:
                 detail=f"Aucun profil pour '{candidat_id}'. Fais d'abord l'etape 1 : POST /api/v1/parse-cv",
             )
         return profil
+
+    def roadmap_pour(candidat_id: str, offre_id: str):
+        """Calcule une roadmap en acceptant une clé historique ou son UUID."""
+        offre_id_uuid = canonical_id(offre_id)
+        offre = next(
+            (
+                {**item, "job_offer_id": canonical_id(str(item["job_offer_id"]))}
+                for item in charger_offres()
+                if canonical_id(str(item["job_offer_id"])) == offre_id_uuid
+            ),
+            None,
+        )
+        if offre is None:
+            raise HTTPException(status_code=404, detail=f"Offre inconnue : {offre_id}")
+        roadmap = generer_roadmap(profil_du_candidat(candidat_id), offre)
+        if roadmap is None:
+            return {"status": "no_gap", "message": "Le candidat couvre deja toutes les competences de l'offre"}
+        return roadmap
 
     @api.get("/", include_in_schema=False)
     def home():
@@ -121,21 +145,12 @@ def create_app(database_path: str | Path | None = None) -> FastAPI:
     @api.get("/api/v1/roadmap/{candidat_id}/{offre_id}", tags=[TAG_4])
     def obtenir_roadmap(candidat_id: str, offre_id: str):
         """Competences a acquerir (obligatoires d'abord) pour viser cette offre."""
-        offre_id_uuid = canonical_id(offre_id)
-        offre = next(
-            (
-                {**item, "job_offer_id": canonical_id(str(item["job_offer_id"]))}
-                for item in charger_offres()
-                if canonical_id(str(item["job_offer_id"])) == offre_id_uuid
-            ),
-            None,
-        )
-        if offre is None:
-            raise HTTPException(status_code=404, detail=f"Offre inconnue : {offre_id}")
-        roadmap = generer_roadmap(profil_du_candidat(candidat_id), offre)
-        if roadmap is None:
-            return {"status": "no_gap", "message": "Le candidat couvre deja toutes les competences de l'offre"}
-        return roadmap
+        return roadmap_pour(candidat_id, offre_id)
+
+    @api.post("/api/v1/roadmap", tags=[TAG_4])
+    def creer_roadmap(request: RoadmapRequest):
+        """Calcule une roadmap depuis les identifiants fournis dans le JSON."""
+        return roadmap_pour(request.candidate_id, request.job_offer_id)
 
     api.state.profile_store = profile_store
     return api
@@ -143,5 +158,11 @@ def create_app(database_path: str | Path | None = None) -> FastAPI:
 
 app = create_app()
 
+
+def run():
+    port = int(os.environ.get("PORT", "8000"))
+    uvicorn.run(app, host="0.0.0.0", port=port)
+
+
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    run()
