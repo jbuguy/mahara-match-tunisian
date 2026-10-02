@@ -615,3 +615,44 @@ Schemas
 Body_parser_cv_api_v1_parse_cv_postExpand allobject
 HTTPValidationErrorExpand allobject
 ValidationErrorExpand allobject
+
+## Lancer le front-end
+
+Terminal 1 (environnement virtuel Python actif, depuis `skill-matching-wp3`) :
+
+```powershell
+python main.py
+```
+
+Terminal 2 :
+
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+
+Ouvrez ensuite http://localhost:5173.
+
+## Lancement rapide
+
+Depuis PowerShell, à la racine de `skill-matching-wp3`, démarrez le backend et le frontend dans deux nouvelles fenêtres avec :
+
+```powershell
+.\start.ps1
+```
+
+Arrêtez les processus lancés par ce script avec :
+
+```powershell
+.\stop.ps1
+```
+
+Si PowerShell bloque l’exécution des scripts, autorisez-les uniquement pour la session courante, puis relancez `start.ps1` :
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\start.ps1
+```
+
+Cette autorisation disparaît à la fermeture de la fenêtre PowerShell. Le frontend est disponible sur http://localhost:5173 et la documentation de l’API sur http://localhost:8000/docs.
