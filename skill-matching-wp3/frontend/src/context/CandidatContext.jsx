@@ -1,6 +1,8 @@
-import { createContext, useContext, useState } from 'react'
+import { createContext, useContext, useEffect, useState } from 'react'
+import { getReferenceData } from '../api.js'
 
 const CandidatContext = createContext(null)
+const EMPTY_REFERENCE_DATA = { offres: [], skills: {} }
 
 function readStoredProfile() {
   try {
@@ -13,6 +15,18 @@ function readStoredProfile() {
 export function CandidatProvider({ children }) {
   const [candidatId, setCandidatId] = useState(() => localStorage.getItem('mahara-candidat-id') || 'demo')
   const [profil, setProfil] = useState(readStoredProfile)
+  const [referenceData, setReferenceData] = useState(EMPTY_REFERENCE_DATA)
+  const [referenceLoading, setReferenceLoading] = useState(true)
+  const [referenceError, setReferenceError] = useState('')
+
+  useEffect(() => {
+    let active = true
+    getReferenceData()
+      .then((data) => { if (active) setReferenceData(data) })
+      .catch((error) => { if (active) setReferenceError(error.message) })
+      .finally(() => { if (active) setReferenceLoading(false) })
+    return () => { active = false }
+  }, [])
 
   function updateCandidatId(value) {
     if (value !== candidatId) {
@@ -30,7 +44,16 @@ export function CandidatProvider({ children }) {
   }
 
   return (
-    <CandidatContext.Provider value={{ candidatId, setCandidatId: updateCandidatId, profil, setProfil: updateProfil }}>
+    <CandidatContext.Provider value={{
+      candidatId,
+      setCandidatId: updateCandidatId,
+      profil,
+      setProfil: updateProfil,
+      offres: referenceData.offres,
+      skillLabels: referenceData.skills,
+      referenceLoading,
+      referenceError,
+    }}>
       {children}
     </CandidatContext.Provider>
   )

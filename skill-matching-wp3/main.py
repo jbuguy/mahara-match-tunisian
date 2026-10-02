@@ -15,7 +15,7 @@ from cv_parser import build_profile_from_cv
 from cv_adapter import adapter_profil_vers_contrat
 from id_utils import canonical_id
 from profile_store import SQLiteProfileStore
-from scoring import classer_offres, generer_roadmap
+from scoring import SKILL_CODES, classer_offres, generer_roadmap, normaliser
 
 TAG_1 = "1 · Parser le CV (format WP1)"
 TAG_2 = "2 · Lire les offres"
@@ -49,6 +49,32 @@ def offres_avec_ids_uuid():
         {**offre, "job_offer_id": canonical_id(str(offre["job_offer_id"]))}
         for offre in charger_offres()
     ]
+
+
+def libelles_competences():
+    """Build one readable label per code from the configured aliases."""
+    labels = {}
+    for label, skill_code in SKILL_CODES.items():
+        labels.setdefault(skill_code, label)
+
+    acronyms = {
+        "aws": "AWS",
+        "c#": "C#",
+        "c++": "C++",
+        "css": "CSS",
+        "fastapi": "FastAPI",
+        "html": "HTML",
+        "javascript": "JavaScript",
+        "php": "PHP",
+        "postgresql": "PostgreSQL",
+        "rest api": "REST API",
+        "sql": "SQL",
+        "typescript": "TypeScript",
+    }
+    return {
+        skill_code: acronyms.get(label, label.title())
+        for skill_code, label in labels.items()
+    }
 
 
 def create_app(database_path: str | Path | None = None) -> FastAPI:
@@ -132,6 +158,13 @@ def create_app(database_path: str | Path | None = None) -> FastAPI:
     def lister_offres():
         """Lit les offres d'exemple et expose des identifiants UUID stables."""
         return offres_avec_ids_uuid()
+
+    @api.get("/api/v1/skills", tags=[TAG_2])
+    def lister_competences(skill_code: str | None = None):
+        """Expose les libelles par code sans enrichir les contrats WP1."""
+        if skill_code and skill_code.startswith("UNMAPPED:"):
+            return {skill_code: normaliser(skill_code.removeprefix("UNMAPPED:"))}
+        return libelles_competences()
 
     # ---------- 3 · Matching ----------
 

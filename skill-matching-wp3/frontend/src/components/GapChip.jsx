@@ -1,6 +1,8 @@
-function GapChip({ gap }) {
+import { libelleCompetence } from '../offerLabels.js'
+
+function GapChip({ gap, skillLabels }) {
   if (!gap) return <span className="gap-chip acquired">Compétences couvertes</span>
-  const label = gap.label_raw || gap.skill_code || 'Compétence'
+  const label = libelleCompetence(gap, skillLabels)
   const text = gap.gap_type === 'missing'
     ? `${label} · manquante`
     : `${label} · niveau ${gap.current_level}/${gap.required_level}`

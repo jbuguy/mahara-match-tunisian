@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { getMatches, getOffres } from '../api.js'
+import { getMatches } from '../api.js'
 import ErrorMessage from '../components/ErrorMessage.jsx'
 import ScoreBadge from '../components/ScoreBadge.jsx'
 import ScoreBar from '../components/ScoreBar.jsx'
 import Spinner from '../components/Spinner.jsx'
 import { useCandidat } from '../context/CandidatContext.jsx'
 import { nomGouvernorat } from '../governorates.js'
+import { libelleCompetence, titreOffre } from '../offerLabels.js'
 
 const criteres = [
   ['hard_skills', 'Compétences techniques'],
@@ -21,20 +22,18 @@ function cle(skill) {
 
 function DetailOffre() {
   const { offreId } = useParams()
-  const { candidatId, profil } = useCandidat()
+  const { candidatId, profil, offres, skillLabels, referenceLoading, referenceError } = useCandidat()
   const [match, setMatch] = useState(null)
-  const [offre, setOffre] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const navigate = useNavigate()
 
   useEffect(() => {
     let active = true
-    Promise.all([getMatches(candidatId), getOffres()])
-      .then(([matches, offres]) => {
+    getMatches(candidatId)
+      .then((matches) => {
         if (!active) return
         setMatch(matches.items?.find((item) => item.job_offer_id === offreId) || null)
-        setOffre(offres.find((item) => item.job_offer_id === offreId) || null)
       })
       .catch((requestError) => { if (active) setError(requestError.message) })
       .finally(() => { if (active) setLoading(false) })
@@ -45,14 +44,17 @@ function DetailOffre() {
   const breakdown = match?.breakdown || {}
   const weights = match?.weights || {}
   const formule = criteres.map(([key]) => `${Number(breakdown[key] || 0).toFixed(1)} × ${(Number(weights[key] || 0) * 100).toFixed(0)} %`).join(' + ')
+  const offre = offres.find((item) => item.job_offer_id === offreId) || null
+  const numeroOffre = offres.findIndex((item) => item.job_offer_id === offreId) + 1
+  const titre = titreOffre(offre, numeroOffre || 1)
 
   return <div className="page">
-    <div className="breadcrumb"><Link to="/offres">Offres recommandées</Link><span>/</span><span>{offreId}</span></div>
-    {loading && <Spinner label="Chargement du détail…" />}
-    {error && <ErrorMessage message={error} onReturn={() => navigate('/profil')} />}
-    {!loading && !error && (!match || !offre) && <div className="panel empty-state"><h2>Offre introuvable</h2><p>Cette offre n’est plus disponible dans les données du moteur.</p><Link className="button button-secondary" to="/offres">Retour aux offres</Link></div>}
-    {!loading && !error && match && offre && <>
-      <header className="page-heading"><div><p className="eyebrow">DÉTAIL DE L’OPPORTUNITÉ</p><h1>{offre.job_offer_id}</h1><p className="page-intro">{nomGouvernorat(offre.location?.governorate_code)} · {offre.min_years_experience} ans d’expérience minimum</p></div><ScoreBadge score={match.score_global} /></header>
+    <div className="breadcrumb"><Link to="/offres">Offres recommandées</Link><span>/</span><span>{titre}</span></div>
+    {(loading || referenceLoading) && <Spinner label="Chargement du détail…" />}
+    {(error || referenceError) && <ErrorMessage message={error || referenceError} onReturn={() => navigate('/profil')} />}
+    {!loading && !referenceLoading && !error && !referenceError && (!match || !offre) && <div className="panel empty-state"><h2>Offre introuvable</h2><p>Cette offre n’est plus disponible dans les données du moteur.</p><Link className="button button-secondary" to="/offres">Retour aux offres</Link></div>}
+    {!loading && !referenceLoading && !error && !referenceError && match && offre && <>
+      <header className="page-heading"><div><p className="eyebrow">DÉTAIL DE L’OPPORTUNITÉ</p><h1>{titre}</h1><p className="page-intro">{nomGouvernorat(offre.location?.governorate_code)} · {offre.min_years_experience} ans d’expérience minimum</p></div><ScoreBadge score={match.score_global} /></header>
       <section className="detail-layout">
         <div className="panel criteria-panel"><div className="panel-heading"><div><span className="step-label">VOTRE MATCH</span><h2>Score par critère</h2></div></div>
           <div className="criteria-list">{criteres.map(([key, label]) => <ScoreBar key={key} value={breakdown[key]} label={label} detail={`Poids dans le calcul : ${(Number(weights[key] || 0) * 100).toFixed(0)} %`} />)}</div>
@@ -63,7 +65,7 @@ function DetailOffre() {
             const level = niveaux.get(cle(skill))
             const status = level == null ? 'Manquante' : level >= skill.min_level ? 'Acquise' : 'Niveau insuffisant'
             const tone = status === 'Acquise' ? 'good' : status === 'Manquante' ? 'low' : 'medium'
-            return <tr key={`${cle(skill)}-${index}`}><td>{skill.label_raw || skill.skill_code}</td><td>{skill.requirement === 'required' ? 'Obligatoire' : 'Facultatif'}</td><td>{skill.min_level}</td><td>{level ?? '—'}</td><td><span className={`status-pill ${tone}`}>{status}</span></td></tr>
+            return <tr key={`${cle(skill)}-${index}`}><td>{libelleCompetence(skill, skillLabels)}</td><td>{skill.requirement === 'required' ? 'Obligatoire' : 'Facultatif'}</td><td>{skill.min_level}</td><td>{level ?? '—'}</td><td><span className={`status-pill ${tone}`}>{status}</span></td></tr>
           })}</tbody></table></div>
           <div className="requirements-footer"><span>Les niveaux du CV sont estimés automatiquement.</span><Link className="button button-primary" to={`/roadmap/${encodeURIComponent(offreId)}`}>Voir ma roadmap <span aria-hidden="true">→</span></Link></div>
         </div>

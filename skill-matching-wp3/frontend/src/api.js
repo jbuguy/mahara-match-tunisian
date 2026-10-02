@@ -1,4 +1,5 @@
 const API_BASE = '/api'
+let referenceDataPromise
 
 async function request(path, options = {}) {
   let response
@@ -34,6 +35,22 @@ export function parseCv(candidatId, governorateCode, file) {
 
 export function getOffres() {
   return request('/v1/offres')
+}
+
+export function getSkills() {
+  return request('/v1/skills')
+}
+
+export function getReferenceData() {
+  if (!referenceDataPromise) {
+    referenceDataPromise = Promise.all([getOffres(), getSkills()])
+      .then(([offres, skills]) => ({ offres, skills }))
+      .catch((error) => {
+        referenceDataPromise = null
+        throw error
+      })
+  }
+  return referenceDataPromise
 }
 
 export function getMatches(candidatId) {

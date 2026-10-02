@@ -103,6 +103,20 @@ def test_unknown_offer_returns_404_for_get_and_post(client):
     assert post_response.status_code == 404
 
 
+def test_skills_endpoint_maps_codes_and_normalizes_unmapped_labels(client):
+    response = client.get("/api/v1/skills")
+    unmapped_response = client.get(
+        "/api/v1/skills", params={"skill_code": "UNMAPPED:  Irrigation  "}
+    )
+
+    assert response.status_code == 200
+    labels = response.json()
+    assert labels["SK-0101"] == "Python"
+    assert labels["SK-9017"] == "Kubernetes"
+    assert unmapped_response.status_code == 200
+    assert unmapped_response.json() == {"UNMAPPED:  Irrigation  ": "irrigation"}
+
+
 @pytest.mark.parametrize(
     ("port_value", "expected_port"),
     [("8001", 8001), (None, 8000)],
