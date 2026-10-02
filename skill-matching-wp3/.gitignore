@@ -15,3 +15,6 @@ __pycache__/
 .idea/
 .DS_Store
 Thumbs.db
+venv-wp3/
+requirements-wp3-minimal.txt
+*.sqlite3
