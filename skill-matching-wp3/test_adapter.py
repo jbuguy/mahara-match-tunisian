@@ -3,6 +3,7 @@ from uuid import UUID, uuid4
 
 from docx import Document
 from fastapi.testclient import TestClient
+from mahara_data.schemas.matching import RankedMatches, Roadmap
 from mahara_data.schemas.profile import CandidateProfile
 
 from cv_adapter import adapter_profil_vers_contrat
@@ -127,3 +128,31 @@ def test_profile_persists_across_app_instances_and_legacy_ids_work(tmp_path):
     assert [
         item["job_offer_id"] for item in response.json()["items"]
     ] == [item["job_offer_id"] for item in legacy_result["items"]]
+
+
+def test_api_match_and_roadmap_outputs_validate_against_wp1(tmp_path):
+    client = TestClient(create_app(tmp_path / "wp3.sqlite3"))
+    parse_response = client.post(
+        "/api/v1/parse-cv",
+        params={"candidat_id": "wp1-contract-candidate", "governorate_code": "TN-71"},
+        files={
+            "fichier": (
+                "cv_exemple.docx",
+                (DATA_DIR / "cv_exemple.docx").read_bytes(),
+            )
+        },
+    )
+    assert parse_response.status_code == 200
+
+    match_response = client.post(
+        "/api/v1/match", params={"candidat_id": "wp1-contract-candidate"}
+    )
+    assert match_response.status_code == 200
+    matches = RankedMatches(**match_response.json())
+    offer_id = matches.items[0].job_offer_id
+
+    roadmap_response = client.get(
+        f"/api/v1/roadmap/wp1-contract-candidate/{offer_id}"
+    )
+    assert roadmap_response.status_code == 200
+    Roadmap(**roadmap_response.json())

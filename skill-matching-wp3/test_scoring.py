@@ -2,7 +2,6 @@ import json
 from pathlib import Path
 from uuid import UUID, uuid4
 
-import pytest
 from mahara_data.schemas.matching import (
     MatchResult,
     RankedMatches,
@@ -13,10 +12,13 @@ from mahara_data.schemas.matching import (
 from cv_adapter import adapter_profil_vers_contrat
 from cv_parser import build_profile_from_cv
 from scoring import (
+    SKILL_CODES,
     calculer_match,
     classer_offres,
+    code_competence,
     detecter_gaps,
     generer_roadmap,
+    normaliser,
 )
 
 
@@ -247,39 +249,37 @@ def test_gaps_distinguish_missing_and_insufficient_level():
     ]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Known defect for step C: gaps use label_raw when skill_code is absent.",
-)
 def test_gap_without_skill_code_validates_against_wp1():
+    label = "Unmapped skill"
+    offre = {
+        "skills": [
+            {
+                "label_raw": label,
+                "requirement": "required",
+                "min_level": 2,
+            }
+        ]
+    }
     gap = detecter_gaps(
         {"skills": []},
-        {
-            "skills": [
-                {
-                    "label_raw": "Unmapped skill",
-                    "requirement": "required",
-                    "min_level": 2,
-                }
-            ]
-        },
+        offre,
     )[0]
 
+    assert gap["skill_code"] == "UNMAPPED:unmapped skill"
+    assert "label_raw" not in gap
+    assert offre["skills"][0]["label_raw"] == label
     SkillGapItem(**gap)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Known defect for step C: roadmap steps use label_raw without required skill_code.",
-)
 def test_roadmap_without_skill_code_validates_against_wp1():
+    label = "Unmapped skill"
     roadmap = generer_roadmap(
         {"candidate_id": str(uuid4()), "skills": []},
         {
             "job_offer_id": str(uuid4()),
             "skills": [
                 {
-                    "label_raw": "Unmapped skill",
+                    "label_raw": label,
                     "requirement": "required",
                     "min_level": 2,
                 }
@@ -288,4 +288,17 @@ def test_roadmap_without_skill_code_validates_against_wp1():
     )
 
     assert roadmap is not None
+    assert roadmap["steps"][0]["skill_code"] == "UNMAPPED:unmapped skill"
+    assert "label_raw" not in roadmap["steps"][0]
     Roadmap(**roadmap)
+
+
+def test_skill_code_aliases_are_normalized_and_arabic_diacritics_are_ignored():
+    assert len(set(SKILL_CODES.values())) >= 30
+    assert all(label == normaliser(label) for label in SKILL_CODES)
+    assert code_competence({"label_raw": "Python"}) == "SK-0101"
+    assert code_competence({"label_raw": "بايْثون"}) == "SK-0101"
+    assert code_competence({"label_raw": "Développeur inconnu"}) == (
+        "UNMAPPED:developpeur inconnu"
+    )
+    assert len(code_competence({"label_raw": "une compétence inconnue très longue"})) <= 32
