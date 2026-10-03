@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { creerSession, envoyerReponse, getOffre, getQuestion, urlRecap } from './api.js'
+import textes from './textes.js'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -9,7 +10,7 @@ describe('API onboarding', () => {
   it('creates a session and returns the exact response body', async () => {
     const payload = {
       session_id: 'session-1',
-      question: { id: 'metier', texte: 'Quel métier ?', audio_url: '/audio/questions/metier' },
+      question: { id: 'metier', texte: textes.questions.metier, audio_url: '/audio/questions/metier' },
     }
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(payload) })
     vi.stubGlobal('fetch', fetchMock)
@@ -19,7 +20,7 @@ describe('API onboarding', () => {
   })
 
   it('reads the current question response', async () => {
-    const payload = { termine: false, question: { id: 'date', texte: 'Date ?', audio_url: '/audio/questions/date' } }
+    const payload = { termine: false, question: { id: 'date', texte: textes.questions.date, audio_url: '/audio/questions/date' } }
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(payload) }))
 
     await expect(getQuestion('session 1')).resolves.toEqual(payload)
@@ -40,9 +41,9 @@ describe('API onboarding', () => {
   })
 
   it('reads plain text offers and builds the recap URL', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, text: () => Promise.resolve('Offre de test') }))
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, text: () => Promise.resolve(textes.offrePrete) }))
 
-    await expect(getOffre('session-1')).resolves.toBe('Offre de test')
+    await expect(getOffre('session-1')).resolves.toBe(textes.offrePrete)
     expect(urlRecap('session-1')).toBe('/api/v1/sessions/session-1/recap-audio')
   })
 
@@ -51,12 +52,12 @@ describe('API onboarding', () => {
       ok: false,
       status: 422,
       json: () => Promise.resolve({
-        detail: { code: 'transcription_vide', message: 'Aucune réponse reconnue.', reessayer: true },
+        detail: { code: 'transcription_vide', message: null, reessayer: true },
       }),
     }))
 
     await expect(creerSession()).rejects.toMatchObject({
-      message: 'Aucune réponse reconnue.',
+      message: textes.erreurs.transcription_vide,
       status: 422,
       code: 'transcription_vide',
       retryable: true,
@@ -66,6 +67,6 @@ describe('API onboarding', () => {
   it('turns an unavailable API into a readable error', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')))
 
-    await expect(creerSession()).rejects.toThrow("L'API est injoignable.")
+    await expect(creerSession()).rejects.toThrow(textes.erreurs.api)
   })
 })

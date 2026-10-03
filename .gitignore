@@ -4,3 +4,7 @@ venv/
 __pycache__/
 *.pyc
 sessions.csv
+
+onboarding-agent-wp2/data/
+node_modules/
+dist/

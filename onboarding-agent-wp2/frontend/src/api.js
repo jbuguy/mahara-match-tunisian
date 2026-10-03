@@ -1,3 +1,5 @@
+import textes from './textes.js'
+
 const API_ROOT = '/api/v1/sessions'
 
 async function request(url, options) {
@@ -5,7 +7,7 @@ async function request(url, options) {
   try {
     response = await fetch(url, options)
   } catch {
-    throw new Error("L'API est injoignable. Vérifiez que le serveur est lancé puis réessayez.")
+    throw new Error(textes.erreurs.api)
   }
 
   if (!response.ok) {
@@ -17,11 +19,15 @@ async function request(url, options) {
     }
 
     const detail = payload?.detail
-    const error = new Error(
-      typeof detail === 'string'
-        ? detail
-        : detail?.message || `La requête a échoué (HTTP ${response.status}).`,
-    )
+    const statusMessages = {
+      400: textes.erreurs.erreur400,
+      404: textes.erreurs.erreur404,
+      409: textes.erreurs.erreur409,
+      413: textes.erreurs.erreur413,
+      500: textes.erreurs.serveur,
+    }
+    const message = textes.erreurs[detail?.code] || statusMessages[response.status] || textes.erreurs.autre
+    const error = new Error(message)
     error.status = response.status
     error.code = detail?.code
     error.retryable = detail?.reessayer === true

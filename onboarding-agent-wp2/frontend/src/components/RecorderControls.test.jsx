@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import '@testing-library/jest-dom/vitest'
 import RecorderControls from './RecorderControls.jsx'
+import textes from '../textes.js'
 
 let recorderInstance
 
@@ -51,12 +52,12 @@ describe('RecorderControls', () => {
     vi.spyOn(Date, 'now').mockImplementation(() => now)
     render(<RecorderControls onRecorded={onRecorded} />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
+    fireEvent.click(screen.getByRole('button', { name: textes.enregistrer }))
     await waitFor(() => expect(recorderInstance).not.toBeNull())
     expect(recorderInstance.mimeType).toBe('audio/webm;codecs=opus')
     recorderInstance.ondataavailable({ data: new Blob(['speech'], { type: 'audio/webm' }) })
     now = 2000
-    fireEvent.click(screen.getByRole('button', { name: /Arrêter/ }))
+    fireEvent.click(screen.getByRole('button', { name: textes.arreter }))
 
     expect(onRecorded).toHaveBeenCalledOnce()
     expect(onRecorded.mock.calls[0][0].type).toBe('audio/webm;codecs=opus')
@@ -69,13 +70,13 @@ describe('RecorderControls', () => {
     vi.spyOn(Date, 'now').mockImplementation(() => now)
     render(<RecorderControls onRecorded={onRecorded} />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
+    fireEvent.click(screen.getByRole('button', { name: textes.enregistrer }))
     await waitFor(() => expect(recorderInstance).not.toBeNull())
     recorderInstance.ondataavailable({ data: new Blob(['x']) })
     now = 1300
-    fireEvent.click(screen.getByRole('button', { name: /Arrêter/ }))
+    fireEvent.click(screen.getByRole('button', { name: textes.arreter }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('trop court')
+    expect(await screen.findByRole('alert')).toHaveTextContent(textes.erreurs.enregistrementCourt)
     expect(onRecorded).not.toHaveBeenCalled()
   })
 
@@ -83,8 +84,8 @@ describe('RecorderControls', () => {
     navigator.mediaDevices.getUserMedia.mockRejectedValueOnce(new DOMException('Denied', 'NotAllowedError'))
     render(<RecorderControls onRecorded={vi.fn()} />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
+    fireEvent.click(screen.getByRole('button', { name: textes.enregistrer }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('accès au microphone est refusé')
+    expect(await screen.findByRole('alert')).toHaveTextContent(textes.erreurs.microphoneRefuse)
   })
 })

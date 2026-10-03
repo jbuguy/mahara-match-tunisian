@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import textes from '../textes.js'
 
 const MIME_TYPES = [
   'audio/webm;codecs=opus',
@@ -11,12 +12,12 @@ const MIN_RECORDING_MS = 1000
 
 function microphoneError(error) {
   if (error?.name === 'NotAllowedError' || error?.name === 'PermissionDeniedError') {
-    return "L'accès au microphone est refusé. Autorisez-le dans le navigateur ou envoyez un fichier audio."
+    return textes.erreurs.microphoneRefuse
   }
   if (error?.name === 'NotFoundError' || error?.name === 'DevicesNotFoundError') {
-    return "Aucun microphone n'a été détecté. Envoyez un fichier audio pour continuer."
+    return textes.erreurs.microphoneAbsent
   }
-  return "Impossible d'accéder au microphone. Vérifiez ses branchements ou envoyez un fichier audio."
+  return textes.erreurs.microphoneErreur
 }
 
 export default function RecorderControls({ onRecorded, disabled = false, retryAvailable = false, onRetry }) {
@@ -37,7 +38,7 @@ export default function RecorderControls({ onRecorded, disabled = false, retryAv
     setError('')
     onRetry?.()
     if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
-      setError("L'enregistrement n'est pas disponible dans ce navigateur. Envoyez un fichier audio.")
+      setError(textes.erreurs.microphoneIndisponible)
       return
     }
 
@@ -55,7 +56,7 @@ export default function RecorderControls({ onRecorded, disabled = false, retryAv
         if (event.data?.size) chunksRef.current.push(event.data)
       }
       recorder.onerror = () => {
-        setError("L'enregistrement a échoué. Réessayez ou envoyez un fichier audio.")
+        setError(textes.erreurs.enregistrement)
         setRecording(false)
         releaseMicrophone()
       }
@@ -65,7 +66,7 @@ export default function RecorderControls({ onRecorded, disabled = false, retryAv
         setRecording(false)
         releaseMicrophone()
         if (duration < MIN_RECORDING_MS || !blob.size) {
-          setError("L'enregistrement est trop court. Parlez au moins une seconde puis réessayez.")
+          setError(textes.erreurs.enregistrementCourt)
           return
         }
         onRecorded(blob)
@@ -88,7 +89,7 @@ export default function RecorderControls({ onRecorded, disabled = false, retryAv
     if (!file) return
     setError('')
     if (!file.size) {
-      setError('Le fichier audio est vide. Choisissez un autre fichier puis réessayez.')
+      setError(textes.erreurs.fichierVide)
       return
     }
     onRecorded(file)
@@ -104,7 +105,7 @@ export default function RecorderControls({ onRecorded, disabled = false, retryAv
           disabled={disabled}
         >
           {recording && <span className="recording-dot" aria-hidden="true" />}
-          {recording ? 'Arrêter' : retryAvailable ? 'Réessayer' : 'Enregistrer'}
+          {recording ? textes.arreter : retryAvailable ? textes.reessayer : textes.enregistrer}
         </button>
         <button
           className="button button-secondary"
@@ -112,19 +113,19 @@ export default function RecorderControls({ onRecorded, disabled = false, retryAv
           onClick={() => fileInputRef.current?.click()}
           disabled={disabled || recording}
         >
-          Envoyer un fichier audio
+          {textes.envoyerFichierAudio}
         </button>
         <input
           ref={fileInputRef}
           className="visually-hidden"
           type="file"
           accept="audio/*"
-          aria-label="Choisir un fichier audio"
+          aria-label={textes.choisirFichierAudio}
           onChange={handleFile}
           disabled={disabled || recording}
         />
       </div>
-      {recording && <p className="recording-status" role="status">Enregistrement en cours</p>}
+      {recording && <p className="recording-status" role="status">{textes.enregistrementEnCours}</p>}
       {error && <p className="message message-error" role="alert">{error}</p>}
     </div>
   )

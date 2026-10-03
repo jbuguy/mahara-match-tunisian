@@ -219,12 +219,13 @@ class ApiTests(unittest.TestCase):
         session = self.create_session()
         self.complete_session(session["session_id"])
 
-        with patch.object(api, "generer_offre_ecrite", return_value="Offre de test"):
+        offre_attendue = "طلب عرض خدمة"
+        with patch.object(api, "generer_offre_ecrite", return_value=offre_attendue):
             offer = self.client.get(
                 f"/api/v1/sessions/{session['session_id']}/offre"
             )
         self.assertEqual(offer.status_code, 200)
-        self.assertEqual(offer.text, "Offre de test")
+        self.assertEqual(offer.text, offre_attendue)
 
         recap_path = Path(self.temp_dir.name) / "recap.wav"
         recap_path.write_bytes(wav_bytes())

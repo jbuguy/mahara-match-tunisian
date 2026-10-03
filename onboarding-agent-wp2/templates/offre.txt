@@ -1,8 +1,8 @@
-Demande d'offre d'emploi ou de service
+طلب عرض خدمة
 
-Métier recherché : {metier}
-Date de disponibilité : {date}
-Gouvernorat : {gouvernorat}
-Téléphone : {telephone}
+الخدمة المطلوبة: {metier}
+تاريخ بداية الخدمة: {date}
+الولاية: {gouvernorat}
+رقم التلفون: {telephone}
 
-Nous recherchons une offre correspondant au métier indiqué, disponible à la date précisée et située dans le gouvernorat mentionné. Pour proposer une opportunité, veuillez contacter le candidat au numéro indiqué.
+نلوجو على فرصة خدمة تناسب الخدمة المطلوبة، وتنجم تبدا فيها في التاريخ المذكور وفي الولاية هاذي. كان عندك فرصة مناسبة، كلّم المترشّح على الرقم هذا.

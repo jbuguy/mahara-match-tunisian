@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { envoyerReponse } from '../api.js'
 import RecorderControls from './RecorderControls.jsx'
+import textes from '../textes.js'
 
 const QUESTION_ORDER = ['metier', 'date', 'gouvernorat', 'telephone']
 
@@ -19,7 +20,7 @@ export default function QuestionScreen({ sessionId, question, onNext, onFinish }
     setAudioNotice('')
     player.currentTime = 0
     player.play().catch(() => {
-      setAudioNotice('La lecture automatique a été bloquée. Appuyez sur « Réécouter » pour entendre la question.')
+      setAudioNotice(textes.audioBloque)
     })
     return () => player.pause()
   }, [question.audio_url])
@@ -40,37 +41,37 @@ export default function QuestionScreen({ sessionId, question, onNext, onFinish }
     if (!audioRef.current) return
     audioRef.current.currentTime = 0
     audioRef.current.play().catch(() => {
-      setAudioNotice('La lecture audio ne démarre pas. Vérifiez le volume de votre appareil.')
+      setAudioNotice(textes.erreurLectureAudio)
     })
   }
 
   return (
     <main className="page-shell">
       <header className="brand-row">
-        <a className="wordmark" href="/" aria-label="Mahara accueil">mahara<span>.</span></a>
-        <span className="brand-caption">Espace candidat</span>
+        <a className="wordmark" href="/" aria-label={textes.espaceCandidat}>{textes.marque}<span>.</span></a>
+        <span className="brand-caption">{textes.espaceCandidat}</span>
       </header>
       <section className="flow-content" aria-labelledby="question-title">
         <div className="progress-heading">
-          <span>VOTRE PARCOURS</span>
-          <span>Question {questionNumber} sur {QUESTION_ORDER.length}</span>
+          <span>{textes.parcours}</span>
+          <span>{textes.questionProgression(questionNumber, QUESTION_ORDER.length)}</span>
         </div>
         <div
           className="progress-track"
           role="progressbar"
-          aria-label={`Question ${questionNumber} sur ${QUESTION_ORDER.length}`}
+          aria-label={textes.questionProgression(questionNumber, QUESTION_ORDER.length)}
           aria-valuemin="1"
           aria-valuemax={QUESTION_ORDER.length}
           aria-valuenow={questionNumber}
         >
-          <span style={{ width: progress }} />
+          <span style={{ inlineSize: progress }} />
         </div>
 
-        <p className="eyebrow">QUESTION {String(questionNumber).padStart(2, '0')}</p>
-        <h1 id="question-title" dir="auto">{question.texte}</h1>
+        <p className="eyebrow">{textes.questionNumero(questionNumber)}</p>
+        <h1 id="question-title" dir="auto">{textes.questions[question.id] || textes.questionInconnue}</h1>
         <audio ref={audioRef} src={question.audio_url} preload="auto" />
         <button className="replay-button" type="button" onClick={replayQuestion} disabled={busy || Boolean(result)}>
-          <span aria-hidden="true">↻</span> Réécouter la question
+          <span aria-hidden="true">↻</span> {textes.reecouter}
         </button>
         {audioNotice && <p className="message message-subtle" role="status">{audioNotice}</p>}
 
@@ -84,22 +85,22 @@ export default function QuestionScreen({ sessionId, question, onNext, onFinish }
             />
             {busy && (
               <p className="transcription-status" role="status">
-                <span className="status-spinner" aria-hidden="true" /> Transcription en cours
+                <span className="status-spinner" aria-hidden="true" /> {textes.transcription}
               </p>
             )}
             {error && <p className="message message-error" role="alert">{error}</p>}
           </div>
         ) : (
           <section className="result-panel" aria-labelledby="result-title">
-            <p className="result-kicker" id="result-title">Réponse enregistrée</p>
+            <p className="result-kicker" id="result-title">{textes.reponseEnregistree}</p>
             <dl className="recognized-values">
               <div>
-                <dt>Ce que vous avez dit</dt>
+                <dt>{textes.ceQuiEstCompris}</dt>
                 <dd dir="auto">{result.texte_brut}</dd>
               </div>
               <div>
-                <dt>Valeur retenue</dt>
-                <dd dir="auto">{result.valeur_extraite ?? 'Non extraite'}</dd>
+                <dt>{textes.valeurRetenue}</dt>
+                <dd dir={question.id === 'telephone' ? 'ltr' : 'auto'}>{result.valeur_extraite ?? textes.reponseNonExtraite}</dd>
               </div>
             </dl>
             <button
@@ -107,13 +108,13 @@ export default function QuestionScreen({ sessionId, question, onNext, onFinish }
               type="button"
               onClick={() => result.termine ? onFinish() : onNext(result.question_suivante)}
             >
-              {result.termine ? 'Voir mon offre' : 'Suivant'}
-              <span className="button-arrow" aria-hidden="true">→</span>
+              {result.termine ? textes.voirOffre : textes.suivant}
+              <span className="button-arrow" aria-hidden="true">←</span>
             </button>
           </section>
         )}
       </section>
-      <footer className="page-footer"><span>Mahara Match</span><span>Question {questionNumber} / 4</span></footer>
+      <footer className="page-footer"><span>{textes.marque}</span><span>{textes.questionProgression(questionNumber, QUESTION_ORDER.length)}</span></footer>
     </main>
   )
 }

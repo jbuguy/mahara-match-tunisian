@@ -15,7 +15,7 @@ def generer_offre_ecrite(session_id):
         "telephone": session.get("telephone"),
     }
     valeurs_formatees = {
-        champ: (valeur or "").strip() or "non précisé"
+        champ: (valeur or "").strip() or "ما تحددش"
         for champ, valeur in valeurs.items()
     }
     return TEMPLATE_PATH.read_text(encoding="utf-8").format(**valeurs_formatees)

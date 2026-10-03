@@ -16,10 +16,10 @@ class OffreGeneratorTests(unittest.TestCase):
         with patch("offre_generator.csv_store.lire_session", return_value=session):
             offre = generer_offre_ecrite("session-1")
 
-        self.assertIn("Métier recherché : agriculture", offre)
-        self.assertIn("Date de disponibilité : 2 octobre", offre)
-        self.assertIn("Gouvernorat : Siliana", offre)
-        self.assertIn("Téléphone : 91131139", offre)
+        self.assertIn("الخدمة المطلوبة: agriculture", offre)
+        self.assertIn("تاريخ بداية الخدمة: 2 octobre", offre)
+        self.assertIn("الولاية: Siliana", offre)
+        self.assertIn("رقم التلفون: 91131139", offre)
         self.assertNotIn("{", offre)
 
     def test_empty_values_are_reported_as_unspecified(self):
@@ -33,7 +33,7 @@ class OffreGeneratorTests(unittest.TestCase):
         with patch("offre_generator.csv_store.lire_session", return_value=session):
             offre = generer_offre_ecrite("session-2")
 
-        self.assertEqual(offre.count("non précisé"), 4)
+        self.assertEqual(offre.count("ما تحددش"), 4)
 
 
 if __name__ == "__main__":
