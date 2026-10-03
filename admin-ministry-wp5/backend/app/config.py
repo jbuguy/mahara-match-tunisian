@@ -10,7 +10,7 @@ ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
 class Settings(BaseSettings):
     app_env: str = "dev"
     api_prefix: str = "/api/v1"
-    database_url: str = "postgresql+psycopg://mahara:mahara@localhost:5432/mahara_match"
+    database_url: str = "postgresql+psycopg://mahara:mahara@localhost:5433/mahara_match"
     cors_origins: str = "http://localhost:5174"
 
     model_config = SettingsConfigDict(env_file=ENV_FILE, extra="ignore")
