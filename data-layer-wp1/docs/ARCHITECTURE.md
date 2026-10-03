@@ -138,10 +138,10 @@ stateDiagram-v2
 
 ### 4.4 Shared database
 
-- **Engine:** Supabase Postgres (the team already uses Supabase in WP4) with the `vector` extension.
+- **Engine:** PostgreSQL 16 with the `vector` extension, run locally in Docker Compose.
 - **Schema:** 35 tables in 9 domains. See [DATA_MODEL.md](DATA_MODEL.md).
-- **Migrations:** plain SQL in `supabase/migrations/`, applied with `supabase db push`. The ORM in `mahara_data.db.models` mirrors it and a pglast-based test checks that they stay identical.
-- **Object storage:** Supabase Storage buckets `cv-raw`, `audio-raw`, `datasets`, `certificates`. They are private and accessed through signed URLs. `documents.storage_path` holds `<bucket>/<key>`.
+- **Migrations:** plain SQL in `supabase/migrations/`, initialized by the Postgres container and applied later with `psql`. The ORM in `mahara_data.db.models` mirrors it and a pglast-based test checks that they stay identical.
+- **Object storage:** not part of the local database stack. Select an S3-compatible store when file ingestion is implemented; `documents.storage_path` holds its object key.
 
 ### 4.5 Embedding worker
 
@@ -256,7 +256,7 @@ Base path `/internal/v1`. The contract column names the model in `mahara_data.sc
 | `POST /training/courses` · `POST /certifications` | `TrainingCourseRecord` · `CertificationRecord` | Providers, WP6 |
 | `GET /ingestion/jobs` | → job status and errors | WP5 |
 
-**Events.** For the MVP, change notifications are written to a Postgres table and read through Supabase Realtime or `LISTEN/NOTIFY`: `candidate.profile.updated`, `offer.published`, `application.created`, `feedback.created`, `taxonomy.version.published`. WP3 uses them to know what to re-score.
+**Events.** For the MVP, change notifications are written to a Postgres table and read with `LISTEN/NOTIFY`: `candidate.profile.updated`, `offer.published`, `application.created`, `feedback.created`, `taxonomy.version.published`. WP3 uses them to know what to re-score.
 
 **Versioning.** Every contract carries `schema_version` (currently `1.0`). Adding an optional field is a minor change. Removing or renaming a field, or changing its meaning, is a major change: it gets a new path version (`/internal/v2`), and v1 stays available for one sprint.
 
@@ -290,9 +290,9 @@ WP5 owns the final role matrix (their W1 deliverable). The schema already suppor
 
 ### 8.3 Controls
 
-- **RLS** is enabled on every table (deny-by-default through the Supabase REST API). Module backends connect with the service role and apply RBAC in the API layer. Per-role policies are added in W4 together with WP5.
+- **Authorization:** module backends apply RBAC in the API layer. PostgreSQL RLS is available for database-enforced row scoping; per-role policies are added in W4 together with WP5.
 - **Audit:** `audit_logs` records PII reads (`candidate.pii.read`), taxonomy validations, erasures and exports.
-- **Encryption:** TLS in transit; Supabase at-rest encryption. Storage buckets are private and accessed through short-lived signed URLs.
+- **Encryption:** configure TLS and at-rest encryption in the deployment environment. Object storage access controls are selected with the storage provider.
 - **Consent:** `candidates.consent_version` and `consent_given_at` are required before a profile is persisted.
 - **Erasure:** `DELETE /candidates/{id}` sets `deleted_at`, deletes `candidate_pii` and storage objects immediately, and hard-deletes the rest through `ON DELETE CASCADE` after a grace period.
 - **Retention:** raw CVs and audio are kept 12 months (to be confirmed, PRD §12); redacted text is kept while the profile exists.
@@ -311,7 +311,7 @@ WP5 owns the final role matrix (their W1 deliverable). The schema already suppor
 
 | Concern | Choice | Why |
 |---|---|---|
-| Database | Supabase Postgres 15+ | Already used by WP4; relational integrity; RLS; managed or self-hostable |
+| Database | PostgreSQL 16 + pgvector | Relational integrity and vector search in one self-hostable service |
 | Vectors | pgvector (HNSW, cosine) | Same database as the entities, so vector and SQL filters work in one query; no extra infrastructure. WP3's ChromaDB PoC can keep running locally, but the shared store is pgvector |
 | ORM / contracts | SQLAlchemy 2 + Pydantic v2 | Same stack as WP4; typed; JSON Schema export |
 | API | FastAPI | Same stack as WP2/WP3/WP4 |
@@ -331,11 +331,11 @@ WP5 owns the final role matrix (their W1 deliverable). The schema already suppor
 
 | Environment | Database | Purpose |
 |---|---|---|
-| local | `supabase start` (Docker) or Postgres 16 + pgvector | Development; unit tests run on SQLite without Docker |
-| staging | Supabase project `mahara-staging` | W4 integration testing with the 5 modules |
-| prod | Supabase project (self-hosted option for sovereignty) | Pilot |
+| local | `docker compose up -d db` (Postgres 16 + pgvector) | Development; unit tests run on SQLite without Docker |
+| staging | PostgreSQL with pgvector | W4 integration testing with the 5 modules |
+| prod | PostgreSQL with pgvector, managed or self-hosted | Pilot |
 
-CI: `pytest` in `data-layer-wp1/` (ORM ↔ SQL ↔ enum ↔ contract sync, example payload validation, schema-export freshness), then `supabase db lint`.
+CI: `pytest` in `data-layer-wp1/` (ORM ↔ SQL ↔ enum ↔ contract sync, example payload validation, schema-export freshness); validate deployment migrations against PostgreSQL.
 
 ## 13. Repository layout
 
@@ -360,7 +360,7 @@ data-layer-wp1/
 |---|---|---|
 | ADR-1 | One Postgres database with pgvector | Separate vector DB (Chroma, Qdrant): one more system to run and sync, and no joins between vectors and relational filters |
 | ADR-2 | PII in a separate 1:1 table | Column-level encryption only: PII would still be one `select *` away from the matching engine |
-| ADR-3 | Hand-written SQL migrations + automated sync tests with the ORM | Alembic autogenerate: the team already uses Supabase migrations (WP4), and hand-written SQL is easier to review |
+| ADR-3 | Hand-written SQL migrations + automated sync tests with the ORM | Alembic autogenerate: hand-written SQL is easier to review |
 | ADR-4 | Postgres enums storing lower-case values | Lookup tables: heavier for fixed lists. Taxonomy-like lists that change (skills, occupations, sectors) are tables |
 | ADR-5 | Proficiency on a 1–4 integer scale | Free-text levels, or CEFR only: the integer scale makes gaps computable (`required − current`) |
 | ADR-6 | Polymorphic `embeddings` table | A vector column on each table: harder to run several models side by side and to re-embed |

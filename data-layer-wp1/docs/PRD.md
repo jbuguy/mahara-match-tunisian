@@ -102,7 +102,7 @@ Priorities: **M** = Must (MVP, 1 month), **S** = Should, **C** = Could.
 | FR-DB-03 | Store vectors in pgvector, one row per (entity, model), with an HNSW cosine index. | M |
 | FR-DB-04 | Snapshot the match score at application time so later re-scoring does not rewrite history. | M |
 | FR-DB-05 | Support soft deletion and erasure of a candidate (cascade to PII, skills, documents and matches). | M |
-| FR-DB-06 | Ship all schema changes as versioned SQL migrations under `supabase/migrations/`. | M |
+| FR-DB-06 | Ship all schema changes as versioned SQL migrations in the repository. | M |
 
 ### 5.5 Internal APIs and contracts
 | ID | Requirement | Prio |
@@ -118,7 +118,7 @@ Priorities: **M** = Must (MVP, 1 month), **S** = Should, **C** = Could.
 | ID | Requirement | Prio |
 |---|---|---|
 | FR-SEC-01 | Enforce RBAC at the data layer for the roles candidate, employer, admin, ministry and training_provider. | M |
-| FR-SEC-02 | Enable Row Level Security (deny-by-default) on every table exposed through Supabase. | M |
+| FR-SEC-02 | Support PostgreSQL Row Level Security for tables that require database-enforced row scoping. | M |
 | FR-SEC-03 | Write every read of `candidate_pii` and every taxonomy validation to `audit_logs`. | M |
 | FR-SEC-04 | Record consent (version and timestamp) before a candidate profile is stored. | M |
 | FR-OBS-01 | Expose ingestion metrics (volume, error rate, latency per source) for the WP5 monitoring dashboard. | S |
@@ -152,7 +152,7 @@ Priorities: **M** = Must (MVP, 1 month), **S** = Should, **C** = Could.
 
 | Step | Week | Deliverable | Acceptance criteria |
 |---|---|---|---|
-| 1 | W1 | **DB schema & API contracts** *(S1 commitment)* | Migration applies on a clean Supabase project; JSON Schemas published; WP2–WP6 leads have reviewed the contracts |
+| 1 | W1 | **DB schema & API contracts** *(S1 commitment)* | Migration applies to a clean PostgreSQL database; JSON Schemas published; WP2–WP6 leads have reviewed the contracts |
 | 2 | W2 | Skills taxonomy v1 | ≥ 300 skills / 100 occupations seeded; resolve endpoint top-3 accuracy ≥ 80% on a 100-label test set |
 | 3 | W2–3 | Ingestion connectors | Upload, webhook and batch import work for all 5 sources; each run is visible in `ingestion_jobs` |
 | 4 | W3 | Preprocessing & NER | PII recall ≥ 95% on the annotated set; skill extraction F1 ≥ 0.75 on 50 annotated CVs |
