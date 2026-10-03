@@ -13,3 +13,6 @@ __pycache__/
 .idea/
 .DS_Store
 Thumbs.db
+# --- Configuration locale ---
+/.env
+!.env.example
