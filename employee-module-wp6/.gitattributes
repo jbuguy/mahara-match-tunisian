@@ -1,0 +1,3 @@
+# Sample CVs must keep their exact bytes (no line-ending conversion).
+*.pdf binary
+*.docx binary
