@@ -1,11 +1,14 @@
+from datetime import datetime, timezone
+
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from mahara_data.db.models.taxonomy import Skill
 from mahara_data.enums import SkillType, TaxonomyStatus
 from mahara_data.schemas.taxonomy import SkillRead
 
-from ..schemas import SkillCreate
+from ..schemas import SkillCreate, SkillUpdate
 
 
 def to_read(skill: Skill) -> SkillRead:
@@ -70,3 +73,44 @@ def list_skills(
         stmt.order_by(Skill.code).limit(page_size).offset((page - 1) * page_size)
     ).scalars().all()
     return list(rows), total
+
+
+def update_skill(db: Session, skill: Skill, payload: SkillUpdate) -> Skill:
+    """Apply editorial changes and bump the version: a shared referential tracks its edits."""
+    changes = payload.model_dump(exclude_unset=True)
+    if not changes:
+        return skill
+
+    for field, value in changes.items():
+        setattr(skill, field, value)
+    skill.version += 1
+
+    db.commit()
+    db.refresh(skill)
+    return skill
+
+
+def validate_skill(db: Session, skill: Skill) -> Skill:
+    """Promote an entry to the official referential. The core governance act of WP5."""
+    skill.status = TaxonomyStatus.VALIDATED
+    skill.validated_at = datetime.now(timezone.utc)
+    # TODO: set validated_by once authentication lands (users.id of the acting admin).
+    db.commit()
+    db.refresh(skill)
+    return skill
+
+
+def remove_skill(db: Session, skill: Skill) -> str:
+    """Delete a never-used draft for real; retire anything else from circulation."""
+    if skill.status == TaxonomyStatus.DRAFT:
+        try:
+            db.delete(skill)
+            db.commit()
+            return "deleted"
+        except IntegrityError:
+            # Something already references it after all: keep the history.
+            db.rollback()
+
+    skill.status = TaxonomyStatus.DEPRECATED
+    db.commit()
+    return "deprecated"
