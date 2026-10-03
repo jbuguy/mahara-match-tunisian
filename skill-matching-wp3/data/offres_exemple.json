@@ -1,0 +1,42 @@
+[
+  {
+    "job_offer_id": "offre-backend",
+    "min_years_experience": 3,
+    "location": {"governorate_code": "TN-71"},
+    "skills": [
+      {"label_raw": "Python", "requirement": "required", "min_level": 3},
+      {"label_raw": "Django", "requirement": "required", "min_level": 3},
+      {"label_raw": "SQL", "requirement": "required", "min_level": 2},
+      {"label_raw": "Kubernetes", "requirement": "preferred", "min_level": 2}
+    ]
+  },
+  {
+    "job_offer_id": "offre-devops",
+    "min_years_experience": 4,
+    "location": {"governorate_code": "TN-71"},
+    "skills": [
+      {"label_raw": "Docker", "requirement": "required", "min_level": 2},
+      {"label_raw": "AWS", "requirement": "required", "min_level": 2},
+      {"label_raw": "Git", "requirement": "required", "min_level": 2},
+      {"label_raw": "Kubernetes", "requirement": "required", "min_level": 3}
+    ]
+  },
+  {
+    "job_offer_id": "offre-backend-tunis",
+    "min_years_experience": 2,
+    "location": {"governorate_code": "TN-11"},
+    "skills": [
+      {"label_raw": "Python", "requirement": "required", "min_level": 2},
+      {"label_raw": "SQL", "requirement": "required", "min_level": 2},
+      {"label_raw": "Communication", "requirement": "preferred", "min_level": 2}
+    ]
+  },
+  {
+    "job_offer_id": "offre-agricole",
+    "min_years_experience": 2,
+    "location": {"governorate_code": "TN-51"},
+    "skills": [
+      {"label_raw": "Irrigation", "requirement": "required", "min_level": 2}
+    ]
+  }
+]

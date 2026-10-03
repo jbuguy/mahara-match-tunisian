@@ -20,10 +20,10 @@ flowchart LR
 
 | Block | What it does | Key tech |
 |---|---|---|
-| **1. Ingestion** | Takes in 5 sources, stores raw files, tracks each run in `ingestion_jobs` | FastAPI, Supabase Storage |
+| **1. Ingestion** | Takes in 5 sources, stores raw files, tracks each run in `ingestion_jobs` | FastAPI; object storage provider TBD |
 | **2. Preprocessing** | Text/OCR → language detection (AR/FR/Derja/Arabizi) → **PII redaction** → normalization → NER → link to taxonomy codes | pypdf, Tesseract, Presidio |
 | **3. Taxonomy** | Skills (`SK-`) and occupations (`OC-`) with FR/AR/Derja labels; unknown labels become suggestions that WP5 validates | Postgres tables + embeddings |
-| **4. Shared DB + API** | 35 tables, vectors in pgvector, versioned JSON contracts | Supabase Postgres, SQLAlchemy, Pydantic |
+| **4. Shared DB + API** | 35 tables, vectors in pgvector, versioned JSON contracts | PostgreSQL 16 + pgvector, SQLAlchemy, Pydantic |
 
 ## Who produces and consumes what
 
@@ -58,7 +58,7 @@ Platform    documents · ingestion_jobs · embeddings · audit_logs
 4. **No PII in profiles.** Name, gender, age and contact details live only in `candidate_pii` and never reach WP3.
 5. **Governorates use ISO codes** (`TN-11` Tunis … `TN-83` Tataouine).
 6. **Contracts reject unknown fields** and carry `schema_version` (currently `1.0`).
-7. **Schema changes go through a migration** in `supabase/migrations/`; CI checks that the SQL and the ORM match.
+7. **Schema changes go through a versioned SQL migration**; CI checks that the SQL and the ORM match.
 
 ## Main internal endpoints (`/internal/v1`)
 

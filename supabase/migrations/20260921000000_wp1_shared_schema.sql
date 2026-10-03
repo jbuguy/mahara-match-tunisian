@@ -642,8 +642,8 @@ end
 $$;
 
 -- ---------------------------------------------------------------------------
--- Row Level Security: deny-by-default through the Supabase REST API.
--- Module backends connect with the service role / table owner, which bypasses RLS.
+-- Row Level Security is defense-in-depth; table owners bypass it.
+-- Application authorization is enforced by the module APIs.
 -- ---------------------------------------------------------------------------
 
 do $$

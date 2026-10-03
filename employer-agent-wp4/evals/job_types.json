@@ -1,0 +1,66 @@
+[
+  {
+    "case": "retail-sales-assistant",
+    "answers": {
+      "title": "Vendeur ou vendeuse en magasin",
+      "responsibilities": "Accueillir les clients, présenter les produits et tenir le rayon organisé.",
+      "location": "TN-11, Tunis",
+      "contract_type": "cdd",
+      "required_skills": "Accueil client, vente et calcul de caisse",
+      "preferred_skills": "Expérience en commerce",
+      "experience_and_education": "Débutant accepté, niveau secondaire",
+      "languages_required": "Arabe tunisien; français de base",
+      "work_mode": "on_site",
+      "positions_count": "2",
+      "salary": null
+    }
+  },
+  {
+    "case": "software-developer",
+    "answers": {
+      "title": "Développeur web junior",
+      "responsibilities": "Développer des fonctionnalités web et corriger des anomalies avec l'équipe produit.",
+      "location": "TN-51, Sousse",
+      "contract_type": "cdi",
+      "required_skills": "JavaScript, Git et développement web",
+      "preferred_skills": "React et tests automatisés",
+      "experience_and_education": "Une première expérience; licence en informatique souhaitée",
+      "languages_required": "Français professionnel",
+      "work_mode": "hybrid",
+      "positions_count": "1",
+      "salary": "Entre 1800 et 2400 TND par mois"
+    }
+  },
+  {
+    "case": "customer-support-agent",
+    "answers": {
+      "title": "Chargé de support client",
+      "responsibilities": "Répondre aux demandes par téléphone et suivre les dossiers clients.",
+      "location": "TN-61, Sfax",
+      "contract_type": "cdd",
+      "required_skills": "Communication, écoute et outils bureautiques",
+      "preferred_skills": "Expérience en centre d'appels",
+      "experience_and_education": "Baccalauréat; expérience non obligatoire",
+      "languages_required": "Arabe et français",
+      "work_mode": "on_site",
+      "positions_count": "4",
+      "salary": null
+    }
+  },
+  {
+    "case": "seasonal-agricultural-worker",
+    "answers": {
+      "title": "Ouvrier agricole saisonnier",
+      "responsibilities": "Participer à la récolte des olives et au tri des produits.",
+      "location": "TN-32, Jendouba",
+      "contract_type": "seasonal",
+      "required_skills": "Travail en équipe et respect des consignes de sécurité",
+      "preferred_skills": null,
+      "experience_and_education": "Aucune expérience ou formation exigée",
+      "languages_required": "Aucune langue additionnelle exigée",
+      "work_mode": "on_site",
+      "positions_count": "12",
+      "salary": "À préciser"
+    }
+  }
+]
