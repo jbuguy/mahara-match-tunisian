@@ -9,4 +9,5 @@ pypdf
 python-docx
 groq
 pytest
+httpx
 httpx2

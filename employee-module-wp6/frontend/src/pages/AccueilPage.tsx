@@ -26,7 +26,7 @@ export function AccueilPage() {
     getMe().catch(() => {})
   }, [])
 
-  // The name is already in the Supabase session, so the greeting doesn't wait for the backend.
+  // The name is already in the Mahara session, so the greeting doesn't wait for the backend.
   const firstName = session?.user.user_metadata.full_name?.split(' ')[0] ?? displayName(session).split('@')[0]
 
   return (

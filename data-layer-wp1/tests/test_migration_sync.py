@@ -18,7 +18,7 @@ from mahara_data.db import Base
 from mahara_data.reference import GOVERNORATES
 
 MIGRATION = (
-    Path(__file__).resolve().parents[2] / "supabase" / "migrations" / "20260921000000_wp1_shared_schema.sql"
+    Path(__file__).resolve().parents[2] / "migrations" / "20260921000000_wp1_shared_schema.sql"
 )
 SQL = MIGRATION.read_text(encoding="utf-8")
 

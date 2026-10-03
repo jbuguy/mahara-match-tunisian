@@ -1,7 +1,7 @@
 """Shared enumerations for the WP1 data layer.
 
 Every enum here is mirrored by a Postgres enum type in
-``supabase/migrations/20260921000000_wp1_shared_schema.sql``. The values (not the
+``migrations/20260921000000_wp1_shared_schema.sql``. The values (not the
 member names) are what is stored in the database and sent over the wire.
 ``tests/test_migration_sync.py`` fails if the two drift apart.
 """

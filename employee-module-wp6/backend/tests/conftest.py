@@ -51,10 +51,8 @@ def signed_in(client, db) -> User:
 
 @pytest.fixture
 def signed_out(client):
-    """No token, and nothing that could reach Supabase or the database."""
-    from app.auth import get_jwks_client
+    """No token, and nothing that could reach the database."""
     from app.config import Settings, get_settings
 
-    app.dependency_overrides[get_settings] = lambda: Settings(_env_file=None, supabase_url="https://x.supabase.co")
-    app.dependency_overrides[get_jwks_client] = lambda: None
+    app.dependency_overrides[get_settings] = lambda: Settings(_env_file=None, jwt_secret="test-secret-that-is-at-least-32-bytes")
     app.dependency_overrides[get_db] = lambda: None

@@ -1,9 +1,9 @@
 import { createContext, useContext } from 'react'
-import type { Session } from '@supabase/supabase-js'
+import type { Session } from './session'
 
 export type AuthState = {
   session: Session | null
-  /** True until Supabase has restored the session (or finished the Google redirect). */
+  /** True until the saved Mahara access token has been restored. */
   loading: boolean
   signInWithGoogle: () => Promise<void>
   signOut: () => Promise<void>

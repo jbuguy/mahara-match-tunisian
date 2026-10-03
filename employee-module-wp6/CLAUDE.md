@@ -22,27 +22,24 @@ low literacy, so keep copy short, buttons big, and a text label on every icon.
 
 ## Constraints
 
-- **Only edit files inside `employee-module-wp6/`.** Never touch other teams' folders or root files.
-- **Ignore `data-layer-wp1/` and `supabase/` completely** (another teammate's work on `main`): don't read them,
-  import from them, install them, or edit/delete them. This module has its own small schema and models.
+- Keep WP6-specific implementation inside `employee-module-wp6/`; shared database migrations live in root `migrations/`.
+- Use PostgreSQL only. `data-layer-wp1/` and its `mahara_data` package define the shared schema and contracts; do not add a hosted BaaS dependency or a second canonical copy of shared data.
 - Branch `feature/wp6-employee-module`. Never commit to `main`.
-- **Own Supabase project for now**, set up with our own `employee-module-wp6/db/schema.sql`. Its table and column
-  names match the team's so a later switch is mostly env vars. Don't add tables or columns beyond the ones listed
-  in the Data model below without asking.
-- Local only: no deploy config, no Docker, no CI. Free services only (Groq's free plan is the only external AI).
+- PostgreSQL runs from the repository's Docker Compose configuration. Google OAuth is an external identity provider; application data and Mahara sessions remain on our own backend/PostgreSQL.
+- Local only: no production deploy config. Groq is the only external AI service.
 - Context is cleared between sessions. Every session ends with the app **working locally**. If a session
   runs long, cut scope, not the test-and-document step at the end.
 
 ## Stack: don't add libraries beyond this list without asking
 
 - **Backend** (`employee-module-wp6/backend/`, port **8006**): Python 3.12+ (dev machine uses 3.14), FastAPI, SQLAlchemy 2
-  (our own models in `app/models.py`), psycopg 3, pydantic-settings, PyJWT[crypto], python-multipart, pypdf,
+  (shared models are preferred for shared entities), psycopg 3, pydantic-settings, PyJWT[crypto], httpx, python-multipart, pypdf,
   python-docx, pytest, and `httpx2` for tests only (Starlette's `TestClient` needs it).
 - **Frontend** (`employee-module-wp6/frontend/`, port **5173**): Vite + React + TypeScript, Tailwind CSS v4,
-  shadcn/ui, lucide-react, React Router v8, @supabase/supabase-js. Plain `fetch` + `useState`, no extra
+  shadcn/ui, lucide-react, React Router v8. Plain `fetch` + `useState`, no extra
   state or form libraries. Packages that shadcn installs itself are approved too (clsx, tailwind-merge,
   class-variance-authority, radix-ui, tw-animate-css).
-- **Auth + DB:** Supabase. Google OAuth only: no passwords, no SMS, no signup form.
+- **Auth + DB:** PostgreSQL plus direct Google OAuth. Google OAuth only: no passwords, no SMS, no signup form. The backend verifies Google's ID token and issues a short-lived Mahara JWT.
 - **AI (Session 6+):** Groq API (free plan) through the official `groq` Python package, called **only from the
   backend**. Chat model from `GROQ_MODEL` (default `openai/gpt-oss-120b`, an open-weights model), speech-to-text
   `whisper-large-v3-turbo` (same `GROQ_API_KEY`, no extra env var). Free-plan limits: about 30 requests and 8,000 tokens per minute for the chat model,
@@ -52,25 +49,18 @@ low literacy, so keep copy short, buttons big, and a text label on every icon.
 
 - React Router **v8**: import from `react-router`. `react-router-dom` no longer exists.
 - Tailwind **v4**: `@import "tailwindcss";` + `@theme {}` in CSS, `@tailwindcss/vite` plugin.
-- Supabase login tokens are **ES256**. Verify with PyJWT `PyJWKClient` on
-  `{SUPABASE_URL}/auth/v1/.well-known/jwks.json`, `audience="authenticated"`. Never use the old HS256 JWT secret.
-- The frontend uses the **publishable** key (`sb_publishable_...`). The backend needs no Supabase key.
-- DB connection: the **session pooler** string (port 5432) as `postgresql+psycopg://...`.
-  The direct connection string is IPv6-only and usually fails at home. In the Supabase dashboard it's under
-  Connect → Direct → Session pooler. The user must be `postgres.<project-ref>` (plain `postgres` fails with
-  "no tenant identifier"), and special characters in the password must be URL-encoded (`%` → `%25`, `@` → `%40`).
+- Google ID tokens are verified with Google's JWKS and audience set to `GOOGLE_CLIENT_ID`; never accept a browser token without server-side verification.
+- Mahara access tokens use HS256, issuer `mahara-match`, audience `mahara-match-wp6`, and a 30-minute expiry. `JWT_SECRET` must have at least 32 random bytes and remain backend-only.
+- Local PostgreSQL uses `postgresql+psycopg://...`; never expose database credentials to the browser.
 
 ## How it works (keep it this simple)
 
-- **Login:** the frontend calls `supabase.auth.signInWithOAuth({ provider: 'google' })`. That's the only thing
-  the frontend does with Supabase.
+- **Login:** the frontend redirects to `/api/v1/auth/google`. The backend performs Google's OAuth code exchange, maps the verified email to the PostgreSQL `users` row, and issues a Mahara token to the callback page.
 - **Data:** everything else goes through the FastAPI backend with `Authorization: Bearer <access_token>`.
   The backend checks the token, finds the user by email, and reads/writes the tables with the models in `app/models.py`.
-  Why not query Supabase from React like GLAM PRO: row level security is on with no policies (same as the team's
-  database), so the browser can't read tables directly; a frontend-only version would break when we switch projects.
 - Backend layout: `app/main.py` (app + routers), `app/config.py`, `app/db.py`, `app/models.py` (SQLAlchemy tables),
   `app/auth.py`, `app/routers/` (thin), `app/services/` (logic), `app/schemas.py` (request/response models), `tests/`.
-  Database setup lives in `employee-module-wp6/db/schema.sql` (run once by hand in the Supabase SQL Editor).
+  PostgreSQL migrations live in root `migrations/`; the WP6 schema file is an idempotent compatibility supplement while shared-schema reconciliation is completed.
 - **CV import** is done inside this backend: read the text with pypdf / python-docx, pull out email, phone,
   skills that match the `skills` table, education and experience lines, and return a **draft** the candidate
   reviews in the form. Nothing is saved and the file isn't stored until they press "Enregistrer".
@@ -118,7 +108,7 @@ occupations     id, code (unique), title_fr                                     
   `literacy_level` is required: default `literate`.
 - Consent: the form has a required checkbox; on save set `consent_version='1.0'` and `consent_given_at=now()`.
 - Saving a profile replaces the candidate's skills, experiences, educations and desired occupations in one transaction.
-- A fresh Supabase project has no skills or occupations: `scripts/seed_dev.py` adds ~45 skills (`SK-9001`...)
+- A fresh development database has no skills or occupations: `scripts/seed_dev.py` adds ~45 skills (`SK-9001`...)
   and ~10 occupations (`OC-9001`...). The `9xxx` codes never collide with the team's real list.
 
 ## Design system (approved Mahara mockups)
@@ -147,10 +137,9 @@ occupations     id, code (unique), title_fr                                     
     so it works whatever folder you start from.
   - Frontend reads it through Vite with `envDir: '..'` in `frontend/vite.config.ts`. Vite only exposes `VITE_` variables to
     the browser, so `DATABASE_URL` never reaches the frontend.
-  - Names: `DATABASE_URL`, `SUPABASE_URL`, `CORS_ORIGINS`, `APP_ENV`, `GROQ_API_KEY`, `GROQ_MODEL` (backend);
-    `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `VITE_API_BASE_URL` (frontend). `GROQ_API_KEY` must never
-    get a `VITE_` prefix: it would leak to the browser.
-- Google Client ID/Secret are not env vars: they live in the Supabase dashboard (Authentication → Providers).
+  - Names: `DATABASE_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `JWT_SECRET`, `API_BASE_URL`, `FRONTEND_URL`, `CORS_ORIGINS`, `APP_ENV`, `GROQ_API_KEY`, `GROQ_MODEL` (backend);
+    `VITE_API_BASE_URL` (frontend). `GOOGLE_CLIENT_SECRET`, `JWT_SECRET`, and `GROQ_API_KEY` must never get a `VITE_` prefix.
+- Google Client ID/Secret are backend environment variables. Configure the local redirect URI as `http://localhost:8006/api/v1/auth/google/callback`.
 - **Commit messages:** `type(wp6): short summary` (team style, e.g. `feat(wp6): add google login`).
   Types: `feat`, `fix`, `test`, `docs`, `refactor`, `chore`. Never mention "session" in a commit message.
 - Code in English, UI text in French. Each endpoint gets at least one pytest.
@@ -169,7 +158,7 @@ occupations     id, code (unique), title_fr                                     
 5. CV import (PDF/DOCX → prefilled form).
 6. Profile assistant, text chat (AI agent fills the form).
 7. Profile assistant, voice input (speak instead of typing).
-8. Later: switch to the team Supabase project.
+8. Integrate WP6 with the shared PostgreSQL schema and WP1 contracts.
 
 Each session's details come in its prompt; don't build ahead.
 
@@ -212,12 +201,10 @@ Each session's details come in its prompt; don't build ahead.
 
 - Last completed: Session 7, voice input for the assistant ("Parler" → MediaRecorder → Groq `whisper-large-v3-turbo`
   → text in the chat's text box, never sent by itself); marked done by me
-- Next up: Session 8 (later), switch to the team Supabase project
+- Next up: replace WP6's duplicate persistence with shared PostgreSQL models/contracts and finish cross-package integration.
 - Voice pieces to reuse: backend `app/services/voice.py` (`audio_kind()` from the first bytes, `transcribe()`),
   `POST /api/v1/me/assistant/transcribe`; frontend `useVoiceRecorder(onText)` in `src/components/assistant/`
-- Supabase: my own project with `db/schema.sql` applied (including `candidate_pii.photo`, added in Session 4), Google
-  provider enabled, and `seed_dev.py` run (SK-9001…SK-9046, OC-9001…OC-9012); Redirect URLs include
-  `http://localhost:5173/auth/callback`. Switch to the team project in Session 8
+- PostgreSQL: use the root Compose database and shared migrations. Google OAuth credentials are configured in `.env`; the redirect URI is `http://localhost:8006/api/v1/auth/google/callback`.
 - `.env` has all names from `.env.example` set, including `GROQ_API_KEY` and `GROQ_MODEL` (added in Session 6;
   backend only). `APP_ENV` must be `dev` or `development` for the seed script to run
 - Assistant pieces to reuse (voice feeds the transcribed text into the same chat):
@@ -227,7 +214,7 @@ Each session's details come in its prompt; don't build ahead.
     `ProfileFormHandle` (`getValues`, `applyUpdates(updates, asking)`, `focusForm`) on `ProfileForm`'s `ref`;
     `src/components/profile/assistant-updates.ts` (draft for the AI, merging its updates)
 - Auth pieces to reuse: backend `Depends(get_current_user)` → `CurrentUser(user, name)` (needs the users row), or
-  `Depends(get_token_claims)` when only a valid login is needed (no database); frontend `api<T>(path)` in `src/lib/api.ts`,
+  `Depends(get_token_claims)` when only a valid Mahara token is needed (no database); frontend `api<T>(path)` in `src/lib/api.ts`,
   `useAuth()` in `src/lib/auth-context.ts`
 - Profile pieces to reuse:
   - backend: `ProfileIn` / `ProfileOut` (now with `has_photo`) in `app/schemas.py`; unknown codes → 422 in FastAPI's

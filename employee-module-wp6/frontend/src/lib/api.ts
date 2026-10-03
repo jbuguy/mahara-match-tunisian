@@ -1,4 +1,4 @@
-import { supabase } from './supabase'
+import { clearAuthSession, getAccessToken } from './session'
 
 export const API_BASE_URL: string = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8006'
 
@@ -14,15 +14,16 @@ export class ApiError extends Error {
   }
 }
 
-/** Calls the backend with the Supabase access token. A 401 means the login is no longer valid: sign out. */
+/** Calls the backend with the Mahara access token. A 401 means the login is no longer valid. */
 async function request(path: string, init: RequestInit = {}): Promise<Response> {
-  const { data } = await supabase.auth.getSession()
+  const accessToken = getAccessToken()
   const headers = new Headers(init.headers)
-  if (data.session) headers.set('Authorization', `Bearer ${data.session.access_token}`)
+  if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`)
 
   const response = await fetch(`${API_BASE_URL}/api/v1${path}`, { ...init, headers })
   if (response.status === 401) {
-    await supabase.auth.signOut({ scope: 'local' })
+    clearAuthSession()
+    window.dispatchEvent(new Event('mahara:signout'))
   }
   if (!response.ok) {
     const body = await response.json().catch(() => null)
@@ -294,13 +295,13 @@ export const MAX_CV_BYTES = 5 * 1024 * 1024
  * Uses XMLHttpRequest because fetch can't report upload progress (`onProgress` gets 0..1).
  */
 export async function importCv(file: File, onProgress: (sent: number) => void): Promise<CvImport> {
-  const { data } = await supabase.auth.getSession()
+  const accessToken = getAccessToken()
   const body = new FormData()
   body.append('file', file)
   const xhr = new XMLHttpRequest()
   await new Promise<void>((resolve, reject) => {
     xhr.open('POST', `${API_BASE_URL}/api/v1/me/cv`)
-    if (data.session) xhr.setRequestHeader('Authorization', `Bearer ${data.session.access_token}`)
+    if (accessToken) xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`)
     xhr.responseType = 'json'
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable) onProgress(event.loaded / event.total)
@@ -309,7 +310,10 @@ export async function importCv(file: File, onProgress: (sent: number) => void): 
     xhr.onerror = () => reject(new Error('network error'))
     xhr.send(body)
   })
-  if (xhr.status === 401) await supabase.auth.signOut({ scope: 'local' })
+  if (xhr.status === 401) {
+    clearAuthSession()
+    window.dispatchEvent(new Event('mahara:signout'))
+  }
   if (xhr.status < 200 || xhr.status >= 300) throw new ApiError(xhr.status, xhr.response?.detail ?? null)
   return xhr.response
 }

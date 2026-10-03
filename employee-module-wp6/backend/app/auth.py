@@ -1,13 +1,11 @@
-"""Supabase login tokens: verify the ES256 signature against the project's JWKS, then load our `users` row."""
+"""Verify Mahara-issued access tokens and load the corresponding Postgres user."""
 
 from dataclasses import dataclass
-from functools import lru_cache
 from typing import Any
 
 import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from jwt import PyJWKClient
 from sqlalchemy.orm import Session
 
 from app.config import Settings, get_settings
@@ -15,8 +13,9 @@ from app.db import get_db
 from app.models import User
 from app.services.users import get_or_create_user
 
-AUDIENCE = "authenticated"
-ALGORITHMS = ["ES256"]  # Supabase asymmetric signing keys; the old HS256 secret is never accepted.
+AUDIENCE = "mahara-match-wp6"
+ISSUER = "mahara-match"
+ALGORITHMS = ["HS256"]
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -27,18 +26,6 @@ class CurrentUser:
     name: str | None
 
 
-def supabase_auth_url(settings: Settings) -> str:
-    if not settings.supabase_url:
-        raise RuntimeError("SUPABASE_URL is not set in employee-module-wp6/.env")
-    return f"{settings.supabase_url.rstrip('/')}/auth/v1"
-
-
-@lru_cache
-def get_jwks_client() -> PyJWKClient:
-    """FastAPI dependency: one cached JWKS client per process (keys are cached too)."""
-    return PyJWKClient(f"{supabase_auth_url(get_settings())}/.well-known/jwks.json", cache_keys=True)
-
-
 def unauthorized(detail: str) -> HTTPException:
     return HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -47,19 +34,18 @@ def unauthorized(detail: str) -> HTTPException:
     )
 
 
-def decode_token(token: str, jwks: PyJWKClient, settings: Settings) -> dict[str, Any]:
+def decode_token(token: str, settings: Settings) -> dict[str, Any]:
+    if not settings.jwt_secret or len(settings.jwt_secret.encode("utf-8")) < 32:
+        raise HTTPException(status_code=503, detail="authentication is not configured")
     try:
-        signing_key = jwks.get_signing_key_from_jwt(token)
         return jwt.decode(
             token,
-            signing_key,
+            settings.jwt_secret,
             algorithms=ALGORITHMS,
             audience=AUDIENCE,
-            issuer=supabase_auth_url(settings),
+            issuer=ISSUER,
             options={"require": ["exp", "sub", "email"]},
         )
-    except jwt.PyJWKClientConnectionError as exc:
-        raise HTTPException(status_code=503, detail="auth keys unavailable") from exc
     except jwt.ExpiredSignatureError as exc:
         raise unauthorized("token expired") from exc
     except jwt.PyJWTError as exc:
@@ -67,19 +53,17 @@ def decode_token(token: str, jwks: PyJWKClient, settings: Settings) -> dict[str,
 
 
 def display_name(claims: dict[str, Any]) -> str | None:
-    metadata = claims.get("user_metadata") or {}
-    return metadata.get("full_name") or metadata.get("name") or None
+    return claims.get("name") or None
 
 
 def get_token_claims(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
-    jwks: PyJWKClient = Depends(get_jwks_client),
     settings: Settings = Depends(get_settings),
 ) -> dict[str, Any]:
-    """FastAPI dependency: a valid login token, without touching the database (used by /reference/*)."""
+    """FastAPI dependency: a valid Mahara access token, without touching the database."""
     if credentials is None:
         raise unauthorized("missing token")
-    return decode_token(credentials.credentials, jwks, settings)
+    return decode_token(credentials.credentials, settings)
 
 
 def get_current_user(

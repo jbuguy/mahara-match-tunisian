@@ -1,5 +1,5 @@
--- Mahara WP6 Employee Module: database schema.
--- Run once in the Supabase SQL Editor. Safe to run again (idempotent).
+-- Mahara WP6 Employee Module: PostgreSQL schema.
+-- Apply with psql after the shared migrations. Safe to run again (idempotent).
 -- Table and column names match the team's schema so a later switch is mostly env vars.
 
 create extension if not exists pgcrypto;

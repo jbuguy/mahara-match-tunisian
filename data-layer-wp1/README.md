@@ -20,7 +20,7 @@ mahara_data/
 contracts/          generated JSON Schemas + example payloads
 scripts/            export_json_schemas.py
 tests/              ORM ↔ SQL sync, model and contract tests
-../supabase/migrations/20260921000000_wp1_shared_schema.sql
+../migrations/20260921000000_wp1_shared_schema.sql
 ```
 
 ## Setup
@@ -52,7 +52,7 @@ Teams that don't use Python can validate against `contracts/*.schema.json`.
 ## Applying the schema
 
 On a new database volume, Docker applies the ordered SQL files from
-`supabase/migrations/` automatically. To apply a migration added after the
+`migrations/` automatically. To apply a migration added after the
 volume was initialized:
 
 ```bash

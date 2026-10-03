@@ -1,7 +1,7 @@
 # WP1 — Data Model Reference
 
 **Schema version 1.0.** Sources of truth:
-- SQL: [`supabase/migrations/20260921000000_wp1_shared_schema.sql`](../../supabase/migrations/20260921000000_wp1_shared_schema.sql)
+- SQL: [`migrations/20260921000000_wp1_shared_schema.sql`](../../migrations/20260921000000_wp1_shared_schema.sql)
 - ORM: [`mahara_data/db/models/`](../mahara_data/db/models/)
 - JSON contracts: [`mahara_data/schemas/`](../mahara_data/schemas/), exported to [`contracts/`](../contracts/)
 

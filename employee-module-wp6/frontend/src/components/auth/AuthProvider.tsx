@@ -1,19 +1,15 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import type { Session } from '@supabase/supabase-js'
 
 import { AuthContext, type AuthState } from '@/lib/auth-context'
-import { supabase } from '@/lib/supabase'
+import { clearAuthSession, restoreAuthSession, type Session } from '@/lib/session'
 
 async function signInWithGoogle() {
-  const { error } = await supabase.auth.signInWithOAuth({
-    provider: 'google',
-    options: { redirectTo: window.location.origin + '/auth/callback' },
-  })
-  if (error) throw error
+  window.location.assign(`${import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8006'}/api/v1/auth/google`)
 }
 
 async function signOut() {
-  await supabase.auth.signOut()
+  clearAuthSession()
+  window.dispatchEvent(new Event('mahara:signout'))
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -21,16 +17,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // getSession() waits for the client to finish initializing, including the PKCE code exchange on /auth/callback.
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session)
-      setLoading(false)
-    })
-    const { data } = supabase.auth.onAuthStateChange((_event, next) => {
-      setSession(next)
-      setLoading(false)
-    })
-    return () => data.subscription.unsubscribe()
+    setSession(restoreAuthSession())
+    setLoading(false)
+    const onSignOut = () => setSession(null)
+    window.addEventListener('mahara:signout', onSignOut)
+    return () => window.removeEventListener('mahara:signout', onSignOut)
   }, [])
 
   const value = useMemo<AuthState>(() => ({ session, loading, signInWithGoogle, signOut }), [session, loading])

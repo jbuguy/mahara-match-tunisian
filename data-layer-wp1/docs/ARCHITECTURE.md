@@ -140,7 +140,7 @@ stateDiagram-v2
 
 - **Engine:** PostgreSQL 16 with the `vector` extension, run locally in Docker Compose.
 - **Schema:** 35 tables in 9 domains. See [DATA_MODEL.md](DATA_MODEL.md).
-- **Migrations:** plain SQL in `supabase/migrations/`, initialized by the Postgres container and applied later with `psql`. The ORM in `mahara_data.db.models` mirrors it and a pglast-based test checks that they stay identical.
+- **Migrations:** plain PostgreSQL SQL in the repository-root `migrations/`, initialized by the Postgres container and applied later with `psql`. The ORM in `mahara_data.db.models` mirrors it and a pglast-based test checks that they stay identical.
 - **Object storage:** not part of the local database stack. Select an S3-compatible store when file ingestion is implemented; `documents.storage_path` holds its object key.
 
 ### 4.5 Embedding worker
@@ -340,7 +340,7 @@ CI: `pytest` in `data-layer-wp1/` (ORM ↔ SQL ↔ enum ↔ contract sync, examp
 ## 13. Repository layout
 
 ```
-supabase/migrations/
+migrations/
   20260921000000_wp1_shared_schema.sql   # shared schema (source of truth for SQL)
 data-layer-wp1/
   docs/                  PRD, architecture, summary, data model

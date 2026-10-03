@@ -5,27 +5,25 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.auth import get_jwks_client
 from app.config import get_settings
 from app.db import get_engine
-from app.routers import assistant, cv, health, me, photo, profile, reference
+from app.routers import assistant, auth, cv, health, me, photo, profile, reference
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
-WARM_CONNECTIONS = 3  # the pages make up to 3 requests at once
+WARM_CONNECTIONS = 3
 
 
 def warm_up() -> None:
-    """Open a few database connections and fetch the login keys now, so the first clicks aren't slow.
+    """Open a few database connections now, so the first clicks aren't slow.
 
-    Each new connection to Supabase costs about a second; the pool keeps them for the next requests.
+    The pool keeps these connections for the next requests.
     """
     try:
         connections = [get_engine().connect() for _ in range(WARM_CONNECTIONS)]
         for connection in connections:
             connection.close()
-        get_jwks_client().get_jwk_set()
     except Exception as exc:  # the app still works, just slower on the first requests
         logger.warning("warm-up skipped: %s", exc)
 
@@ -47,6 +45,7 @@ app.add_middleware(
 )
 
 app.include_router(health.router, prefix="/api/v1")
+app.include_router(auth.router, prefix="/api/v1")
 app.include_router(me.router, prefix="/api/v1")
 app.include_router(profile.router, prefix="/api/v1")
 app.include_router(photo.router, prefix="/api/v1")

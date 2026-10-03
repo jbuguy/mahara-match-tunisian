@@ -4,10 +4,10 @@
  */
 
 import { useEffect, useSyncExternalStore } from 'react'
-import type { Session } from '@supabase/supabase-js'
 
 import { getPhoto } from './api'
 import { useAuth } from './auth-context'
+import type { Session } from './session'
 
 type PhotoState = {
   userId: string | null
