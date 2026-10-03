@@ -1,17 +1,31 @@
-.env*
+# Python
+venv/
+.venv/
+venv-wp3/
 __pycache__/
 *.py[cod]
 *.egg-info/
 .pytest_cache/
-.venv/
-venv/
-venv-wp3/
-backend/*.db
+
+# Secrets and local config
+.env
+.env*
+
+# Node / build output
 node_modules/
+dist/
 **/build/
 *.tsbuildinfo
+
+# Generated data and local databases
+sessions.csv
+backend/*.db
+*.sqlite3
+onboarding-agent-wp2/data/
+onboarding-agent-wp2/audio_test_reponse/
+
+# Tooling
 supabase/.branches/
 supabase/.temp/
 employer-agent-wp4/employer_agent_wp4/static/
 skill-matching-wp3/.mahara-match.pids.json
-*.sqlite3
