@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import get_settings
-from .routers import health,suggestions,taxonomy
+from .routers import health,suggestions,taxonomy,occupations
 
 settings = get_settings()
 
@@ -22,3 +22,4 @@ app.add_middleware(
 app.include_router(health.router, prefix=settings.api_prefix)
 app.include_router(taxonomy.router, prefix=settings.api_prefix)
 app.include_router(suggestions.router, prefix=settings.api_prefix)
+app.include_router(occupations.router, prefix=settings.api_prefix)
