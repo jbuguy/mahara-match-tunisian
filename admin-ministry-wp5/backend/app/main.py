@@ -9,8 +9,7 @@ from mahara_data.schemas.common import ApiError
 from .config import get_settings
 from .errors import install_error_handlers
 from .metrics import METRICS
-from .routers import health, market,monitoring, occupations, suggestions, taxonomy
-
+from .routers import analytics,health, ingestion, market, monitoring, occupations, suggestions, taxonomy
 settings = get_settings()
 
 TAGS = [
@@ -38,6 +37,16 @@ TAGS = [
         "name": "admin-market",
         "description": "Ministry data exchange: deposits of labour-market datasets "
         "(official, informal or study) and their ingestion reports.",
+    },
+        {
+        "name": "admin-ingestion",
+        "description": "Ingestion runs: volumes, rejected rows and the pipeline version "
+        "that produced each result.",
+    },
+        {
+        "name": "admin-analytics",
+        "description": "Skill-gap cartography for the ministry, aggregated under a "
+        "k-anonymity threshold of 10.",
     },
 ]
 
@@ -101,3 +110,5 @@ app.include_router(suggestions.router, prefix=settings.api_prefix, responses=COM
 app.include_router(occupations.router, prefix=settings.api_prefix, responses=COMMON_ERRORS)
 app.include_router(monitoring.router, prefix=settings.api_prefix)
 app.include_router(market.router, prefix=settings.api_prefix, responses=COMMON_ERRORS)
+app.include_router(ingestion.router, prefix=settings.api_prefix, responses=COMMON_ERRORS)
+app.include_router(analytics.router, prefix=settings.api_prefix, responses=COMMON_ERRORS)

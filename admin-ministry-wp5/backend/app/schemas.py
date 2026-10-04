@@ -1,9 +1,15 @@
 import uuid
 from pydantic import Field
-from datetime import date
-from mahara_data.enums import MarketDataOrigin, ProcessingStatus, RequirementLevel, SkillType
+from datetime import date, datetime
+from mahara_data.enums import (
+    IngestionSource,
+    MarketDataOrigin,
+    ProcessingStatus,
+    RequirementLevel,
+    SkillType,
+)
 from mahara_data.schemas.common import Contract, TaxonomyCode
-from mahara_data.schemas.market import MarketDatasetCreate, MarketIndicatorRecord
+from mahara_data.schemas.market import MarketDatasetCreate, MarketIndicatorRecord , SkillGapAggregate
 
 
 class SkillCreate(Contract):
@@ -124,3 +130,27 @@ class MarketDatasetOut(Contract):
     indicator_count: int
     job_id: uuid.UUID | None = None
     job_status: ProcessingStatus | None = None
+
+class IngestionJobOut(Contract):
+    """How one ingestion run went: volumes, rejections, and the rules that produced it."""
+
+    job_id: uuid.UUID
+    source: IngestionSource
+    status: ProcessingStatus
+    pipeline_version: str
+    records_total: int
+    records_ok: int
+    records_failed: int
+    errors: list[dict] = Field(default_factory=list)
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+    created_at: datetime
+
+class SkillGapMap(Contract):
+    """Ministry cartography. Cells describing fewer than k individuals are withheld."""
+
+    period_start: date
+    period_end: date
+    k_anonymity: int
+    cells_suppressed: int
+    cells: list[SkillGapAggregate] = Field(default_factory=list)
