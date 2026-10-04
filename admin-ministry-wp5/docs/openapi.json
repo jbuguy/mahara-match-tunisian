@@ -1,0 +1,2513 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Mahara Match - WP5 Admin & Ministry API",
+    "description": "WP5 owns the governance of the shared referential: skills, occupations, and the review of labels proposed by the ingestion pipelines. Entities and schemas come from WP1's `mahara_data` package; WP5 owns the lifecycle, not the model.\n\nEvery error follows WP1's `ApiError` contract.",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/v1/health": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Liveness probe",
+        "description": "Answers as long as the process is up. No dependency is checked here.",
+        "operationId": "liveness_api_v1_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LivenessOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/health/ready": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Readiness probe",
+        "description": "Checks every dependency WP5 needs before it can serve traffic.",
+        "operationId": "readiness_api_v1_health_ready_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/taxonomy/skills": {
+      "post": {
+        "tags": [
+          "admin-taxonomy"
+        ],
+        "summary": "Create Skill",
+        "operationId": "create_skill_api_v1_admin_taxonomy_skills_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SkillCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkillRead"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The resource does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with the current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The payload does not match the contract",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "admin-taxonomy"
+        ],
+        "summary": "List Skills",
+        "operationId": "list_skills_api_v1_admin_taxonomy_skills_get",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/TaxonomyStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "skill_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/SkillType"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Skill Type"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Search"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 25,
+              "title": "Page Size"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_SkillRead_"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The resource does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with the current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The payload does not match the contract",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/taxonomy/skills/{code}": {
+      "get": {
+        "tags": [
+          "admin-taxonomy"
+        ],
+        "summary": "Read Skill",
+        "operationId": "read_skill_api_v1_admin_taxonomy_skills__code__get",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Code"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkillRead"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The resource does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with the current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The payload does not match the contract",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "admin-taxonomy"
+        ],
+        "summary": "Edit Skill",
+        "description": "Editorial corrections. Cannot change the status: see the dedicated routes.",
+        "operationId": "edit_skill_api_v1_admin_taxonomy_skills__code__patch",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Code"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SkillUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkillRead"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The resource does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with the current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The payload does not match the contract",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "admin-taxonomy"
+        ],
+        "summary": "Remove Skill",
+        "description": "Deletes an unused draft, retires anything else. Never breaks existing profiles.",
+        "operationId": "remove_skill_api_v1_admin_taxonomy_skills__code__delete",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Code"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemovalOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The resource does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with the current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The payload does not match the contract",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/taxonomy/skills/{code}/validate": {
+      "post": {
+        "tags": [
+          "admin-taxonomy"
+        ],
+        "summary": "Validate Skill",
+        "operationId": "validate_skill_api_v1_admin_taxonomy_skills__code__validate_post",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Code"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkillRead"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The resource does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with the current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The payload does not match the contract",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/taxonomy/suggestions": {
+      "get": {
+        "tags": [
+          "admin-suggestions"
+        ],
+        "summary": "List Suggestions",
+        "description": "The review inbox. Defaults to what is still waiting, busiest labels first.",
+        "operationId": "list_suggestions_api_v1_admin_taxonomy_suggestions_get",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/SuggestionStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "pending",
+              "title": "Status"
+            }
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/IngestionSource"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source"
+            }
+          },
+          {
+            "name": "skill_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/SkillType"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Skill Type"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 25,
+              "title": "Page Size"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_SkillSuggestionRead_"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The resource does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with the current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The payload does not match the contract",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/taxonomy/suggestions/{suggestion_id}/approve": {
+      "post": {
+        "tags": [
+          "admin-suggestions"
+        ],
+        "summary": "Approve Suggestion",
+        "description": "The label was genuinely new. Creates the entry as a draft, to be validated separately.",
+        "operationId": "approve_suggestion_api_v1_admin_taxonomy_suggestions__suggestion_id__approve_post",
+        "parameters": [
+          {
+            "name": "suggestion_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Suggestion Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SuggestionApprove"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkillRead"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The resource does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with the current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The payload does not match the contract",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/taxonomy/suggestions/{suggestion_id}/merge": {
+      "post": {
+        "tags": [
+          "admin-suggestions"
+        ],
+        "summary": "Merge Suggestion",
+        "description": "The label was a synonym. Enriches an existing entry instead of duplicating it.",
+        "operationId": "merge_suggestion_api_v1_admin_taxonomy_suggestions__suggestion_id__merge_post",
+        "parameters": [
+          {
+            "name": "suggestion_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Suggestion Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SuggestionMerge"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkillRead"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The resource does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with the current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The payload does not match the contract",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/taxonomy/suggestions/{suggestion_id}/reject": {
+      "post": {
+        "tags": [
+          "admin-suggestions"
+        ],
+        "summary": "Reject Suggestion",
+        "description": "Noise, typo, or not a skill. The refusal is recorded, never erased.",
+        "operationId": "reject_suggestion_api_v1_admin_taxonomy_suggestions__suggestion_id__reject_post",
+        "parameters": [
+          {
+            "name": "suggestion_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Suggestion Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkillSuggestionRead"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The resource does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with the current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The payload does not match the contract",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/taxonomy/occupations": {
+      "post": {
+        "tags": [
+          "admin-occupations"
+        ],
+        "summary": "Create Occupation",
+        "operationId": "create_occupation_api_v1_admin_taxonomy_occupations_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OccupationCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OccupationRead"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The resource does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with the current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The payload does not match the contract",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "admin-occupations"
+        ],
+        "summary": "List Occupations",
+        "operationId": "list_occupations_api_v1_admin_taxonomy_occupations_get",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/TaxonomyStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Search"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 25,
+              "title": "Page Size"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_OccupationRead_"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The resource does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with the current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The payload does not match the contract",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/taxonomy/occupations/{code}": {
+      "get": {
+        "tags": [
+          "admin-occupations"
+        ],
+        "summary": "Read Occupation",
+        "operationId": "read_occupation_api_v1_admin_taxonomy_occupations__code__get",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Code"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OccupationRead"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The resource does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with the current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The payload does not match the contract",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "admin-occupations"
+        ],
+        "summary": "Edit Occupation",
+        "description": "Editorial corrections. Cannot change the status: see the dedicated routes.",
+        "operationId": "edit_occupation_api_v1_admin_taxonomy_occupations__code__patch",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Code"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OccupationUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OccupationRead"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The resource does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with the current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The payload does not match the contract",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "admin-occupations"
+        ],
+        "summary": "Remove Occupation",
+        "description": "Deletes an unused draft, retires anything else. Never breaks existing offers.",
+        "operationId": "remove_occupation_api_v1_admin_taxonomy_occupations__code__delete",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Code"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemovalOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The resource does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with the current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The payload does not match the contract",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/taxonomy/occupations/{code}/validate": {
+      "post": {
+        "tags": [
+          "admin-occupations"
+        ],
+        "summary": "Validate Occupation",
+        "operationId": "validate_occupation_api_v1_admin_taxonomy_occupations__code__validate_post",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Code"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OccupationRead"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The resource does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with the current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The payload does not match the contract",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/taxonomy/occupations/{code}/skills": {
+      "put": {
+        "tags": [
+          "admin-occupations"
+        ],
+        "summary": "Replace Required Skills",
+        "description": "The complete requirement list. What you omit is removed.",
+        "operationId": "replace_required_skills_api_v1_admin_taxonomy_occupations__code__skills_put",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Code"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OccupationSkillsReplace"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OccupationRead"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The resource does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with the current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The payload does not match the contract",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/monitoring/overview": {
+      "get": {
+        "tags": [
+          "admin-monitoring"
+        ],
+        "summary": "Module health at a glance",
+        "operationId": "overview_api_v1_admin_monitoring_overview_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OverviewOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/monitoring/routes": {
+      "get": {
+        "tags": [
+          "admin-monitoring"
+        ],
+        "summary": "Per-route traffic",
+        "description": "Counters since the last restart. They live in memory, not in the database.",
+        "operationId": "route_stats_api_v1_admin_monitoring_routes_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RouteStatsOut"
+                  },
+                  "type": "array",
+                  "title": "Response Route Stats Api V1 Admin Monitoring Routes Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/monitoring/taxonomy": {
+      "get": {
+        "tags": [
+          "admin-monitoring"
+        ],
+        "summary": "Referential quality",
+        "description": "Governance indicators: what is waiting, and what is incomplete.",
+        "operationId": "taxonomy_stats_api_v1_admin_monitoring_taxonomy_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaxonomyStatsOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ApiError": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code",
+            "examples": [
+              "validation_error",
+              "not_found"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "details": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Details"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "ApiError"
+      },
+      "DependencyOut": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "status"
+        ],
+        "title": "DependencyOut"
+      },
+      "IngestionSource": {
+        "type": "string",
+        "enum": [
+          "cv_upload",
+          "conversation",
+          "employer_offer",
+          "ministry_market",
+          "training_catalog"
+        ],
+        "title": "IngestionSource"
+      },
+      "LivenessOut": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "module": {
+            "type": "string",
+            "title": "Module"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "module"
+        ],
+        "title": "LivenessOut"
+      },
+      "OccupationCreate": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Code"
+          },
+          "isco_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 8
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Isco Code"
+          },
+          "title_fr": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title Fr"
+          },
+          "title_ar": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title Ar"
+          },
+          "alt_titles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Alt Titles"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "sector_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sector Code"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code",
+          "title_fr"
+        ],
+        "title": "OccupationCreate",
+        "description": "Payload to add an occupation to the national referential. Owned by WP5."
+      },
+      "OccupationRead": {
+        "properties": {
+          "occupation_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Occupation Id"
+          },
+          "code": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Code"
+          },
+          "isco_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Isco Code"
+          },
+          "title_fr": {
+            "type": "string",
+            "title": "Title Fr"
+          },
+          "title_ar": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title Ar"
+          },
+          "alt_titles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Alt Titles"
+          },
+          "sector_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sector Code"
+          },
+          "status": {
+            "$ref": "#/components/schemas/TaxonomyStatus"
+          },
+          "skills": {
+            "items": {
+              "$ref": "#/components/schemas/OccupationSkillRead"
+            },
+            "type": "array",
+            "title": "Skills"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "occupation_id",
+          "code",
+          "title_fr",
+          "status"
+        ],
+        "title": "OccupationRead"
+      },
+      "OccupationSkillRead": {
+        "properties": {
+          "skill_code": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Skill Code"
+          },
+          "requirement": {
+            "$ref": "#/components/schemas/RequirementLevel"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "skill_code",
+          "requirement"
+        ],
+        "title": "OccupationSkillRead"
+      },
+      "OccupationSkillWrite": {
+        "properties": {
+          "skill_code": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Skill Code"
+          },
+          "requirement": {
+            "$ref": "#/components/schemas/RequirementLevel"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "skill_code",
+          "requirement"
+        ],
+        "title": "OccupationSkillWrite",
+        "description": "One requirement line: which skill, and whether it is mandatory."
+      },
+      "OccupationSkillsReplace": {
+        "properties": {
+          "skills": {
+            "items": {
+              "$ref": "#/components/schemas/OccupationSkillWrite"
+            },
+            "type": "array",
+            "title": "Skills"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "OccupationSkillsReplace",
+        "description": "The complete requirement list. Replaces whatever was there before."
+      },
+      "OccupationUpdate": {
+        "properties": {
+          "isco_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 8
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Isco Code"
+          },
+          "title_fr": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title Fr"
+          },
+          "title_ar": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title Ar"
+          },
+          "alt_titles": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alt Titles"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "sector_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sector Code"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "OccupationUpdate",
+        "description": "Editorial corrections only. Status changes go through their own routes."
+      },
+      "OverviewOut": {
+        "properties": {
+          "module": {
+            "type": "string",
+            "title": "Module"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "uptime_seconds": {
+            "type": "number",
+            "title": "Uptime Seconds"
+          },
+          "database_latency_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Database Latency Ms"
+          },
+          "requests_total": {
+            "type": "integer",
+            "title": "Requests Total"
+          },
+          "refusals_total": {
+            "type": "integer",
+            "title": "Refusals Total"
+          },
+          "errors_total": {
+            "type": "integer",
+            "title": "Errors Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "module",
+          "status",
+          "uptime_seconds",
+          "database_latency_ms",
+          "requests_total",
+          "refusals_total",
+          "errors_total"
+        ],
+        "title": "OverviewOut"
+      },
+      "Page_OccupationRead_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/OccupationRead"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "title": "Page Size"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "Page[OccupationRead]"
+      },
+      "Page_SkillRead_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SkillRead"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "title": "Page Size"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "Page[SkillRead]"
+      },
+      "Page_SkillSuggestionRead_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SkillSuggestionRead"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "title": "Page Size"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "Page[SkillSuggestionRead]"
+      },
+      "ReadinessOut": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "module": {
+            "type": "string",
+            "title": "Module"
+          },
+          "dependencies": {
+            "items": {
+              "$ref": "#/components/schemas/DependencyOut"
+            },
+            "type": "array",
+            "title": "Dependencies"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "module",
+          "dependencies"
+        ],
+        "title": "ReadinessOut"
+      },
+      "RemovalOut": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "outcome": {
+            "type": "string",
+            "title": "Outcome"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code",
+          "outcome"
+        ],
+        "title": "RemovalOut",
+        "description": "Tells the caller what actually happened: a real delete, or a retirement."
+      },
+      "RequirementLevel": {
+        "type": "string",
+        "enum": [
+          "required",
+          "preferred"
+        ],
+        "title": "RequirementLevel"
+      },
+      "RouteStatsOut": {
+        "properties": {
+          "route": {
+            "type": "string",
+            "title": "Route"
+          },
+          "requests": {
+            "type": "integer",
+            "title": "Requests"
+          },
+          "refusals": {
+            "type": "integer",
+            "title": "Refusals"
+          },
+          "errors": {
+            "type": "integer",
+            "title": "Errors"
+          },
+          "avg_ms": {
+            "type": "number",
+            "title": "Avg Ms"
+          },
+          "max_ms": {
+            "type": "number",
+            "title": "Max Ms"
+          }
+        },
+        "type": "object",
+        "required": [
+          "route",
+          "requests",
+          "refusals",
+          "errors",
+          "avg_ms",
+          "max_ms"
+        ],
+        "title": "RouteStatsOut"
+      },
+      "SkillCreate": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Code"
+          },
+          "label_fr": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Label Fr"
+          },
+          "label_ar": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label Ar"
+          },
+          "label_derja": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label Derja"
+          },
+          "alt_labels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Alt Labels"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "skill_type": {
+            "$ref": "#/components/schemas/SkillType"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code",
+          "label_fr",
+          "skill_type"
+        ],
+        "title": "SkillCreate",
+        "description": "Payload to add an entry to the national skills referential. Owned by WP5."
+      },
+      "SkillRead": {
+        "properties": {
+          "skill_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Skill Id"
+          },
+          "code": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Code"
+          },
+          "label_fr": {
+            "type": "string",
+            "title": "Label Fr"
+          },
+          "label_ar": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label Ar"
+          },
+          "label_derja": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label Derja"
+          },
+          "alt_labels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Alt Labels"
+          },
+          "skill_type": {
+            "$ref": "#/components/schemas/SkillType"
+          },
+          "category_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category Code"
+          },
+          "status": {
+            "$ref": "#/components/schemas/TaxonomyStatus"
+          },
+          "esco_uri": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Esco Uri"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Version"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "skill_id",
+          "code",
+          "label_fr",
+          "skill_type",
+          "status",
+          "version"
+        ],
+        "title": "SkillRead"
+      },
+      "SkillSuggestionRead": {
+        "properties": {
+          "suggestion_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Suggestion Id"
+          },
+          "proposed_label": {
+            "type": "string",
+            "title": "Proposed Label"
+          },
+          "normalized_label": {
+            "type": "string",
+            "title": "Normalized Label"
+          },
+          "skill_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SkillType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source": {
+            "$ref": "#/components/schemas/IngestionSource"
+          },
+          "occurrences": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Occurrences"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SuggestionStatus"
+          },
+          "resolved_skill_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolved Skill Code"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "suggestion_id",
+          "proposed_label",
+          "normalized_label",
+          "source",
+          "occurrences",
+          "status"
+        ],
+        "title": "SkillSuggestionRead"
+      },
+      "SkillType": {
+        "type": "string",
+        "enum": [
+          "hard",
+          "soft",
+          "language"
+        ],
+        "title": "SkillType"
+      },
+      "SkillUpdate": {
+        "properties": {
+          "label_fr": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label Fr"
+          },
+          "label_ar": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label Ar"
+          },
+          "label_derja": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label Derja"
+          },
+          "alt_labels": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alt Labels"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "skill_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SkillType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "SkillUpdate",
+        "description": "Editorial corrections only. Status changes go through their own routes."
+      },
+      "SuggestionApprove": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Code"
+          },
+          "label_fr": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Label Fr"
+          },
+          "label_ar": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label Ar"
+          },
+          "label_derja": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label Derja"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "skill_type": {
+            "$ref": "#/components/schemas/SkillType"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code",
+          "label_fr",
+          "skill_type"
+        ],
+        "title": "SuggestionApprove",
+        "description": "Promote a suggestion into a new entry of the referential. The admin writes the code."
+      },
+      "SuggestionMerge": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Code"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code"
+        ],
+        "title": "SuggestionMerge",
+        "description": "Attach the proposed label as a synonym of a skill that already exists."
+      },
+      "SuggestionStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "approved",
+          "rejected",
+          "merged"
+        ],
+        "title": "SuggestionStatus"
+      },
+      "TaxonomyStatsOut": {
+        "properties": {
+          "skills": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Skills"
+          },
+          "occupations": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Occupations"
+          },
+          "suggestions": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Suggestions"
+          },
+          "occupations_without_skills": {
+            "type": "integer",
+            "title": "Occupations Without Skills"
+          }
+        },
+        "type": "object",
+        "required": [
+          "skills",
+          "occupations",
+          "suggestions",
+          "occupations_without_skills"
+        ],
+        "title": "TaxonomyStatsOut"
+      },
+      "TaxonomyStatus": {
+        "type": "string",
+        "enum": [
+          "draft",
+          "validated",
+          "deprecated"
+        ],
+        "title": "TaxonomyStatus"
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "health",
+      "description": "Liveness and readiness probes."
+    },
+    {
+      "name": "admin-taxonomy",
+      "description": "Governance of the national skills referential: create, edit, validate and retire entries. Nothing enters circulation without validation."
+    },
+    {
+      "name": "admin-suggestions",
+      "description": "Review inbox. Unknown labels found by the WP2 and WP4 pipelines wait here for one of three verdicts: approve, merge as a synonym, or reject."
+    },
+    {
+      "name": "admin-occupations",
+      "description": "Occupation referential, aligned with ISCO-08, and the required skills that feed WP3's gap detection."
+    },
+    {
+      "name": "admin-monitoring",
+      "description": "Technical health and referential quality indicators."
+    }
+  ]
+}
