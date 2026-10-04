@@ -1,7 +1,7 @@
 from sqlalchemy import String, case, cast, or_, select
 from sqlalchemy.orm import Session
 
-from app.models import Governorate, Occupation, Skill
+from ..models import Governorate, Occupation, Skill
 
 SEARCH_LIMIT = 20
 

@@ -208,3 +208,26 @@ def test_platform_validates_wp4_offers_and_wp6_profiles_against_wp1_contracts():
     assert profile_response.status_code == 200
     assert profile_response.json()["valid"] is True
     assert profile_response.json()["contract"] == "candidate_profile"
+
+
+def test_platform_validates_onboarding_agent_output_against_wp1_contracts():
+    response = client.post(
+        "/platform/integrations/wp2/onboard",
+        json={
+            "onboarding_path": "derja_guided_voice",
+            "literacy_level": "non_literate",
+            "preferred_language": "ar-TN",
+            "languages": [{"code": "ar-TN", "level": 2}],
+            "location": {"governorate_code": "TN-11", "delegation": "Tunis"},
+            "education_level": "baccalaureate",
+            "years_experience": 2,
+            "skills": [{"skill_code": "SK-0103", "skill_type": "hard", "level": 2, "source": "dialogue", "confidence": 0.8}],
+            "conversation_session_id": "123e4567-e89b-12d3-a456-426614174002",
+            "summary": "Candidate with a short professional history and onboarding through guided Derja voice flow.",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["valid"] is True
+    assert response.json()["contract"] == "candidate_profile"
+    assert response.json()["module"] == "wp2"

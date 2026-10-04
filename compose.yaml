@@ -10,7 +10,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./migrations:/docker-entrypoint-initdb.d:ro
-      - ./employee-module-wp6/db/schema.sql:/wp6/schema.sql:ro
+      - ./employee-module-wp6/db/schema.sql:/docker-entrypoint-initdb.d/20261004000000_wp6_schema.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mahara} -d ${POSTGRES_DB:-mahara_match}"]
       interval: 5s

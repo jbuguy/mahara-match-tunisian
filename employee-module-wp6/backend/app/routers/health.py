@@ -2,8 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.db import get_db
-from app.models import Governorate
+from ..db import get_db
+from ..models import Governorate
 
 router = APIRouter(tags=["health"])
 

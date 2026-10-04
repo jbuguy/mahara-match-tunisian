@@ -14,8 +14,8 @@ from pypdf import PdfReader
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Skill
-from app.schemas import CvDraft, CvEducation, CvExperience, CvImportOut, CvSkill
+from ..models import Skill
+from ..schemas import CvDraft, CvEducation, CvExperience, CvImportOut, CvSkill
 
 MAX_CV_BYTES = 5 * 1024 * 1024
 MAX_PDF_PAGES = 10  # a CV is 1-3 pages; this keeps a huge PDF from tying up the server

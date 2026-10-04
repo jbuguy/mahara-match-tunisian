@@ -19,9 +19,9 @@ from pydantic import BaseModel, BeforeValidator, StringConstraints, ValidationEr
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.config import Settings, get_settings
-from app.models import Occupation
-from app.schemas import (
+from ..config import Settings, get_settings
+from ..models import Occupation
+from ..schemas import (
     AssistantChatIn,
     AssistantChatOut,
     AssistantDraft,
@@ -34,7 +34,7 @@ from app.schemas import (
     LanguageOut,
     OccupationOut,
 )
-from app.services.cv_import import CatalogSkill, find_phone, find_skills, fold, words
+from .cv_import import CatalogSkill, find_phone, find_skills, fold, words
 
 logger = logging.getLogger(__name__)
 

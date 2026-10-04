@@ -4,7 +4,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator, model_validator
 
-from app.models import EDUCATION_LEVELS, LITERACY_LEVELS, SKILL_SOURCES
+from .models import EDUCATION_LEVELS, LITERACY_LEVELS, SKILL_SOURCES
 
 EducationLevel = Literal[*EDUCATION_LEVELS]
 LiteracyLevel = Literal[*LITERACY_LEVELS]

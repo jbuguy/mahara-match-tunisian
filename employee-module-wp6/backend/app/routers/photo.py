@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile, status
 from sqlalchemy.orm import Session
 
-from app.auth import CurrentUser, get_current_user
-from app.db import get_db
-from app.services.photo import JPEG_START, MAX_PHOTO_BYTES, get_photo, set_photo
+from ..auth import CurrentUser, get_current_user
+from ..db import get_db
+from ..services.photo import JPEG_START, MAX_PHOTO_BYTES, get_photo, set_photo
 
 router = APIRouter(prefix="/me/photo", tags=["photo"])
 

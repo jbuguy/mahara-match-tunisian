@@ -3,10 +3,10 @@ from typing import Any
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
-from app.auth import get_token_claims
-from app.db import get_db
-from app.schemas import CvImportOut
-from app.services.cv_import import MAX_CV_BYTES, UNREADABLE, UnreadableCv, build_draft, file_kind, load_skills, read_text
+from ..auth import get_token_claims
+from ..db import get_db
+from ..schemas import CvImportOut
+from ..services.cv_import import MAX_CV_BYTES, UNREADABLE, UnreadableCv, build_draft, file_kind, load_skills, read_text
 
 router = APIRouter(prefix="/me/cv", tags=["cv"])
 

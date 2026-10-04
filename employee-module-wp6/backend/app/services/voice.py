@@ -10,7 +10,7 @@ import re
 import groq
 from fastapi import status
 
-from app.services.assistant import BUSY, SORRY, AssistantUnavailable
+from .assistant import BUSY, SORRY, AssistantUnavailable
 
 logger = logging.getLogger(__name__)
 

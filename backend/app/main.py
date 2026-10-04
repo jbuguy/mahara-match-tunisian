@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any, Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -12,9 +13,11 @@ from shared_llm import LLMSettings, OpenAICompatibleClient
 
 from .config import get_settings
 from .database import Base, engine, get_db
+from .google_auth import router as google_auth_router
 from .models import Employer, EmployerDraftSession
 from .schemas import EmployerLogin, EmployerProfile, EmployerSignup, EmployerUpdate, Token
 from .security import create_access_token, get_current_employer, hash_password, verify_password
+from .wp6_integration import register_wp6_routes
 
 from employer_agent_wp4 import create_employer_agent_router
 
@@ -44,6 +47,13 @@ app = FastAPI(
     description="Production-oriented API shell for Mahara Match, with module-specific services behind a single platform surface.",
     lifespan=lifespan,
 )
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origin_list,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 app.include_router(
     create_employer_agent_router(
         get_db,
@@ -52,6 +62,8 @@ app.include_router(
         llm_client=llm_client,
     )
 )
+app.include_router(google_auth_router)
+register_wp6_routes(app, settings, get_db)
 
 
 def check_shared_contracts() -> str:
@@ -202,6 +214,26 @@ def validate_wp6_profile(payload: dict[str, Any]) -> dict[str, object]:
 
     return {
         "module": "wp6",
+        "contract": "candidate_profile",
+        "source": "wp1",
+        "valid": True,
+        "status": "validated",
+        "profile": profile.model_dump(mode="json"),
+    }
+
+
+@app.post("/platform/integrations/wp2/onboard")
+def validate_wp2_onboarding(payload: dict[str, Any]) -> dict[str, object]:
+    from mahara_data.schemas.profile import CandidateProfile
+    from pydantic import ValidationError
+
+    try:
+        profile = CandidateProfile.model_validate(payload)
+    except ValidationError as exc:
+        raise HTTPException(status_code=422, detail={"contract": "candidate_profile", "error": str(exc)}) from exc
+
+    return {
+        "module": "wp2",
         "contract": "candidate_profile",
         "source": "wp1",
         "valid": True,

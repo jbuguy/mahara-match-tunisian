@@ -5,13 +5,13 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from app.auth import get_token_claims
-from app.config import Settings, get_settings
-from app.db import get_db
-from app.schemas import AssistantChatIn, AssistantChatOut, TranscriptOut
-from app.services.assistant import SORRY, AssistantUnavailable, assistant_turn, get_groq_client, load_occupations
-from app.services.cv_import import load_skills
-from app.services.voice import MAX_AUDIO_BYTES, audio_kind, transcribe
+from ..auth import get_token_claims
+from ..config import Settings, get_settings
+from ..db import get_db
+from ..schemas import AssistantChatIn, AssistantChatOut, TranscriptOut
+from ..services.assistant import SORRY, AssistantUnavailable, assistant_turn, get_groq_client, load_occupations
+from ..services.cv_import import load_skills
+from ..services.voice import MAX_AUDIO_BYTES, audio_kind, transcribe
 
 router = APIRouter(prefix="/me/assistant", tags=["assistant"])
 

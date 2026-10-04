@@ -13,7 +13,7 @@ from sqlalchemy.dialects.postgresql import UUID, insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.models import (
+from ..models import (
     Candidate,
     CandidateDesiredOccupation,
     CandidateEducation,
@@ -25,7 +25,7 @@ from app.models import (
     Skill,
     User,
 )
-from app.schemas import ProfileIn, ProfileOut
+from ..schemas import ProfileIn, ProfileOut
 
 CONSENT_VERSION = "1.0"
 

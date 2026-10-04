@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.auth import CurrentUser, get_current_user
-from app.db import get_db
-from app.schemas import ProfileIn, ProfileOut
-from app.services.profile import get_profile, save_profile
+from ..auth import CurrentUser, get_current_user
+from ..db import get_db
+from ..schemas import ProfileIn, ProfileOut
+from ..services.profile import get_profile, save_profile
 
 router = APIRouter(prefix="/me/profile", tags=["profile"])
 

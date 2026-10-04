@@ -89,11 +89,32 @@ No PII stored unless strictly necessary and consented; anonymized/aggregated ana
 - Access to the shared LLM endpoint (see `/docs/llm-access.md`)
 
 ### Local setup
-```bash
-git clone [repo-url]
-cd [repo-name]
-cp .env.example .env   # fill in DB creds, LLM endpoint, JWT secret
-docker compose up --build
+Start PostgreSQL and apply the WP1 and WP6 schema initialization scripts:
+
+```powershell
+docker compose up -d db
+```
+
+Compose initializes the WP6 tables automatically for a new database volume. For an existing Postgres volume, apply `employee-module-wp6/db/schema.sql` once using `psql` before starting the backend.
+
+Configure the root API from `backend/.env.example` (copy it to `backend/.env`). Set Google OAuth credentials and register this exact authorized redirect URI in Google Cloud:
+
+```text
+http://localhost:8000/auth/google/callback
+```
+
+Then run the API and frontend in separate terminals:
+
+```powershell
+cd backend
+python -m pip install -r requirements.txt
+python -m uvicorn app.main:app --reload --port 8000
+```
+
+```powershell
+cd frontend
+npm install
+npm run dev
 ```
 
 ### Production validation

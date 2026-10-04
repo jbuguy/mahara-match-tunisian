@@ -8,10 +8,10 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
-from app.config import Settings, get_settings
-from app.db import get_db
-from app.models import User
-from app.services.users import get_or_create_user
+from .config import Settings, get_settings
+from .db import get_db
+from .models import User
+from .services.users import get_or_create_user
 
 AUDIENCE = "mahara-match-wp6"
 ISSUER = "mahara-match"

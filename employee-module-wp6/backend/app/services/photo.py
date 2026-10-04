@@ -5,7 +5,7 @@ import uuid
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
-from app.models import Candidate, CandidatePii
+from ..models import Candidate, CandidatePii
 
 # The browser sends a 256x256 JPEG (about 20-40 KB); this leaves room without accepting big files.
 MAX_PHOTO_BYTES = 300_000

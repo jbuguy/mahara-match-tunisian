@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from app.auth import get_token_claims
-from app.db import get_db
-from app.schemas import GovernorateOut, OccupationOut, SkillOut
-from app.services import reference
+from ..auth import get_token_claims
+from ..db import get_db
+from ..schemas import GovernorateOut, OccupationOut, SkillOut
+from ..services import reference
 
 router = APIRouter(prefix="/reference", tags=["reference"], dependencies=[Depends(get_token_claims)])
 

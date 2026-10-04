@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.models import Candidate, User
+from ..models import Candidate, User
 
 
 # last_login_at is refreshed at most this often: writing it on every request cost two database round trips.
