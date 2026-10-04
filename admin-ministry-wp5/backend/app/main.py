@@ -9,7 +9,7 @@ from mahara_data.schemas.common import ApiError
 from .config import get_settings
 from .errors import install_error_handlers
 from .metrics import METRICS
-from .routers import health, monitoring, occupations, suggestions, taxonomy
+from .routers import health, market,monitoring, occupations, suggestions, taxonomy
 
 settings = get_settings()
 
@@ -33,6 +33,11 @@ TAGS = [
     {
         "name": "admin-monitoring",
         "description": "Technical health and referential quality indicators.",
+    },
+        {
+        "name": "admin-market",
+        "description": "Ministry data exchange: deposits of labour-market datasets "
+        "(official, informal or study) and their ingestion reports.",
     },
 ]
 
@@ -95,3 +100,4 @@ app.include_router(taxonomy.router, prefix=settings.api_prefix, responses=COMMON
 app.include_router(suggestions.router, prefix=settings.api_prefix, responses=COMMON_ERRORS)
 app.include_router(occupations.router, prefix=settings.api_prefix, responses=COMMON_ERRORS)
 app.include_router(monitoring.router, prefix=settings.api_prefix)
+app.include_router(market.router, prefix=settings.api_prefix, responses=COMMON_ERRORS)

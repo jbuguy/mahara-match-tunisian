@@ -1,7 +1,9 @@
+import uuid
 from pydantic import Field
-
-from mahara_data.enums import RequirementLevel, SkillType
+from datetime import date
+from mahara_data.enums import MarketDataOrigin, ProcessingStatus, RequirementLevel, SkillType
 from mahara_data.schemas.common import Contract, TaxonomyCode
+from mahara_data.schemas.market import MarketDatasetCreate, MarketIndicatorRecord
 
 
 class SkillCreate(Contract):
@@ -83,3 +85,42 @@ class OccupationSkillsReplace(Contract):
     """The complete requirement list. Replaces whatever was there before."""
 
     skills: list[OccupationSkillWrite] = Field(default_factory=list)
+
+class MarketDatasetSubmission(Contract):
+    """What the ministry deposits: one dataset header plus its normalized rows."""
+
+    dataset: MarketDatasetCreate
+    records: list[MarketIndicatorRecord] = Field(default_factory=list, max_length=5000)
+
+
+class RecordRejection(Contract):
+    """One row the pipeline could not keep, with its position so it can be fixed and resent."""
+
+    index: int
+    reason: str
+
+
+class IngestionReport(Contract):
+    """What the depositor gets back: what was kept, what was not, and why."""
+
+    dataset_id: uuid.UUID
+    job_id: uuid.UUID
+    status: ProcessingStatus
+    records_total: int
+    records_ok: int
+    records_failed: int
+    rejections: list[RecordRejection] = Field(default_factory=list)
+
+
+class MarketDatasetOut(Contract):
+    """A deposited dataset, seen from the admin side."""
+
+    dataset_id: uuid.UUID
+    title: str
+    origin: MarketDataOrigin
+    publisher: str
+    period_start: date
+    period_end: date
+    indicator_count: int
+    job_id: uuid.UUID | None = None
+    job_status: ProcessingStatus | None = None
