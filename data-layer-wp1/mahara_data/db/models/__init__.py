@@ -1,6 +1,6 @@
 """All ORM models. Importing this package registers every table on `Base.metadata`."""
 
-from .accounts import User
+from .accounts import AuthIdentity, User
 from .candidates import (
     Candidate,
     CandidateDesiredOccupation,
@@ -20,6 +20,7 @@ from .training import CandidateCertification, TrainingCourse, TrainingCourseSkil
 
 __all__ = [
     "Application",
+    "AuthIdentity",
     "AuditLog",
     "Candidate",
     "CandidateCertification",

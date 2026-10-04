@@ -133,6 +133,19 @@ def test_platform_health_and_readiness_endpoints_are_available():
     assert readiness.json()["checks"]["shared_contracts"] == "ok"
 
 
+def test_development_cors_allows_vite_fallback_port():
+    response = client.options(
+        "/health",
+        headers={
+            "Origin": "http://127.0.0.1:5174",
+            "Access-Control-Request-Method": "GET",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://127.0.0.1:5174"
+
+
 def test_platform_module_registry_lists_work_packages_with_shared_contracts():
     response = client.get("/platform/modules")
 
@@ -141,6 +154,7 @@ def test_platform_module_registry_lists_work_packages_with_shared_contracts():
     assert payload["platform"] == "mahara-match"
     assert any(module["code"] == "wp1" for module in payload["modules"])
     assert any(module["code"] == "wp4" for module in payload["modules"])
+    assert any(module["code"] == "wp3" for module in payload["modules"])
     assert all(module["shared_contracts"] in {"ok", "not_configured"} for module in payload["modules"])
 
 
@@ -165,6 +179,8 @@ def test_platform_modules_expose_module_status_and_contract_counts():
     assert wp1["contract_count"] >= 10
     assert "candidate_profile" in wp1["contracts"]
     assert any(module["code"] == "wp4" for module in modules)
+    wp3 = next(module for module in modules if module["code"] == "wp3")
+    assert wp3["status"] == "registered"
     assert any(module["code"] == "wp6" for module in modules)
 
 

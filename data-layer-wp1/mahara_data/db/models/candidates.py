@@ -15,6 +15,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Integer,
+    LargeBinary,
     Numeric,
     SmallInteger,
     String,
@@ -72,6 +73,7 @@ class CandidatePII(TimestampMixin, Base):
     date_of_birth: Mapped[date | None] = mapped_column(Date)
     gender: Mapped[str | None] = mapped_column(String(16))
     address: Mapped[str | None] = mapped_column(Text)
+    photo: Mapped[bytes | None] = mapped_column(LargeBinary)
 
 
 class CandidateSkill(Base):

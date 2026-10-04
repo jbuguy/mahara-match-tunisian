@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     app_version: str = "0.1.0"
     environment: str = "development"
     app_env: str = "development"
-    database_url: str = "postgresql+psycopg://mahara:mahara@localhost:5432/mahara_match"
+    database_url: str | None = None
     jwt_secret: str = "mahara-match-super-secret-key-change-this-in-production"
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60

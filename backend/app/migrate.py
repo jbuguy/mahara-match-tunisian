@@ -272,6 +272,8 @@ def _database_dsn(value: str) -> str:
     url = make_url(value)
     if not url.drivername.startswith("postgresql"):
         raise MigrationError("Migrations require a PostgreSQL database URL")
+    if "sslmode" not in url.query:
+        url = url.update_query_dict({"sslmode": "require"})
     return url.set(drivername="postgresql").render_as_string(hide_password=False)
 
 
@@ -289,6 +291,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         migrations = discover_migrations(args.migrations_dir)
         database_url = args.database_url or get_settings().database_url
+        if not database_url:
+            raise MigrationError("Set DATABASE_URL to the Supabase PostgreSQL connection string")
         with psycopg.connect(_database_dsn(database_url), autocommit=True) as connection:
             report = apply_migrations(connection, migrations, baseline_existing=args.baseline_existing)
     except (MigrationError, psycopg.Error, ValueError) as error:

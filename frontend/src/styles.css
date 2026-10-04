@@ -209,6 +209,14 @@ button {
 .form-notice { color: var(--teal-strong); margin: 0; }
 .signup-choice { padding: 16px; background: var(--surface-soft); border-radius: 10px; }
 .signup-choice h3, .signup-choice p { margin: 0 0 10px; }
+.signup-role-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 24px; }
+.signup-role-grid .signup-choice { min-height: 190px; border: 1px solid var(--line); text-align: left; color: var(--ink); }
+.signup-role-grid .signup-choice:hover { border-color: var(--teal); background: #edf5f1; }
+.signup-role-grid .signup-choice span { display: inline-block; margin-top: 12px; color: var(--teal-strong); font-size: .84rem; font-weight: 700; }
+.signup-role-form { margin-top: 20px; }
+.text-button { border: 0; padding: 8px 0; background: transparent; color: var(--teal-strong); font-weight: 600; }
+.auth-switch { margin: 20px 0 0; color: var(--ink-soft); font-size: .9rem; text-align: center; }
+.auth-switch a { color: var(--teal-strong); font-weight: 700; }
 .profile-form { max-width: 760px; }
 .cv-upload { display: inline-flex; position: relative; overflow: hidden; margin-bottom: 16px; }
 .cv-upload input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
@@ -225,6 +233,19 @@ button {
 .conversation-message p { margin: 4px 0 0; white-space: pre-wrap; }
 .conversation-form { display: grid; gap: 10px; margin-top: 16px; }
 .conversation-form textarea { width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 12px; resize: vertical; font: inherit; }
+.assistant-chat-tools { display: flex; flex-wrap: wrap; gap: 10px; }
+.assistant-chat-tools button { min-height: 44px; }
+.candidate-start { padding-top: 32px; }
+.candidate-start .panel-header h2 { margin-bottom: 8px; }
+.candidate-start .panel-header p:last-child { margin: 0; color: var(--ink-soft); }
+.candidate-start-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 26px; }
+.candidate-start-option { display: flex; min-height: 250px; flex-direction: column; align-items: flex-start; border-top: 3px solid var(--teal); padding: 20px 4px; }
+.candidate-start-option:nth-child(2) { border-color: var(--gold); }
+.candidate-start-option:nth-child(3) { border-color: #b3654d; }
+.candidate-start-option .start-number { color: var(--ink-soft); font-size: .78rem; font-weight: 700; }
+.candidate-start-option h3 { margin: 20px 0 8px; }
+.candidate-start-option p { flex: 1; color: var(--ink-soft); line-height: 1.55; }
+.candidate-start-option a { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; text-decoration: none; }
 .publish-btn { display: block; margin-top: 16px; }
 
 .two-col {
@@ -351,6 +372,137 @@ button {
   border-radius: 16px;
   padding: 16px;
   background: rgba(248, 247, 243, 0.8);
+}
+
+.match-results {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+.match-item {
+  padding: 20px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.match-item:last-child {
+  border-bottom: 0;
+}
+
+.application-list {
+  display: grid;
+  gap: 12px;
+}
+
+.application-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--line);
+  padding: 14px 0;
+}
+
+.application-item:last-child {
+  border-bottom: 0;
+}
+
+.application-item h4,
+.application-item p {
+  margin: 0 0 6px;
+}
+
+.application-item p {
+  color: var(--ink-soft);
+}
+
+.match-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.match-heading h3,
+.match-gaps h4,
+.roadmap-result h4 {
+  margin: 0 0 6px;
+}
+
+.match-id,
+.match-gaps small,
+.roadmap-result small {
+  color: var(--ink-soft);
+  overflow-wrap: anywhere;
+}
+
+.match-score {
+  color: var(--teal-strong);
+  font-size: 1.8rem;
+  white-space: nowrap;
+}
+
+.match-breakdown {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.match-metric {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 5px 8px;
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+  text-transform: capitalize;
+}
+
+.match-metric strong {
+  color: var(--ink);
+}
+
+.match-metric progress {
+  grid-column: 1 / -1;
+  width: 100%;
+  height: 7px;
+  accent-color: var(--teal);
+}
+
+.match-gaps {
+  margin-bottom: 16px;
+}
+
+.match-gaps h4 span {
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+
+.match-gaps ul,
+.roadmap-result ol {
+  display: grid;
+  gap: 8px;
+  padding-left: 20px;
+}
+
+.match-gaps li,
+.roadmap-result li {
+  padding-left: 4px;
+}
+
+.match-gaps li small,
+.roadmap-result li small {
+  display: block;
+}
+
+.roadmap-result {
+  margin-top: 14px;
+  padding: 14px 0 0;
+  border-top: 1px solid var(--line);
+}
+
+.roadmap-result p {
+  margin-bottom: 0;
 }
 
 .profile-topline {
@@ -516,6 +668,9 @@ pre {
 }
 
 @media (max-width: 980px) {
+  .signup-role-grid { grid-template-columns: 1fr; }
+  .signup-role-grid .signup-choice { min-height: 0; }
+
   .app-frame {
     grid-template-columns: 1fr;
   }
@@ -528,8 +683,15 @@ pre {
   .stats-grid,
   .content-grid,
   .journey-grid,
+  .candidate-start-options,
   .agent-answers,
-  .two-col {
+  .two-col,
+  .match-breakdown {
     grid-template-columns: 1fr;
+  }
+
+  .application-item {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }

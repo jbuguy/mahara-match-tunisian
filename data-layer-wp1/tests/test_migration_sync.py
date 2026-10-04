@@ -17,10 +17,12 @@ from mahara_data import enums
 from mahara_data.db import Base
 from mahara_data.reference import GOVERNORATES
 
-MIGRATION = (
-    Path(__file__).resolve().parents[2] / "migrations" / "20260921000000_wp1_shared_schema.sql"
+MIGRATIONS_DIR = Path(__file__).resolve().parents[2] / "migrations"
+MIGRATIONS = (
+    MIGRATIONS_DIR / "20260921000000_wp1_shared_schema.sql",
+    MIGRATIONS_DIR / "20261005000000_platform_auth_extensions.sql",
 )
-SQL = MIGRATION.read_text(encoding="utf-8")
+SQL = "\n".join(path.read_text(encoding="utf-8") for path in MIGRATIONS)
 
 
 def _parse():
@@ -113,11 +115,15 @@ def test_governorate_seed_matches_reference():
 def test_rls_enabled_on_every_table():
     block = SQL[SQL.index("Row Level Security") :]
     block = block[: block.index("] loop")]
-    assert set(re.findall(r"'([a-z_]+)'", block)) == set(ORM_TABLES)
+    rls_tables = set(re.findall(r"'([a-z_]+)'", block))
+    rls_tables.update(re.findall(r"alter table public\.([a-z_]+) enable row level security", SQL, re.IGNORECASE))
+    assert rls_tables == set(ORM_TABLES)
 
 
 def test_updated_at_trigger_on_every_table_with_updated_at():
     block = SQL[SQL.index("create or replace function public.set_updated_at") :]
     block = block[block.index("foreach") : block.index("] loop")]
     expected = {name for name, table in ORM_TABLES.items() if "updated_at" in table.columns}
-    assert set(re.findall(r"'([a-z_]+)'", block)) == expected
+    trigger_tables = set(re.findall(r"'([a-z_]+)'", block))
+    trigger_tables.update(re.findall(r"create trigger ([a-z_]+)_set_updated_at", SQL, re.IGNORECASE))
+    assert trigger_tables == expected

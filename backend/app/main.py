@@ -1,3 +1,4 @@
+import importlib
 import importlib.util
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -11,10 +12,13 @@ from sqlalchemy.orm import Session
 
 from shared_llm import LLMSettings, OpenAICompatibleClient
 
+from .applications import create_application_router
 from .config import get_settings
-from .database import Base, engine, get_db
+from .database import get_db
 from .google_auth import router as google_auth_router
 from .wp2_integration import create_wp2_router
+from .wp3_integration import create_wp3_router
+from .wp4_voice import create_wp4_voice_router
 from .models import (
     AuthIdentity,
     AuthProvider,
@@ -64,8 +68,6 @@ llm_client = OpenAICompatibleClient(
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    if engine.dialect.name == "sqlite":
-        Base.metadata.create_all(bind=engine)
     yield
     await llm_client.close()
 
@@ -79,6 +81,11 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
+    allow_origin_regex=(
+        r"https?://(?:localhost|127\.0\.0\.1)(?::\d+)?"
+        if settings.app_env == "development"
+        else None
+    ),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -92,8 +99,20 @@ app.include_router(
     )
 )
 app.include_router(google_auth_router)
+app.include_router(create_application_router(get_db, get_current_user, get_current_employer))
 app.include_router(create_wp2_router(get_db, get_current_user))
-register_wp6_routes(app, settings, get_db)
+get_wp6_candidate_profile = register_wp6_routes(app, settings, get_db)
+wp6_voice = importlib.import_module("mahara_wp6.services.voice")
+wp6_assistant = importlib.import_module("mahara_wp6.services.assistant")
+app.include_router(
+    create_wp4_voice_router(
+        get_current_employer,
+        wp6_assistant.get_groq_client,
+        wp6_voice.audio_kind,
+        wp6_voice.transcribe,
+    )
+)
+app.include_router(create_wp3_router(get_db, get_current_user, get_wp6_candidate_profile))
 
 
 def check_shared_contracts() -> str:
@@ -124,6 +143,7 @@ def detect_module_status(module_code: str) -> str:
         "wp1": repo_root / "data-layer-wp1",
         "wp4": repo_root / "employer-agent-wp4",
         "wp2": repo_root / "onboarding-agent-wp2",
+        "wp3": repo_root / "skill-matching-wp3",
         "wp6": repo_root / "employee-module-wp6",
     }
     module_path = module_paths.get(module_code)
@@ -152,6 +172,16 @@ def build_module_registry() -> list[dict[str, object]]:
             "owner": "platform",
             "description": "Guided voice intake and candidate profile draft",
             "status": detect_module_status("wp2"),
+            "shared_contracts": shared_status,
+            "contracts": wp1_contracts,
+            "contract_count": len(wp1_contracts),
+        },
+        {
+            "code": "wp3",
+            "name": "Skill matching",
+            "owner": "platform",
+            "description": "Candidate-to-offer ranking and skill-gap roadmaps",
+            "status": detect_module_status("wp3"),
             "shared_contracts": shared_status,
             "contracts": wp1_contracts,
             "contract_count": len(wp1_contracts),
@@ -341,7 +371,7 @@ def candidate_signup(payload: CandidateSignup, db: Annotated[Session, Depends(ge
     )
 
     candidate = get_or_create_candidate_for_user(db, user, onboarding_path=payload.onboarding_path or "cv_upload")
-    candidate.preferred_language = (payload.preferred_language or "fr").strip() or "fr"
+    user.preferred_language = (payload.preferred_language or "fr").strip() or "fr"
     candidate.governorate_code = payload.governorate_code.strip() if payload.governorate_code else None
     db.commit()
     db.refresh(candidate)

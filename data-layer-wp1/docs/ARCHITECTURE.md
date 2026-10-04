@@ -28,7 +28,7 @@ WP1 is the data foundation the other five modules sit on. It has four building b
 | P3 | **Privacy by design** | PII is redacted at intake and stored in one isolated table. Matching never sees identity data. |
 | P4 | **Everything maps to the taxonomy** | Skills and occupations are referenced by code. Free text is kept for traceability but is never the join key. |
 | P5 | **Traceable and replayable** | Raw inputs are kept. Every derived row records the pipeline or model version that produced it. |
-| P6 | **Sovereign and local** | Self-hosted Postgres, storage and models. No raw personal data goes to third-party APIs. |
+| P6 | **Controlled data boundary** | One managed Supabase PostgreSQL database for the MVP; no raw personal data goes to third-party APIs. |
 | P7 | **Simple first** | Postgres + pgvector instead of a separate vector database, REST before gRPC, batch before streaming. |
 
 ## 3. System context
@@ -138,9 +138,9 @@ stateDiagram-v2
 
 ### 4.4 Shared database
 
-- **Engine:** PostgreSQL 16 with the `vector` extension, run locally in Docker Compose.
+- **Engine:** Supabase-managed PostgreSQL with the `vector` extension. All workpackages use the root platform backend and one server-side database connection.
 - **Schema:** 35 tables in 9 domains. See [DATA_MODEL.md](DATA_MODEL.md).
-- **Migrations:** plain PostgreSQL SQL in the repository-root `migrations/`, initialized by the Postgres container and applied later with `psql`. The ORM in `mahara_data.db.models` mirrors it and a pglast-based test checks that they stay identical.
+- **Migrations:** ordered PostgreSQL SQL in the repository-root `migrations/`, applied and checksum-tracked with `backend/app/migrate.py`. The ORM in `mahara_data.db.models` mirrors the schema and a pglast-based test checks that they stay identical.
 - **Object storage:** not part of the local database stack. Select an S3-compatible store when file ingestion is implemented; `documents.storage_path` holds its object key.
 
 ### 4.5 Embedding worker
@@ -331,7 +331,7 @@ WP5 owns the final role matrix (their W1 deliverable). The schema already suppor
 
 | Environment | Database | Purpose |
 |---|---|---|
-| local | `docker compose up -d db` (Postgres 16 + pgvector) | Development; unit tests run on SQLite without Docker |
+| local | Supabase PostgreSQL via backend `DATABASE_URL` | Development; unit tests run on SQLite without network access |
 | staging | PostgreSQL with pgvector | W4 integration testing with the 5 modules |
 | prod | PostgreSQL with pgvector, managed or self-hosted | Pilot |
 

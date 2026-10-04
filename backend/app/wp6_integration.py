@@ -6,8 +6,10 @@ from typing import Any
 
 from fastapi import FastAPI
 
+from .models import Candidate
 
-def register_wp6_routes(app: FastAPI, settings: Any, root_get_db: Any) -> None:
+
+def register_wp6_routes(app: FastAPI, settings: Any, root_get_db: Any) -> Any:
     repo_root = Path(__file__).resolve().parents[2]
     wp6_app_path = repo_root / "employee-module-wp6" / "backend" / "app"
     package_name = "mahara_wp6"
@@ -34,6 +36,7 @@ def register_wp6_routes(app: FastAPI, settings: Any, root_get_db: Any) -> None:
     cv_router = importlib.import_module(f"{package_name}.routers.cv").router
     photo_router = importlib.import_module(f"{package_name}.routers.photo").router
     assistant_router = importlib.import_module(f"{package_name}.routers.assistant").router
+    profile_service = importlib.import_module(f"{package_name}.services.profile")
 
     def get_wp6_settings():
         return config.Settings(
@@ -58,3 +61,15 @@ def register_wp6_routes(app: FastAPI, settings: Any, root_get_db: Any) -> None:
     app.include_router(cv_router, prefix="/api/v1")
     app.include_router(photo_router, prefix="/api/v1")
     app.include_router(assistant_router, prefix="/api/v1")
+
+    def get_candidate_profile(db: Any, user_id: Any):
+        candidate = db.query(Candidate).filter(Candidate.user_id == user_id).first()
+        if candidate is None:
+            return None
+
+        profile = profile_service.get_profile(db, user_id)
+        if profile is None:
+            return None
+        return candidate.id, profile.model_dump(mode="json")
+
+    return get_candidate_profile

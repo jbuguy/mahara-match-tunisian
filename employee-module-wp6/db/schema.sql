@@ -1,6 +1,6 @@
 -- Mahara WP6 Employee Module: PostgreSQL schema.
--- Apply with psql after the shared migrations. Safe to run again (idempotent).
--- Table and column names match the team's schema so a later switch is mostly env vars.
+-- HISTORICAL ONLY: WP1 root migrations are the sole shared schema source of truth.
+-- Do not apply this file to the shared Supabase database.
 
 create extension if not exists pgcrypto;
 

@@ -1,11 +1,12 @@
 # Mahara WP6: Employee Module
 
-This module is the candidate side of Mahara Match. It has a FastAPI backend on port 8006 and a Vite + React frontend on port 5173.
+This package contains the candidate-side WP6 implementation used by the root platform API and frontend. The root platform shares one Supabase PostgreSQL database across WP1, WP2, WP3, WP4, and WP6.
 Project rules and history are in [CLAUDE.md](CLAUDE.md) and [docs/sessions/](docs/sessions/).
 
-## 1. Settings: one `.env` file
+## 1. Settings
 
-All settings live in `employee-module-wp6/.env`, which is git-ignored. The backend and the frontend both read it.
+Optional standalone WP6 settings live in `employee-module-wp6/.env`, which is git-ignored. The integrated platform's
+`DATABASE_URL`, auth credentials, and shared runtime settings belong in `backend/.env` at the repository root.
 
 ```bash
 cp .env.example .env   # then fill in the values
@@ -13,35 +14,26 @@ cp .env.example .env   # then fill in the values
 
 | Name | Used by | Where to find it |
 |---|---|---|
-| `DATABASE_URL` | backend | Local PostgreSQL from root `compose.yaml`: `postgresql+psycopg://mahara:mahara@localhost:5432/mahara_match` |
-| `GOOGLE_CLIENT_ID` | backend | Google Cloud Console → APIs & Services → Credentials |
-| `GOOGLE_CLIENT_SECRET` | backend | Google Cloud Console → APIs & Services → Credentials |
-| `JWT_SECRET` | backend | Generate a random secret of at least 32 bytes; keep it backend-only |
-| `API_BASE_URL` | backend | `http://localhost:8006` |
-| `FRONTEND_URL` | backend | `http://localhost:5173` |
-| `CORS_ORIGINS` | backend | `http://localhost:5173` (comma-separated if several) |
-| `APP_ENV` | backend | `development` |
-| `GROQ_API_KEY` | backend | [console.groq.com](https://console.groq.com) → API Keys (free plan, `gsk_...`). Never give it a `VITE_` prefix |
-| `GROQ_MODEL` | backend | `openai/gpt-oss-120b` (the default when left empty) |
-| `VITE_API_BASE_URL` | frontend | `http://localhost:8006` |
+| `GOOGLE_CLIENT_ID` | root backend | Google Cloud Console → APIs & Services → Credentials |
+| `GOOGLE_CLIENT_SECRET` | root backend | Google Cloud Console → APIs & Services → Credentials |
+| `JWT_SECRET` | root backend | Generate a random secret of at least 32 bytes; keep it backend-only |
+| `GROQ_API_KEY` | root backend | [console.groq.com](https://console.groq.com) → API Keys; never give it a `VITE_` prefix |
+| `GROQ_MODEL` | root backend | `openai/gpt-oss-120b` (the default when left empty) |
+| `DATABASE_URL` | root backend only | Supabase PostgreSQL URL in `backend/.env`; direct/session pooler with SSL |
 
 Only `VITE_*` names reach the browser, so `DATABASE_URL` and `GROQ_API_KEY` never do. Without `GROQ_API_KEY` the
 app still works; only the profile assistant says it isn't available.
 
-## 2. Database (once)
+## 2. Shared database
 
-From the repository root, start PostgreSQL and apply the shared migrations:
-
-```powershell
-docker compose up -d db
-```
-
-The first database initialization applies the ordered files in root `migrations/`. Apply [db/schema.sql](db/schema.sql)
-to the same database for the WP6 compatibility additions, including `candidate_pii.photo`; it is safe to re-run:
+WP1 migrations in the repository root define the shared schema. Configure `backend/.env` and apply them from the root backend:
 
 ```powershell
-docker compose exec db psql -U mahara -d mahara_match -f /wp6/schema.sql
+cd backend
+python -m app.migrate
 ```
+
+Use a direct or session-pooler URL with SSL for migrations. Do not apply [db/schema.sql](db/schema.sql); it is retained only as historical WP6 development material and is not a second schema source.
 
 ## 2b. Google login (once)
 
@@ -54,17 +46,14 @@ docker compose exec db psql -U mahara -d mahara_match -f /wp6/schema.sql
 The backend exchanges Google's one-time authorization code, verifies the signed identity token, and issues a
 30-minute Mahara access token. If sign-in fails, `/auth/callback` shows the returned error code.
 
-## 3. Backend
+## 3. Integrated runtime
 
-Python 3.14 is what's installed on the dev machine. The code needs 3.12 or newer.
+Run the shared API and frontend from the repository root. WP6 routes and services are registered by the root FastAPI app;
+do not start a second WP6 database or apply `db/schema.sql`.
 
 ```bash
 cd backend
-py -m venv .venv                          # Windows (macOS/Linux: python3 -m venv .venv)
-.venv/Scripts/python -m pip install -r requirements.txt   # macOS/Linux: .venv/bin/python
-.venv/Scripts/python -m scripts.seed_dev  # dev skills (SK-9001...) and occupations (OC-9001...), once
-.venv/Scripts/python -m uvicorn app.main:app --reload --port 8006
-.venv/Scripts/python -m pytest -rs        # tests
+python -m uvicorn app.main:app --reload --port 8000
 ```
 
 The seed script only runs when `APP_ENV` is `dev` or `development`. Running it again is safe.

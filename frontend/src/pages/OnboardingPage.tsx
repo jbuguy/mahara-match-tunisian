@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
-import { API_BASE_URL, requestJson } from '../lib/api'
+import { API_BASE_URL, requestJson, WP2_SESSION_KEY } from '../lib/api'
 
 type Question = { id: string; texte: string; audio_url: string }
 type Governorate = { code: string; name_fr: string; name_ar: string }
@@ -19,7 +19,6 @@ type AnswerResult = {
   termine: boolean
 }
 
-const SESSION_KEY = 'mahara_wp2_session_id'
 const QUESTION_COUNT = 4
 const MIME_TYPES = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/ogg', 'audio/mp4']
 
@@ -67,7 +66,7 @@ export function OnboardingPage() {
         if (active) setError('Governorate options could not be loaded. You can still complete the voice questions.')
       }
 
-      const savedSessionId = localStorage.getItem(SESSION_KEY)
+      const savedSessionId = localStorage.getItem(WP2_SESSION_KEY)
       if (savedSessionId) {
         try {
           const session = await requestJson<OnboardingSession>(`/api/v1/onboarding/sessions/${encodeURIComponent(savedSessionId)}`)
@@ -76,7 +75,7 @@ export function OnboardingPage() {
           setQuestion(session.question)
           if (session.termine) setAnswers(session.answers)
         } catch {
-          localStorage.removeItem(SESSION_KEY)
+          localStorage.removeItem(WP2_SESSION_KEY)
         }
       }
       if (active) setLoading(false)
@@ -114,7 +113,7 @@ export function OnboardingPage() {
     setError('')
     try {
       const created = await requestJson<SessionCreated>('/api/v1/onboarding/sessions', { method: 'POST' })
-      localStorage.setItem(SESSION_KEY, created.session_id)
+      localStorage.setItem(WP2_SESSION_KEY, created.session_id)
       setSessionId(created.session_id)
       setQuestion(created.question)
       setAnswers({})
@@ -214,12 +213,13 @@ export function OnboardingPage() {
   }
 
   function continueToProfile() {
-    localStorage.removeItem(SESSION_KEY)
     navigate('/candidate', {
       state: {
         wp2Draft: {
+          sessionId,
           jobTitle: reviewJob.trim(),
           availableFrom: reviewDate || null,
+          availabilityTranscript: answers.date_disponibilite || '',
           governorateCode: reviewGovernorate || null,
           phone: reviewPhone.trim() || null,
         },

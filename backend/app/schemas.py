@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
@@ -71,9 +71,9 @@ class CandidateProfile(BaseModel):
     literacy_level: str | None
     governorate_code: str | None
     education_level: str | None
-    years_experience: int | None
+    years_experience: float | None
     summary: str | None
-    available_from: str | None
+    available_from: date | None
     consent_version: str | None
     consent_given_at: datetime | None
     created_at: datetime
@@ -86,9 +86,9 @@ class CandidateUpdate(BaseModel):
     literacy_level: str | None = None
     governorate_code: str | None = None
     education_level: str | None = None
-    years_experience: int | None = None
+    years_experience: float | None = None
     summary: str | None = None
-    available_from: str | None = None
+    available_from: date | None = None
     consent_version: str | None = None
 
 

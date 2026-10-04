@@ -1,12 +1,14 @@
-import { BrowserRouter, NavLink, Navigate, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 
-import { API_BASE_URL } from './lib/api'
+import { API_BASE_URL, requestJson } from './lib/api'
 import { DashboardPage } from './pages/DashboardPage'
 import { AuthCallbackPage } from './pages/AuthCallbackPage'
 import { EmployerPage } from './pages/EmployerPage'
 import { OnboardingPage } from './pages/OnboardingPage'
 import { CandidatePage } from './pages/CandidatePage'
+import { CandidateStartPage } from './pages/CandidateStartPage'
+import { MatchesPage } from './pages/MatchesPage'
 import { SignInPage } from './pages/SignInPage'
 import { SignUpPage } from './pages/SignUpPage'
 
@@ -36,6 +38,41 @@ function PlatformShell({
   modules: ModuleEntry[]
   loading: boolean
 }) {
+  const location = useLocation()
+  const [account, setAccount] = useState<{ kind: 'candidate'; hasProfile: boolean } | { kind: 'employer' } | null>(null)
+  const [accountLoading, setAccountLoading] = useState(true)
+
+  useEffect(() => {
+    let active = true
+    async function loadAccount() {
+      const token = localStorage.getItem('mahara_access_token')
+      if (!token) {
+        if (active) {
+          setAccount(null)
+          setAccountLoading(false)
+        }
+        return
+      }
+      setAccountLoading(true)
+      const [candidate, employer] = await Promise.allSettled([
+        requestJson<{ has_profile: boolean }>('/api/v1/me'),
+        requestJson<{ email: string }>('/employers/me'),
+      ])
+      if (!active) return
+      if (candidate.status === 'fulfilled') setAccount({ kind: 'candidate', hasProfile: candidate.value.has_profile })
+      else if (employer.status === 'fulfilled') setAccount({ kind: 'employer' })
+      else setAccount(null)
+      setAccountLoading(false)
+    }
+
+    void loadAccount()
+    window.addEventListener('mahara-auth-changed', loadAccount)
+    return () => {
+      active = false
+      window.removeEventListener('mahara-auth-changed', loadAccount)
+    }
+  }, [location.pathname])
+
   return (
     <main className="mahara-app-shell">
       <div className="app-frame">
@@ -49,24 +86,21 @@ function PlatformShell({
           </div>
 
           <nav className="sidebar-nav" aria-label="main navigation">
-            <NavLink to="/signin" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>
-              Sign in
-            </NavLink>
-            <NavLink to="/signup" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>
-              Sign up
-            </NavLink>
-            <NavLink to="/dashboard" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>
-              Dashboard
-            </NavLink>
-            <NavLink to="/onboarding" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>
-              Onboarding agent
-            </NavLink>
-            <NavLink to="/candidate" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>
-              Candidate journey
-            </NavLink>
-            <NavLink to="/employer" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>
-              Employer journey
-            </NavLink>
+            {accountLoading && <span className="nav-link" role="status">Loading workspace…</span>}
+            {!accountLoading && !account && <>
+              <NavLink to="/signin" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>Sign in</NavLink>
+              <NavLink to="/signup" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>Create account</NavLink>
+            </>}
+            {!accountLoading && account?.kind === 'candidate' && <>
+              <NavLink to="/dashboard" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>Overview</NavLink>
+              {!account.hasProfile && <NavLink to="/candidate/start" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>Set up my profile</NavLink>}
+              <NavLink to="/candidate" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>My profile</NavLink>
+              <NavLink to="/matches" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>Job matches</NavLink>
+            </>}
+            {!accountLoading && account?.kind === 'employer' && <>
+              <NavLink to="/dashboard" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>Overview</NavLink>
+              <NavLink to="/employer" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>Offers</NavLink>
+            </>}
           </nav>
 
           <div className="sidebar-panel">
@@ -83,7 +117,9 @@ function PlatformShell({
             <Route path="/auth/callback" element={<AuthCallbackPage />} />
             <Route path="/dashboard" element={<DashboardPage health={health} modules={modules} />} />
             <Route path="/onboarding" element={<OnboardingPage />} />
+            <Route path="/candidate/start" element={<CandidateStartPage />} />
             <Route path="/candidate" element={<CandidatePage />} />
+            <Route path="/matches" element={<MatchesPage />} />
             <Route path="/employer" element={<EmployerPage />} />
           </Routes>
         </section>

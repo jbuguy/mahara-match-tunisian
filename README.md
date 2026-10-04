@@ -64,7 +64,7 @@ Feature list is a working hypothesis — to be validated with real users (both s
 - **LLM serving**: vLLM / TGI / Ollama — one shared model endpoint, consumed by all WPs (avoid duplicating model hosting per WP)
 - **Models**: Open-weight, Arabic/Derja-capable (e.g. Jais, AceGPT, or Qwen2.5/Llama 3.1 as multilingual fallback)
 - **Auth**: JWT
-- **Containerization**: Docker / Docker Compose
+- **Containerization**: Docker for services that need it; PostgreSQL is hosted by Supabase
 - **CI/CD**: GitHub Actions
 - **Deployment target**: [cloud provider TBD — AWS/GCP/Azure/university cloud]
 
@@ -83,21 +83,23 @@ No PII stored unless strictly necessary and consented; anonymized/aggregated ana
 ## Getting started
 
 ### Prerequisites
-- Docker & Docker Compose
 - Python 3.11+
 - Node.js 18+ (frontend)
+- A Supabase project with PostgreSQL
 - Access to the shared LLM endpoint (see `/docs/llm-access.md`)
 
 ### Local setup
-Start PostgreSQL and apply the WP1 and WP6 schema initialization scripts:
+Configure the root API from `backend/.env.example` (copy it to `backend/.env`). Set `DATABASE_URL` to the PostgreSQL connection string from Supabase's **Connect** panel. Use a direct or session-pooler connection with SSL; transaction-mode pooling is not supported by the migration lock. Never expose this value to the frontend. Percent-encode reserved characters in the password if the connection URL requires it.
+
+Before the first migration, confirm the project has no data to preserve or take a backup and review its existing schema. Apply the canonical WP1 migrations from the `backend` directory:
 
 ```powershell
-docker compose up -d db
+python -m app.migrate
 ```
 
-Compose initializes the WP6 tables automatically for a new database volume. For an existing Postgres volume, apply `employee-module-wp6/db/schema.sql` once using `psql` before starting the backend.
+Apply the repository's ordered migrations from the `backend` directory, then start the API. WP1 owns the canonical shared schema; do not apply the historical WP6 `db/schema.sql` separately.
 
-Configure the root API from `backend/.env.example` (copy it to `backend/.env`). Set Google OAuth credentials and register this exact authorized redirect URI in Google Cloud:
+Set Google OAuth credentials and register this exact authorized redirect URI in Google Cloud:
 
 ```text
 http://localhost:8000/auth/google/callback
@@ -120,8 +122,7 @@ npm run dev
 WP2 voice intake uses `faster-whisper` and `pydub`. Install FFmpeg and make sure
 `ffmpeg` is available on `PATH` so browser recordings can be decoded. The small
 Whisper model is downloaded the first time a voice response is transcribed.
-Fresh databases apply the onboarding-session migration through Docker Compose;
-for an existing database, run `python -m app.migrate` from `backend`.
+The onboarding-session migration is applied by `python -m app.migrate` along with the other ordered root migrations.
 
 ### Production validation
 The repo keeps package-specific tooling isolated, but the platform still behaves like a coherent production system with a single canonical database and a shared API shell. Use the root backend for service-level validation, then run package-specific suites when changing module-local code.

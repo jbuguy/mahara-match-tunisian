@@ -21,7 +21,7 @@ export function SignInPage() {
         body: JSON.stringify({ email, password }),
       })
       localStorage.setItem('mahara_access_token', token.access_token)
-      navigate('/dashboard')
+      navigate('/employer')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to sign in with email and password.')
     } finally {

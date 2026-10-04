@@ -129,7 +129,7 @@ def test_existing_schema_requires_explicit_baseline():
 
 def test_baseline_validates_wp1_schema_then_applies_new_migrations(tmp_path):
     migrations = discover_migrations(ROOT_MIGRATIONS_DIR)
-    migrations.append(migration("20261005000000", "20261005000000_new.sql", "select 2;"))
+    migrations.append(migration("20261006000000", "20261006000000_new.sql", "select 2;"))
     schema = {
         (table, "id"): "text"
         for table in _legacy_table_names(migrations)
@@ -151,7 +151,7 @@ def test_baseline_validates_wp1_schema_then_applies_new_migrations(tmp_path):
     report = apply_migrations(connection, migrations, baseline_existing=True)
 
     assert report.baselined_versions == LEGACY_BASELINE_VERSIONS
-    assert report.applied_versions == ("20261004010000", "20261005000000")
+    assert report.applied_versions == ("20261004010000", "20261005000000", "20261006000000")
 
 
 def test_baseline_rejects_incomplete_legacy_schema():

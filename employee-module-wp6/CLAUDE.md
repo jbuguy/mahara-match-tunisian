@@ -25,7 +25,7 @@ low literacy, so keep copy short, buttons big, and a text label on every icon.
 - Keep WP6-specific implementation inside `employee-module-wp6/`; shared database migrations live in root `migrations/`.
 - Use PostgreSQL only. `data-layer-wp1/` and its `mahara_data` package define the shared schema and contracts; do not add a hosted BaaS dependency or a second canonical copy of shared data.
 - Branch `feature/wp6-employee-module`. Never commit to `main`.
-- PostgreSQL runs from the repository's Docker Compose configuration. Google OAuth is an external identity provider; application data and Mahara sessions remain on our own backend/PostgreSQL.
+- One Supabase PostgreSQL database is shared through the root platform backend. Google OAuth remains an external identity provider; application data and Mahara sessions stay behind the backend API.
 - Local only: no production deploy config. Groq is the only external AI service.
 - Context is cleared between sessions. Every session ends with the app **working locally**. If a session
   runs long, cut scope, not the test-and-document step at the end.
@@ -76,40 +76,9 @@ low literacy, so keep copy short, buttons big, and a text label on every icon.
   `whisper-large-v3-turbo` (same `GROQ_API_KEY`, no forced language so French and Derja both work) and returns the text.
   The transcript always goes into the chat's text box first, for the candidate to fix and send; the audio is never stored.
 
-## Data model (our `db/schema.sql`; names match the team's schema so we can switch later)
+## Shared data model
 
-`db/schema.sql` is the source of truth for keys and types; this section is the summary.
-
-```text
-governorates    code (pk, e.g. TN-11), name_fr, name_ar                  -- 24 rows inserted by schema.sql
-users           id, email (unique), role='candidate', preferred_language='fr', last_login_at
-candidates      id, user_id (unique: one profile per user), onboarding_path, literacy_level, governorate_code, education_level,
-                years_experience, languages (jsonb [{code, level}]), summary, available_from,
-                consent_version, consent_given_at
-candidate_pii   candidate_id (pk), full_name, email, phone, photo (bytea, own 256px JPEG; null = Google photo)
-                                                               (identity kept apart from the profile)
-candidate_skills        (candidate_id, skill_id) pk, level 1-4, source ('self_declared' | 'cv'), confidence
-candidate_experiences   id, candidate_id, job_title_raw, employer_name, start_date, end_date, duration_months, description
-candidate_educations    id, candidate_id, level, field_of_study, institution, graduation_year
-candidate_desired_occupations  (candidate_id, occupation_id) pk, priority
-skills          id, code (unique), label_fr, alt_labels (jsonb), skill_type, status      -- filled by seed_dev.py
-occupations     id, code (unique), title_fr                                              -- filled by seed_dev.py
-```
-
-- All ids are `uuid default gen_random_uuid()`; every table has row level security turned on with no policies.
-- Allowed values (plain text columns with a check constraint, same values as the team uses):
-  `onboarding_path` cv_upload | derja_detailed · `literacy_level` literate | basic | non_literate ·
-  `skill_type` hard | soft | language · skill `source` self_declared | cv · `users.role` candidate | employer | admin |
-  ministry | training_provider · `skills.status` draft | validated | deprecated · `education_level` none | primary |
-  lower_secondary | baccalaureate | vocational_cap | vocational_btp | vocational_bts | licence | master | engineer | doctorate.
-- Link a Google login to `users` by email: **always lower-case the email in code** before saving or looking it up
-  (the `unique` constraint itself is case-sensitive, like the team's). Create the row on first login.
-- `onboarding_path` is required: `cv_upload` if the profile came from a CV import, otherwise `derja_detailed`.
-  `literacy_level` is required: default `literate`.
-- Consent: the form has a required checkbox; on save set `consent_version='1.0'` and `consent_given_at=now()`.
-- Saving a profile replaces the candidate's skills, experiences, educations and desired occupations in one transaction.
-- A fresh development database has no skills or occupations: `scripts/seed_dev.py` adds ~45 skills (`SK-9001`...)
-  and ~10 occupations (`OC-9001`...). The `9xxx` codes never collide with the team's real list.
+WP1 owns the schema, enums, and public contracts in `data-layer-wp1/mahara_data/` and the ordered SQL migrations in the repository-root `migrations/`. WP6 must use those shared definitions; `db/schema.sql` is historical and must not be applied. Candidate identity stays in `candidate_pii`, separate from the profile used by matching.
 
 ## Design system (approved Mahara mockups)
 
@@ -129,7 +98,9 @@ occupations     id, code (unique), title_fr                                     
 
 ## Conventions
 
-- **All keys and settings live in one file: `employee-module-wp6/.env`**, which I fill in myself. It is git-ignored
+- **Database credentials live only in the root backend's ignored `backend/.env`**; never print or commit them. WP6-only development keys may remain in `employee-module-wp6/.env`.
+  Keep `backend/.env.example` up to date with placeholder values. `DATABASE_URL` must be the Supabase PostgreSQL URL with SSL and must never receive a `VITE_` prefix.
+- **WP6 frontend/backend settings** may live in `employee-module-wp6/.env`, which is git-ignored
   (`employee-module-wp6/.gitignore` has `/.env`). Never create other `.env` files, never commit it, never print its
   values, and never ask me to paste them in the chat. If a value is missing, tell me the variable name and I'll add it.
   Keep `employee-module-wp6/.env.example` up to date with the same names and placeholder values (that one is committed).

@@ -10,6 +10,11 @@ from sqlalchemy.pool import StaticPool
 
 from app.database import Base, get_db
 from app.models import EmployerDraftSession
+from mahara_data.db import Base as SharedBase
+from mahara_data.db.models.employers import Employer as SharedEmployer
+from mahara_data.db.models.reference import Governorate
+from mahara_data.db.models.taxonomy import Skill
+from mahara_data.enums import CompanySize, SkillType, TaxonomyStatus
 from employer_agent_wp4 import create_employer_agent_router
 import employer_agent_wp4.router as employer_router
 
@@ -76,7 +81,30 @@ client = TestClient(app)
 
 def setup_function():
     Base.metadata.drop_all(bind=test_engine)
+    SharedBase.metadata.drop_all(bind=test_engine)
+    SharedBase.metadata.create_all(bind=test_engine)
     Base.metadata.create_all(bind=test_engine)
+    with TestSession() as db:
+        db.add(Governorate(code="TN-11", name_fr="Tunis", name_ar="تونس"))
+        db.add(
+            SharedEmployer(
+                id=employer.id,
+                company_name="Test Employer",
+                email="employer@example.com",
+                password_hash="unused",
+                sector="Technology",
+                company_size=CompanySize.SMALL,
+            )
+        )
+        db.add(
+            Skill(
+                code="SK-0001",
+                label_fr="Développement web",
+                skill_type=SkillType.HARD,
+                status=TaxonomyStatus.VALIDATED,
+            )
+        )
+        db.commit()
 
 
 def create_session_with_draft():
@@ -237,6 +265,8 @@ def test_editor_rejects_skill_codes_not_in_the_generated_taxonomy_matches():
 
 def test_employer_can_publish_a_valid_draft():
     session_id, _ = create_session_with_draft()
+    review = client.get(f"/employer-agent/sessions/{session_id}/review")
+    assert review.status_code == 200
 
     response = client.post(f"/employer-agent/sessions/{session_id}/publish")
 
@@ -251,6 +281,8 @@ def test_employer_can_publish_a_valid_draft():
 
 def test_published_offer_cannot_be_edited_or_published_again():
     session_id, _ = create_session_with_draft()
+    review = client.get(f"/employer-agent/sessions/{session_id}/review")
+    assert review.status_code == 200
     published = client.post(f"/employer-agent/sessions/{session_id}/publish")
     draft = published.json()["draft"]
 
@@ -334,7 +366,7 @@ def test_review_endpoint_returns_grounded_candidate_summary_without_salary_data(
     assert review["salary"]["status"] == "not_provided"
     assert review["salary"]["benchmark"] is None
     assert review["candidate_snapshot"]["title"] == "Développeur web"
-    assert review["candidate_snapshot"]["skills"][0]["label"] == "SK-0001"
+    assert review["candidate_snapshot"]["skills"][0]["label"] == "Développement web"
 
 
 def test_skipped_required_answers_are_reasked_instead_of_lost():

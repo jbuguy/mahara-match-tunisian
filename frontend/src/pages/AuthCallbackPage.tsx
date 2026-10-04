@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { requestJson } from '../lib/api'
 
 export function AuthCallbackPage() {
   const navigate = useNavigate()
@@ -17,7 +18,9 @@ export function AuthCallbackPage() {
 
     if (accessToken) {
       localStorage.setItem('mahara_access_token', accessToken)
-      navigate('/dashboard', { replace: true })
+      void requestJson<{ has_profile: boolean }>('/api/v1/me')
+        .then((user) => navigate(user.has_profile ? '/candidate' : '/candidate/start', { replace: true }))
+        .catch(() => navigate('/dashboard', { replace: true }))
       return
     }
 

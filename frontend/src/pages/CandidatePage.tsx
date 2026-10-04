@@ -1,7 +1,8 @@
 import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 
-import { requestJson } from '../lib/api'
+import { requestJson, WP2_SESSION_KEY } from '../lib/api'
+import { useVoiceInput } from '../lib/useVoiceInput'
 
 type Identity = { email: string; name: string | null; has_profile: boolean }
 type Governorate = { code: string; name_fr: string; name_ar: string }
@@ -37,6 +38,15 @@ type CvDraft = {
   unmatched_words: string[]
 }
 type AssistantMessage = { role: 'user' | 'assistant'; content: string }
+type OnboardingSession = { session_id: string; termine: boolean; answers: Record<string, string> }
+type OnboardingDraft = {
+  sessionId?: string
+  jobTitle?: string
+  availableFrom?: string | null
+  availabilityTranscript?: string
+  governorateCode?: string | null
+  phone?: string | null
+}
 type AssistantAnswer = {
   reply: string
   done: boolean
@@ -60,15 +70,9 @@ const educationOptions = [
   ['vocational_bts', 'BTS'], ['licence', 'Licence'], ['master', 'Master'],
   ['engineer', 'Engineer'], ['doctorate', 'Doctorate'],
 ]
-
 export function CandidatePage() {
   const location = useLocation()
-  const onboardingDraft = (location.state as { wp2Draft?: {
-    jobTitle?: string
-    availableFrom?: string | null
-    governorateCode?: string | null
-    phone?: string | null
-  } } | null)?.wp2Draft
+  const onboardingDraft = (location.state as { wp2Draft?: OnboardingDraft } | null)?.wp2Draft
   const [identity, setIdentity] = useState<Identity | null>(null)
   const [governorates, setGovernorates] = useState<Governorate[]>([])
   const [fullName, setFullName] = useState('')
@@ -78,6 +82,7 @@ export function CandidatePage() {
   const [educationLevel, setEducationLevel] = useState('')
   const [yearsExperience, setYearsExperience] = useState('')
   const [availableFrom, setAvailableFrom] = useState('')
+  const [availabilityTranscript, setAvailabilityTranscript] = useState('')
   const [summary, setSummary] = useState('')
   const [consentGiven, setConsentGiven] = useState(false)
   const [fromCv, setFromCv] = useState(false)
@@ -95,6 +100,33 @@ export function CandidatePage() {
   const [assistantInput, setAssistantInput] = useState('')
   const [assistantError, setAssistantError] = useState('')
   const [assistantPending, setAssistantPending] = useState(false)
+  const assistantVoice = useVoiceInput('/api/v1/me/assistant/transcribe')
+
+  useEffect(() => {
+    if (!assistantVoice.transcript) return
+    setAssistantInput((current) => current ? `${current.trimEnd()} ${assistantVoice.transcript}` : assistantVoice.transcript)
+    assistantVoice.clearTranscript()
+  }, [assistantVoice.transcript])
+
+  function applyOnboardingDraft(draft: OnboardingDraft) {
+    if (draft.phone) setPhone(draft.phone)
+    if (draft.governorateCode) setGovernorateCode(draft.governorateCode)
+    if (draft.availableFrom) setAvailableFrom(draft.availableFrom)
+    if (draft.availabilityTranscript) setAvailabilityTranscript(draft.availabilityTranscript)
+    if (draft.jobTitle) {
+      setExperiences((current) => current.some((item) => item.job_title_raw.toLocaleLowerCase() === draft.jobTitle?.toLocaleLowerCase())
+        ? current
+        : [...current, {
+            job_title_raw: draft.jobTitle ?? '',
+            employer_name: null,
+            start_date: null,
+            end_date: null,
+            duration_months: null,
+            description: null,
+          }])
+    }
+    if (draft.sessionId) localStorage.setItem(WP2_SESSION_KEY, draft.sessionId)
+  }
 
   useEffect(() => {
     let active = true
@@ -129,11 +161,28 @@ export function CandidatePage() {
           if (!(profileError instanceof Error) || profileError.message !== 'profile not found') throw profileError
         }
         if (onboardingDraft) {
-          if (onboardingDraft.phone) setPhone(onboardingDraft.phone)
-          if (onboardingDraft.governorateCode) setGovernorateCode(onboardingDraft.governorateCode)
-          if (onboardingDraft.availableFrom) setAvailableFrom(onboardingDraft.availableFrom)
-          if (onboardingDraft.jobTitle) {
-            setSummary((current) => current || `Métier indiqué à l'accueil : ${onboardingDraft.jobTitle}`)
+          applyOnboardingDraft(onboardingDraft)
+        } else {
+          const sessionId = localStorage.getItem(WP2_SESSION_KEY)
+          if (sessionId) {
+            try {
+              const session = await requestJson<OnboardingSession>(`/api/v1/onboarding/sessions/${encodeURIComponent(sessionId)}`)
+              if (session.termine) {
+                const spokenPlace = session.answers.gouvernorat?.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase()
+                const matchedPlace = locations.find((place) => [place.name_fr, place.name_ar].some((name) =>
+                  name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase() === spokenPlace,
+                ))
+                applyOnboardingDraft({
+                  sessionId,
+                  jobTitle: session.answers.metier,
+                  availabilityTranscript: session.answers.date_disponibilite,
+                  governorateCode: matchedPlace?.code,
+                  phone: session.answers.telephone,
+                })
+              }
+            } catch {
+              localStorage.removeItem(WP2_SESSION_KEY)
+            }
           }
         }
       } catch (loadError) {
@@ -145,6 +194,11 @@ export function CandidatePage() {
     void loadProfile()
     return () => { active = false }
   }, [])
+
+  useEffect(() => {
+    if (loading || !location.hash) return
+    document.querySelector(location.hash)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [loading, location.hash])
 
   async function importCv(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
@@ -189,6 +243,7 @@ export function CandidatePage() {
     setError('')
     setNotice('')
     try {
+      const onboardingSessionId = localStorage.getItem(WP2_SESSION_KEY)
       await requestJson('/api/v1/me/profile', {
         method: 'PUT',
         body: JSON.stringify({
@@ -210,7 +265,16 @@ export function CandidatePage() {
           desired_occupations: desiredOccupations,
         }),
       })
-      setNotice('Your profile has been saved.')
+      let saveNotice = 'Your profile has been saved.'
+      if (onboardingSessionId) {
+        try {
+          await requestJson(`/api/v1/onboarding/sessions/${encodeURIComponent(onboardingSessionId)}/finalize`, { method: 'POST' })
+          localStorage.removeItem(WP2_SESSION_KEY)
+        } catch {
+          saveNotice = 'Your profile is saved. Save again to retry linking your voice onboarding.'
+        }
+      }
+      setNotice(saveNotice)
       setIdentity((current) => current ? { ...current, has_profile: true } : current)
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'Could not save your profile.')
@@ -286,7 +350,7 @@ export function CandidatePage() {
         <div><p className="eyebrow">WP6 · Candidate</p><h2>Your professional profile</h2></div>
         <span className="module-tag">{identity?.has_profile ? 'Profile saved' : 'Profile setup'}</span>
       </header>
-      <label className="secondary-btn cv-upload">{importingCv ? 'Reading CV…' : 'Import CV'}<input type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={importCv} disabled={importingCv} /></label>
+      <label id="cv-import" className="secondary-btn cv-upload">{importingCv ? 'Reading CV…' : 'Import CV'}<input type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={importCv} disabled={importingCv} /></label>
       <form className="auth-form profile-form" onSubmit={saveProfile}>
         <div className="two-col">
           <label><span>Full name</span><input required value={fullName} onChange={(event) => setFullName(event.target.value)} /></label>
@@ -300,17 +364,27 @@ export function CandidatePage() {
           <label><span>Education</span><select value={educationLevel} onChange={(event) => setEducationLevel(event.target.value)}><option value="">Not specified</option>{educationOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
           <label><span>Years of experience</span><input type="number" min="0" max="80" value={yearsExperience} onChange={(event) => setYearsExperience(event.target.value)} /></label>
         </div>
-        <label><span>Available from</span><input type="date" value={availableFrom} onChange={(event) => setAvailableFrom(event.target.value)} /></label>
+        <label><span>Available from</span><input type="date" value={availableFrom} onChange={(event) => setAvailableFrom(event.target.value)} />{availabilityTranscript && <small>Voice answer: {availabilityTranscript}. Choose the date to save.</small>}</label>
         <label><span>Professional summary</span><textarea rows={4} value={summary} onChange={(event) => setSummary(event.target.value)} /></label>
         <label className="consent-control"><input required type="checkbox" checked={consentGiven} onChange={(event) => setConsentGiven(event.target.checked)} /><span>I consent to Mahara Match storing and using this information to support my job search.</span></label>
         {notice && <p className="form-notice" role="status">{notice}</p>}
         {error && <p className="form-error" role="alert">{error}</p>}
         <button className="primary-btn" type="submit" disabled={saving}>{saving ? 'Saving…' : 'Save profile'}</button>
       </form>
-      <section className="detail-panel assistant-chat">
+      <section id="assistant" className="detail-panel assistant-chat">
         <div><p className="eyebrow">WP6 · Profile assistant</p><h3>Get help completing your profile</h3></div>
         <div className="assistant-transcript" aria-live="polite">{assistantMessages.map((item, index) => <div className={`conversation-message ${item.role}`} key={`${index}-${item.role}`}><span>{item.role === 'assistant' ? 'Mahara' : 'You'}</span><p>{item.content}</p></div>)}{assistantMessages.length === 0 && <p>Ask for help describing your experience, skills, or next career step.</p>}</div>
-        <form className="conversation-form" onSubmit={askAssistant}><textarea aria-label="Message to profile assistant" rows={2} value={assistantInput} onChange={(event) => setAssistantInput(event.target.value)} placeholder="Write in French, Arabic, or Derja…" required /><button className="secondary-btn" type="submit" disabled={assistantPending || !assistantInput.trim()}>{assistantPending ? 'Thinking…' : 'Ask assistant'}</button></form>
+        <form className="conversation-form" onSubmit={askAssistant}>
+          <textarea aria-label="Message to profile assistant" rows={2} value={assistantInput} onChange={(event) => setAssistantInput(event.target.value)} placeholder="Write in French, Arabic, or Derja…" required />
+          {assistantVoice.error && <p className="form-error" role="alert">{assistantVoice.error}</p>}
+          <div className="assistant-chat-tools">
+            <button className={assistantVoice.recording ? 'secondary-btn voice-recording' : 'secondary-btn'} type="button" onClick={assistantVoice.recording ? assistantVoice.stop : assistantVoice.start} disabled={assistantPending || assistantVoice.transcribing}>
+              {assistantVoice.recording ? 'Stop speaking' : assistantVoice.transcribing ? 'Transcribing…' : 'Parler'}
+            </button>
+            <button className="secondary-btn" type="submit" disabled={assistantPending || assistantVoice.transcribing || !assistantInput.trim()}>{assistantPending ? 'Thinking…' : 'Ask assistant'}</button>
+          </div>
+          {assistantVoice.recording && <p role="status">Recording. Stop when you are done; transcripts can be edited before sending.</p>}
+        </form>
         {assistantError && <p className="form-error" role="alert">{assistantError}</p>}
       </section>
     </div>

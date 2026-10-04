@@ -2,6 +2,7 @@
 
 **Schema version 1.0.** Sources of truth:
 - SQL: [`migrations/20260921000000_wp1_shared_schema.sql`](../../migrations/20260921000000_wp1_shared_schema.sql)
+- Platform authentication extension: [`migrations/20261005000000_platform_auth_extensions.sql`](../../migrations/20261005000000_platform_auth_extensions.sql)
 - ORM: [`mahara_data/db/models/`](../mahara_data/db/models/)
 - JSON contracts: [`mahara_data/schemas/`](../mahara_data/schemas/), exported to [`contracts/`](../contracts/)
 

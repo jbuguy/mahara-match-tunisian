@@ -50,6 +50,7 @@ export function DashboardPage({ health, modules }: { health: HealthResponse | nu
     localStorage.removeItem('mahara_access_token')
     setAccount(null)
     setLoadingAccount(false)
+    window.dispatchEvent(new Event('mahara-auth-changed'))
   }
 
   return (
@@ -95,15 +96,14 @@ export function DashboardPage({ health, modules }: { health: HealthResponse | nu
         <section className="detail-panel">
           <h3>Action center</h3>
           <div className="action-stack">
-            <Link className="secondary-btn" to="/onboarding">
-              Launch onboarding agent
-            </Link>
-            <Link className="secondary-btn" to="/candidate">
-              Review candidate journey
-            </Link>
-            <Link className="secondary-btn" to="/employer">
-              Open employer journey
-            </Link>
+            {loadingAccount ? <p role="status">Checking your workspace…</p> : account?.kind === 'Candidate' ? <>
+              {!account.hasProfile && <Link className="secondary-btn" to="/candidate/start">Set up my profile</Link>}
+              <Link className="secondary-btn" to="/candidate">{account.hasProfile ? 'Review my profile' : 'Complete my profile'}</Link>
+              {account.hasProfile && <Link className="secondary-btn" to="/matches">View job matches</Link>}
+            </> : account?.kind === 'Employer' ? <Link className="secondary-btn" to="/employer">Create or manage offers</Link> : <>
+              <Link className="secondary-btn" to="/signup">Choose how you will use Mahara</Link>
+              <Link className="ghost-btn" to="/signin">Sign in</Link>
+            </>}
           </div>
         </section>
       </div>

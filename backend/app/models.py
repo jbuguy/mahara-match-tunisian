@@ -1,9 +1,12 @@
 import enum
 import uuid
-from datetime import datetime
+from datetime import date, datetime
+from decimal import Decimal
 
-from sqlalchemy import JSON, Boolean, DateTime, Enum, ForeignKey, String, Uuid, UniqueConstraint, func
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, Enum, ForeignKey, Numeric, String, Uuid, UniqueConstraint, func
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from mahara_data.db.base import JSONType, pg_enum
+from mahara_data.enums import EducationLevel, LiteracyLevel, OnboardingPath, UserRole
 
 from .database import Base
 
@@ -27,10 +30,18 @@ def normalize_email(email: str) -> str:
 class User(Base):
     __tablename__ = "users"
 
+    role: Mapped[UserRole] = mapped_column(
+        pg_enum(UserRole, "user_role"), default=UserRole.CANDIDATE, nullable=False
+    )
     id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    email: Mapped[str] = mapped_column(String(320), unique=True, index=True, nullable=False)
+    email: Mapped[str | None] = mapped_column(String(320), unique=True, index=True)
+    phone: Mapped[str | None] = mapped_column(String(20), unique=True)
+    password_hash: Mapped[str | None] = mapped_column(String(255))
+    preferred_language: Mapped[str] = mapped_column(String(8), default="ar-TN", nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     email_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    roles: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    roles: Mapped[list[str]] = mapped_column(JSONType, default=list, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
@@ -49,7 +60,12 @@ class AuthIdentity(Base):
         Uuid(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
     )
     provider: Mapped[AuthProvider] = mapped_column(
-        Enum(AuthProvider, name="auth_provider", values_callable=lambda enum: [member.value for member in enum]),
+        Enum(
+            AuthProvider,
+            name="auth_identity_provider",
+            values_callable=lambda enum: [member.value for member in enum],
+            native_enum=False,
+        ),
         nullable=False,
     )
     provider_user_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
@@ -107,22 +123,35 @@ class AuthIdentity(Base):
 
 class Candidate(Base):
     __tablename__ = "candidates"
+    __table_args__ = (CheckConstraint("years_experience >= 0", name="candidates_years_experience_positive"),)
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), unique=True, index=True, nullable=False
     )
-    onboarding_path: Mapped[str] = mapped_column(String(80), default="cv_upload", nullable=False)
-    literacy_level: Mapped[str | None] = mapped_column(String(40), nullable=True)
-    governorate_code: Mapped[str | None] = mapped_column(String(20), nullable=True)
-    preferred_language: Mapped[str | None] = mapped_column(String(10), nullable=True)
-    education_level: Mapped[str | None] = mapped_column(String(40), nullable=True)
-    years_experience: Mapped[int | None] = mapped_column(nullable=True)
-    languages: Mapped[list[dict] | list] = mapped_column(JSON, default=list, nullable=False)
-    summary: Mapped[str | None] = mapped_column(String(2000), nullable=True)
-    available_from: Mapped[str | None] = mapped_column(String(30), nullable=True)
-    consent_version: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    onboarding_path: Mapped[OnboardingPath] = mapped_column(
+        pg_enum(OnboardingPath, "onboarding_path"), default=OnboardingPath.CV_UPLOAD, nullable=False
+    )
+    literacy_level: Mapped[LiteracyLevel] = mapped_column(
+        pg_enum(LiteracyLevel, "literacy_level"), default=LiteracyLevel.LITERATE, nullable=False
+    )
+    governorate_code: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    education_level: Mapped[EducationLevel | None] = mapped_column(pg_enum(EducationLevel, "education_level"))
+    years_experience: Mapped[Decimal | None] = mapped_column(Numeric(4, 1), nullable=True)
+    languages: Mapped[list[dict]] = mapped_column(JSONType, default=list, nullable=False)
+    summary: Mapped[str | None] = mapped_column(String, nullable=True)
+    available_from: Mapped[date | None] = mapped_column(Date, nullable=True)
+    consent_version: Mapped[str | None] = mapped_column(String(16), nullable=True)
     consent_given_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    user: Mapped[User] = relationship()
+
+    @property
+    def preferred_language(self) -> str:
+        return self.user.preferred_language
+
+    @preferred_language.setter
+    def preferred_language(self, value: str) -> None:
+        self.user.preferred_language = value
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
@@ -152,7 +181,12 @@ def get_or_create_user(db, email: str, *, roles: list[str] | None = None, email_
     normalized_email = normalize_email(email)
     user = db.query(User).filter(User.email == normalized_email).first()
     if user is None:
-        user = User(email=normalized_email, email_verified=bool(email_verified), roles=[])
+        user = User(
+            email=normalized_email,
+            role=UserRole(roles[0]) if roles else UserRole.CANDIDATE,
+            email_verified=bool(email_verified),
+            roles=[],
+        )
         db.add(user)
         db.flush()
 
@@ -172,6 +206,8 @@ def ensure_user_has_role(user: User, role: str) -> None:
         return
     if normalized_role not in user.roles:
         user.roles = [*user.roles, normalized_role]
+    if user.role is UserRole.CANDIDATE and normalized_role != UserRole.CANDIDATE.value:
+        user.role = UserRole(normalized_role)
 
 
 def get_or_create_candidate_for_user(db, user: User, *, onboarding_path: str = "cv_upload") -> Candidate:
@@ -180,8 +216,8 @@ def get_or_create_candidate_for_user(db, user: User, *, onboarding_path: str = "
     if candidate is None:
         candidate = Candidate(
             user_id=user.id,
-            onboarding_path=onboarding_path,
-            preferred_language="fr",
+            onboarding_path=OnboardingPath(onboarding_path),
+            literacy_level=LiteracyLevel.LITERATE,
         )
         db.add(candidate)
         db.flush()
@@ -197,9 +233,9 @@ class EmployerDraftSession(Base):
     employer_id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("employers.id", ondelete="CASCADE"), index=True, nullable=False
     )
-    state: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
-    messages: Mapped[list[dict]] = mapped_column(JSON, default=list, nullable=False)
-    draft: Mapped[dict | None] = mapped_column(JSON)
+    state: Mapped[dict] = mapped_column(JSONType, default=dict, nullable=False)
+    messages: Mapped[list[dict]] = mapped_column(JSONType, default=list, nullable=False)
+    draft: Mapped[dict | None] = mapped_column(JSONType)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
@@ -212,7 +248,7 @@ class CandidateOnboardingSession(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
     )
-    answers: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    answers: Mapped[dict] = mapped_column(JSONType, default=dict, nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="active", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(

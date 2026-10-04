@@ -2,6 +2,7 @@ import sys
 import tempfile
 import types
 import uuid
+from datetime import UTC, datetime
 
 import pytest
 from fastapi import FastAPI
@@ -10,8 +11,10 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from mahara_data.db.models.candidates import ConversationSession
+
 from app.database import Base
-from app.models import CandidateOnboardingSession, User
+from app.models import Candidate, CandidateOnboardingSession, User
 from app import wp2_integration
 from app.wp2_integration import QUESTIONS, create_wp2_router
 
@@ -24,6 +27,7 @@ def wp2_client(monkeypatch):
         poolclass=StaticPool,
     )
     Base.metadata.create_all(engine)
+    ConversationSession.__table__.create(engine)
     session_factory = sessionmaker(bind=engine, autoflush=False, autocommit=False)
     with session_factory() as db:
         user = User(email="candidate@example.com", roles=["candidate"])
@@ -120,3 +124,77 @@ def test_empty_audio_is_retryable_and_does_not_advance(wp2_client):
     assert response.json()["detail"]["code"] == "audio_vide"
     current = client.get(f"/api/v1/onboarding/sessions/{session_id}")
     assert current.json()["question"]["id"] == QUESTIONS[0]["id"]
+
+
+def test_finalize_links_completed_intake_to_consented_candidate(wp2_client):
+    client, session_factory, _active_user, user_id, _other_user_id, _monkeypatch = wp2_client
+    session_id = client.post("/api/v1/onboarding/sessions").json()["session_id"]
+
+    with session_factory() as db:
+        intake = db.get(CandidateOnboardingSession, uuid.UUID(session_id))
+        intake.answers = {question["colonne_csv"]: "Réponse" for question in QUESTIONS}
+        intake.status = "completed"
+        candidate = Candidate(
+            user_id=user_id,
+            onboarding_path="derja_detailed",
+            literacy_level="literate",
+            consent_given_at=datetime.now(UTC),
+        )
+        db.add(candidate)
+        db.commit()
+        candidate_id = candidate.id
+
+    response = client.post(f"/api/v1/onboarding/sessions/{session_id}/finalize")
+
+    assert response.status_code == 200, response.text
+    assert response.json() == {
+        "session_id": session_id,
+        "candidate_id": str(candidate_id),
+        "onboarding_path": "derja_detailed",
+        "status": "linked",
+    }
+    with session_factory() as db:
+        conversation = db.get(ConversationSession, uuid.UUID(session_id))
+        assert conversation.candidate_id == candidate_id
+        assert conversation.channel.value == "audio"
+        assert conversation.transcript == []
+        assert db.get(CandidateOnboardingSession, uuid.UUID(session_id)).status == "completed"
+
+
+def test_finalize_requires_a_saved_consented_profile(wp2_client):
+    client, _session_factory, _active_user, _user_id, _other_user_id, _monkeypatch = wp2_client
+    session_id = client.post("/api/v1/onboarding/sessions").json()["session_id"]
+
+    response = client.post(f"/api/v1/onboarding/sessions/{session_id}/finalize")
+
+    assert response.status_code == 409
+
+
+def test_finalize_is_idempotent_for_non_literate_candidate(wp2_client):
+    client, session_factory, _active_user, user_id, _other_user_id, _monkeypatch = wp2_client
+    session_id = client.post("/api/v1/onboarding/sessions").json()["session_id"]
+
+    with session_factory() as db:
+        intake = db.get(CandidateOnboardingSession, uuid.UUID(session_id))
+        intake.answers = {question["colonne_csv"]: "Réponse" for question in QUESTIONS}
+        intake.status = "completed"
+        candidate = Candidate(
+            user_id=user_id,
+            onboarding_path="derja_detailed",
+            literacy_level="non_literate",
+            consent_given_at=datetime.now(UTC),
+        )
+        db.add(candidate)
+        db.commit()
+        candidate_id = candidate.id
+
+    first = client.post(f"/api/v1/onboarding/sessions/{session_id}/finalize")
+    second = client.post(f"/api/v1/onboarding/sessions/{session_id}/finalize")
+
+    assert first.status_code == second.status_code == 200
+    assert first.json() == second.json()
+    assert second.json()["onboarding_path"] == "derja_guided_voice"
+    with session_factory() as db:
+        conversation = db.get(ConversationSession, uuid.UUID(session_id))
+        assert conversation.candidate_id == candidate_id
+        assert conversation.onboarding_path.value == "derja_guided_voice"

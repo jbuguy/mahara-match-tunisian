@@ -4,6 +4,7 @@ import mimetypes
 import sys
 import tempfile
 import uuid
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -11,7 +12,10 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
-from .models import CandidateOnboardingSession
+from mahara_data.db.models.candidates import ConversationSession
+from mahara_data.enums import ConversationChannel, OnboardingPath, ProcessingStatus
+
+from .models import Candidate, CandidateOnboardingSession
 
 WP2_ROOT = Path(__file__).resolve().parents[2] / "onboarding-agent-wp2"
 MAX_AUDIO_BYTES = 25 * 1024 * 1024
@@ -99,6 +103,55 @@ def create_wp2_router(get_db: Any, get_current_user: Any) -> APIRouter:
             "termine": question is None,
             "question": _question_payload(question) if question else None,
             "answers": session.answers if question is None else {},
+        }
+
+    @router.post("/sessions/{session_id}/finalize")
+    def finalize_session(
+        session_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        user: Annotated[Any, Depends(get_current_user)],
+    ):
+        session = _session_or_404(db, session_id, user.id)
+        if _current_question(session.answers) is not None:
+            raise HTTPException(status_code=409, detail="Cette session d'accueil n'est pas terminée")
+
+        candidate = db.query(Candidate).filter(Candidate.user_id == user.id).first()
+        if candidate is None or candidate.consent_given_at is None:
+            raise HTTPException(status_code=409, detail="Enregistrez votre profil avec votre consentement avant de terminer l'accueil")
+
+        conversation = db.get(ConversationSession, session.id)
+        if conversation is not None and conversation.candidate_id not in (None, candidate.id):
+            raise HTTPException(status_code=409, detail="Cette session est déjà associée à un autre profil")
+
+        onboarding_path = (
+            OnboardingPath.DERJA_GUIDED_VOICE
+            if candidate.literacy_level == "non_literate"
+            else OnboardingPath.DERJA_DETAILED
+        )
+        if conversation is None:
+            conversation = ConversationSession(
+                id=session.id,
+                candidate_id=candidate.id,
+                channel=ConversationChannel.AUDIO,
+                onboarding_path=onboarding_path,
+                language="ar-TN",
+                status=ProcessingStatus.COMPLETED,
+                transcript=[],
+                detected_intents=[],
+                appetence={},
+                ended_at=datetime.now(UTC),
+            )
+            db.add(conversation)
+        elif conversation.candidate_id is None:
+            conversation.candidate_id = candidate.id
+
+        candidate.onboarding_path = conversation.onboarding_path.value
+        db.commit()
+        return {
+            "session_id": str(session.id),
+            "candidate_id": str(candidate.id),
+            "onboarding_path": candidate.onboarding_path,
+            "status": "linked",
         }
 
     @router.post("/sessions/{session_id}/reponse")
