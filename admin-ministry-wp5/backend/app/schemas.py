@@ -32,3 +32,19 @@ class RemovalOut(Contract):
 
     code: str
     outcome: str  # "deleted" | "deprecated"
+
+class SuggestionApprove(Contract):
+    """Promote a suggestion into a new entry of the referential. The admin writes the code."""
+
+    code: TaxonomyCode
+    label_fr: str = Field(min_length=1, max_length=200)
+    label_ar: str | None = Field(default=None, max_length=200)
+    label_derja: str | None = Field(default=None, max_length=200)
+    description: str | None = None
+    skill_type: SkillType
+
+
+class SuggestionMerge(Contract):
+    """Attach the proposed label as a synonym of a skill that already exists."""
+
+    code: TaxonomyCode
