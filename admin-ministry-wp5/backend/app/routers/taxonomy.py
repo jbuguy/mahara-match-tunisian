@@ -8,6 +8,7 @@ from mahara_data.enums import SkillType, TaxonomyStatus
 from mahara_data.schemas.common import Page
 from mahara_data.schemas.taxonomy import SkillRead
 
+
 from ..db import get_db
 from ..schemas import RemovalOut, SkillCreate, SkillUpdate
 from ..services import taxonomy as service

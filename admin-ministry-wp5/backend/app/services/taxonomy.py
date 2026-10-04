@@ -8,7 +8,9 @@ from mahara_data.db.models.taxonomy import Skill
 from mahara_data.enums import SkillType, TaxonomyStatus
 from mahara_data.schemas.taxonomy import SkillRead
 
+
 from ..schemas import SkillCreate, SkillUpdate
+from . import audit
 
 
 def to_read(skill: Skill) -> SkillRead:
@@ -95,6 +97,7 @@ def validate_skill(db: Session, skill: Skill) -> Skill:
     skill.status = TaxonomyStatus.VALIDATED
     skill.validated_at = datetime.now(timezone.utc)
     # TODO: set validated_by once authentication lands (users.id of the acting admin).
+    audit.record(db, "skill.validated", "skill", skill.code, {"version": skill.version})
     db.commit()
     db.refresh(skill)
     return skill
@@ -103,14 +106,19 @@ def validate_skill(db: Session, skill: Skill) -> Skill:
 def remove_skill(db: Session, skill: Skill) -> str:
     """Delete a never-used draft for real; retire anything else from circulation."""
     if skill.status == TaxonomyStatus.DRAFT:
+        code = skill.code
         try:
             db.delete(skill)
+            audit.record(db, "skill.deleted", "skill", code, {"reason": "unused draft"})
             db.commit()
             return "deleted"
         except IntegrityError:
             # Something already references it after all: keep the history.
             db.rollback()
 
+    audit.record(
+        db, "skill.deprecated", "skill", skill.code, {"previous_status": skill.status.value}
+    )
     skill.status = TaxonomyStatus.DEPRECATED
     db.commit()
     return "deprecated"

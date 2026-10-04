@@ -10,6 +10,7 @@ from mahara_data.enums import RequirementLevel, TaxonomyStatus
 from mahara_data.schemas.taxonomy import OccupationRead, OccupationSkillRead
 
 from ..schemas import OccupationCreate
+from . import audit
 
 
 def to_read(db: Session, occupation: Occupation) -> OccupationRead:
@@ -114,6 +115,7 @@ def update_occupation(db: Session, occupation: Occupation, changes: dict) -> Occ
 def validate_occupation(db: Session, occupation: Occupation) -> Occupation:
     """Promote the occupation to the official referential. A WP5 governance act."""
     occupation.status = TaxonomyStatus.VALIDATED
+    audit.record(db, "occupation.validated", "occupation", occupation.code)
     db.commit()
     db.refresh(occupation)
     return occupation
@@ -122,16 +124,25 @@ def validate_occupation(db: Session, occupation: Occupation) -> Occupation:
 def remove_occupation(db: Session, occupation: Occupation) -> str:
     """Delete a never-used draft for real; retire anything else from circulation."""
     if occupation.status == TaxonomyStatus.DRAFT:
+        code = occupation.code
         try:
             db.execute(
                 delete(OccupationSkill).where(OccupationSkill.occupation_id == occupation.id)
             )
             db.delete(occupation)
+            audit.record(db, "occupation.deleted", "occupation", code, {"reason": "unused draft"})
             db.commit()
             return "deleted"
         except IntegrityError:
             db.rollback()
 
+    audit.record(
+        db,
+        "occupation.deprecated",
+        "occupation",
+        occupation.code,
+        {"previous_status": occupation.status.value},
+    )
     occupation.status = TaxonomyStatus.DEPRECATED
     db.commit()
     return "deprecated"
@@ -148,6 +159,13 @@ def replace_skills(
                 occupation_id=occupation.id, skill_id=skill_id, requirement=requirement
             )
         )
+    audit.record(
+        db,
+        "occupation.skills_replaced",
+        "occupation",
+        occupation.code,
+        {"requirement_count": len(pairs)},
+    )
     db.commit()
     db.refresh(occupation)
     return occupation

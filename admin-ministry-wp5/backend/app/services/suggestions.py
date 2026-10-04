@@ -9,6 +9,7 @@ from mahara_data.enums import IngestionSource, SkillType, SuggestionStatus, Taxo
 from mahara_data.schemas.taxonomy import SkillSuggestionRead
 
 from ..schemas import SuggestionApprove
+from . import audit
 
 
 def to_read(db: Session, suggestion: SkillSuggestion) -> SkillSuggestionRead:
@@ -94,6 +95,13 @@ def approve(db: Session, suggestion: SkillSuggestion, payload: SuggestionApprove
     db.flush()  # gets the new id without closing the transaction
 
     _close(suggestion, SuggestionStatus.APPROVED, skill.id)
+    audit.record(
+        db,
+        "suggestion.approved",
+        "skill_suggestion",
+        str(suggestion.id),
+        {"created_skill_code": skill.code, "proposed_label": suggestion.proposed_label},
+    )
     db.commit()
     db.refresh(skill)
     return skill
@@ -108,6 +116,13 @@ def merge(db: Session, suggestion: SkillSuggestion, skill: Skill) -> Skill:
         skill.version += 1
 
     _close(suggestion, SuggestionStatus.MERGED, skill.id)
+    audit.record(
+        db,
+        "suggestion.merged",
+        "skill_suggestion",
+        str(suggestion.id),
+        {"merged_into": skill.code, "proposed_label": suggestion.proposed_label},
+    )
     db.commit()
     db.refresh(skill)
     return skill
@@ -116,6 +131,13 @@ def merge(db: Session, suggestion: SkillSuggestion, skill: Skill) -> Skill:
 def reject(db: Session, suggestion: SkillSuggestion) -> SkillSuggestion:
     """Noise. Traced, never deleted: a refusal is part of the governance history."""
     _close(suggestion, SuggestionStatus.REJECTED)
+    audit.record(
+        db,
+        "suggestion.rejected",
+        "skill_suggestion",
+        str(suggestion.id),
+        {"proposed_label": suggestion.proposed_label},
+    )
     db.commit()
     db.refresh(suggestion)
     return suggestion
