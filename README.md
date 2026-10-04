@@ -21,18 +21,20 @@ Unemployment in Tunisia isn't one problem — it's four:
 
 ---
 
-## Architecture: Work Packages
+## Platform architecture
 
-| WP | Name | Scope |
-|---|---|---|
-| WP1 | Data Layer | — | Shared schema, storage, logs |
-| WP2 | Onboarding Agent | — | Dialect-first conversational onboarding, shared LLM |
-| WP3 | Skill Matching Engine | — | Skill profile extraction, scoring, matching |
-| **WP4** | **Employer Module** | Employer accounts, AI-assisted job posting, bias check, candidate dashboard, feedback loop |
-| WP5 | — | — |
-| WP6 | Employee Module  | Job-seeker-facing experience |
+Mahara Match is structured as a single production platform with clear service boundaries, not a collection of disconnected demo apps. The canonical data layer is PostgreSQL, shared contracts are owned by WP1, and each module exposes a well-defined API contract while the platform shell remains a coherent operational surface.
 
-Each WP has its own service/module and README under `/services/*` 
+| Layer | Responsibility |
+|---|---|
+| Core platform | API shell, auth, deployment, observability, health checks, environment config |
+| WP1 | Canonical data model, Postgres schema, contracts, migrations, validation |
+| WP2 | Candidate onboarding and conversational intake |
+| WP3 | Matching, skill scoring, candidate-to-offer ranking |
+| WP4 | Employer workflows and AI-assisted job publishing |
+| WP6 | Employee journey, candidate profile, applications, roadmap |
+
+This keeps the repository production-like: one runtime model, one database, module boundaries, and shared contracts instead of isolated package copies.
 
 ---
 
@@ -92,6 +94,19 @@ git clone [repo-url]
 cd [repo-name]
 cp .env.example .env   # fill in DB creds, LLM endpoint, JWT secret
 docker compose up --build
+```
+
+### Production validation
+The repo keeps package-specific tooling isolated, but the platform still behaves like a coherent production system with a single canonical database and a shared API shell. Use the root backend for service-level validation, then run package-specific suites when changing module-local code.
+
+```bash
+# root-level platform checks
+cd backend && pytest
+
+# package-specific suites
+cd ../data-layer-wp1 && pytest
+cd ../employee-module-wp6/backend && pytest
+cd ../skill-matching-wp3 && pytest
 ```
 
 ### Running a single WP service (e.g. WP4)

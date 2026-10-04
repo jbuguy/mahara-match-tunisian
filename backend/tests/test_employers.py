@@ -117,3 +117,94 @@ def test_profile_can_be_updated():
     assert response.json()["id"] == employer_id
     assert response.json()["company_name"] == "Updated Carthage"
     assert response.json()["company_size"] == "51-200"
+
+
+def test_platform_health_and_readiness_endpoints_are_available():
+    health = client.get("/health")
+    readiness = client.get("/ready")
+
+    assert health.status_code == 200
+    assert health.json()["status"] == "ok"
+    assert health.json()["service"] == "mahara-match"
+
+    assert readiness.status_code == 200
+    assert readiness.json()["status"] == "ready"
+    assert readiness.json()["checks"]["database"] == "ok"
+    assert readiness.json()["checks"]["shared_contracts"] == "ok"
+
+
+def test_platform_module_registry_lists_work_packages_with_shared_contracts():
+    response = client.get("/platform/modules")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["platform"] == "mahara-match"
+    assert any(module["code"] == "wp1" for module in payload["modules"])
+    assert any(module["code"] == "wp4" for module in payload["modules"])
+    assert all(module["shared_contracts"] in {"ok", "not_configured"} for module in payload["modules"])
+
+
+def test_platform_contracts_endpoint_exposes_wp1_schema_catalog():
+    response = client.get("/platform/contracts")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["source"] == "wp1"
+    assert "candidate_profile" in payload["contracts"]
+    assert "job_offer" in payload["contracts"]
+    assert "application" in payload["contracts"]
+
+
+def test_platform_modules_expose_module_status_and_contract_counts():
+    response = client.get("/platform/modules")
+
+    assert response.status_code == 200
+    modules = response.json()["modules"]
+    wp1 = next(module for module in modules if module["code"] == "wp1")
+    assert wp1["status"] == "registered"
+    assert wp1["contract_count"] >= 10
+    assert "candidate_profile" in wp1["contracts"]
+    assert any(module["code"] == "wp4" for module in modules)
+    assert any(module["code"] == "wp6" for module in modules)
+
+
+def test_platform_validates_wp4_offers_and_wp6_profiles_against_wp1_contracts():
+    offer_response = client.post(
+        "/platform/integrations/wp4/validate-offer",
+        json={
+            "title": "Full Stack Developer",
+            "description": "Build and maintain the platform backend and integrations for Tunisian employers.",
+            "contract_type": "cdi",
+            "location": {"governorate_code": "TN-11", "delegation": "Tunis"},
+            "positions_count": 1,
+            "skills": [{"skill_code": "SK-0103", "requirement": "required", "min_level": 2}],
+            "employer_id": "123e4567-e89b-12d3-a456-426614174000",
+            "occupation_code": "OC-2512",
+            "status": "draft",
+            "source": "employer_form",
+        },
+    )
+    profile_response = client.post(
+        "/platform/integrations/wp6/validate-profile",
+        json={
+            "onboarding_path": "cv_upload",
+            "literacy_level": "literate",
+            "preferred_language": "fr",
+            "languages": [{"code": "fr", "level": 2}],
+            "location": {"governorate_code": "TN-11", "delegation": "Tunis"},
+            "education_level": "licence",
+            "years_experience": 3,
+            "skills": [{"skill_code": "SK-0103", "skill_type": "hard", "level": 3, "source": "cv", "confidence": 0.95}],
+            "source_document_ids": ["123e4567-e89b-12d3-a456-426614174001"],
+            "experiences": [{"job_title_raw": "Developer", "occupation_code": "OC-2512", "is_informal": False, "duration_months": 24, "governorate_code": "TN-11"}],
+            "summary": "Product and platform developer with backend and frontend experience.",
+        },
+    )
+
+    assert offer_response.status_code == 200
+    assert offer_response.json()["valid"] is True
+    assert offer_response.json()["contract"] == "job_offer"
+
+    assert profile_response.status_code == 200
+    assert profile_response.json()["valid"] is True
+    assert profile_response.json()["contract"] == "candidate_profile"
