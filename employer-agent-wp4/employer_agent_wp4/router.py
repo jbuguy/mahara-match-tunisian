@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import uuid
 from collections.abc import Callable
 from datetime import datetime, timezone
@@ -20,12 +22,14 @@ from .workflow import (
     INTERVIEW_FIELDS,
     REQUIRED_FIELDS,
     InterviewError,
+    OfferPublishError,
     build_offer_review,
     current_field,
     extract_answer,
     first_question,
     generate_offer,
     next_question,
+    persist_published_offer,
 )
 
 
@@ -173,7 +177,12 @@ def create_employer_agent_router(
         session = _owned_session(db, session_model, session_id, current.id)
         if session.draft is None:
             raise HTTPException(status_code=409, detail="This session does not have a generated draft")
-        return build_offer_review(db, session.draft)
+        review = build_offer_review(db, session.draft)
+        state = dict(session.state or {})
+        state["reviewed_draft_fingerprint"] = _draft_fingerprint(session.draft)
+        session.state = state
+        db.commit()
+        return review
 
     @router.patch("/sessions/{session_id}/draft")
     def update_draft(
@@ -203,6 +212,9 @@ def create_employer_agent_router(
         except ValidationError as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
         session.draft = validated.model_dump(mode="json")
+        state = dict(session.state or {})
+        state.pop("reviewed_draft_fingerprint", None)
+        session.state = state
         db.commit()
         db.refresh(session)
         return _session_response(session)
@@ -218,6 +230,8 @@ def create_employer_agent_router(
             raise HTTPException(status_code=409, detail="This session does not have a generated draft")
         if session.draft.get("status") == "published":
             raise HTTPException(status_code=409, detail="This offer has already been published")
+        if session.state.get("reviewed_draft_fingerprint") != _draft_fingerprint(session.draft):
+            raise HTTPException(status_code=409, detail="Review the current offer draft before publishing")
 
         candidate = dict(session.draft)
         candidate["offer_id"] = candidate.get("offer_id") or str(uuid.uuid4())
@@ -229,6 +243,13 @@ def create_employer_agent_router(
             validated = NormalizedJobOffer.model_validate(candidate)
         except ValidationError as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
+
+        try:
+            persist_published_offer(db, validated, current.id)
+        except ValueError as error:
+            db.rollback()
+            status_code = error.status_code if isinstance(error, OfferPublishError) else 422
+            raise HTTPException(status_code=status_code, detail=str(error)) from error
 
         session.draft = validated.model_dump(mode="json")
         session.messages = [
@@ -329,6 +350,11 @@ def _owned_session(db: Session, session_model: type, session_id: uuid.UUID, empl
     if session is None or session.employer_id != employer_id:
         raise HTTPException(status_code=404, detail="Draft session not found")
     return session
+
+
+def _draft_fingerprint(draft: dict[str, Any]) -> str:
+    encoded = json.dumps(draft, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def _session_response(session: Any) -> dict[str, Any]:

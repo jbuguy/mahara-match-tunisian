@@ -1,7 +1,13 @@
-def initialiser_moteur_stt():
-    import transcription
+import importlib
 
-    return transcription
+
+def _transcription_module():
+    module_name = f"{__package__}.transcription" if __package__ else "transcription"
+    return importlib.import_module(module_name)
+
+
+def initialiser_moteur_stt():
+    return _transcription_module()
 
 
 def transcrire_et_extraire(chemin_audio, type_reponse):
@@ -20,9 +26,8 @@ def transcrire_et_extraire(chemin_audio, type_reponse):
     if type_reponse not in types_existants:
         raise ValueError(f"Type de réponse non pris en charge : {type_reponse}")
 
-    from transcription import transcrire_reponse_exacte
-
-    resultat = transcrire_reponse_exacte(chemin_audio, types_existants[type_reponse])
+    transcription = _transcription_module()
+    resultat = transcription.transcrire_reponse_exacte(chemin_audio, types_existants[type_reponse])
     return {
         "texte_brut": resultat.texte_brut,
         "valeur_extraite": resultat.valeur_normalisee,

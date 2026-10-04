@@ -399,6 +399,59 @@ button {
   gap: 18px;
 }
 
+.onboarding-panel {
+  max-width: 780px;
+}
+
+.onboarding-start,
+.onboarding-review {
+  display: grid;
+  gap: 16px;
+}
+
+.onboarding-review small {
+  color: var(--ink-soft);
+  line-height: 1.5;
+}
+
+.question-audio {
+  width: min(100%, 420px);
+}
+
+.voice-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.voice-actions > span {
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+}
+
+.voice-recording {
+  background: #a13d31;
+}
+
+.voice-indicator {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.voice-recording .voice-indicator {
+  animation: recording-pulse 1.1s ease-in-out infinite alternate;
+  background: #fff;
+}
+
+@keyframes recording-pulse {
+  to { opacity: 0.35; }
+}
+
 .agent-header {
   display: flex;
   align-items: center;

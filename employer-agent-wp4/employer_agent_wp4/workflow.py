@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import json
+import uuid
 from collections.abc import Callable
 from datetime import date, timedelta
 from typing import Any
 
+from mahara_data.db.models.employers import Employer, JobOffer, JobOfferSkill
 from mahara_data.db.models.market import MarketDataset, MarketIndicator
+from mahara_data.db.models.reference import Governorate, Sector
 from mahara_data.db.models.taxonomy import Occupation, Skill
-from mahara_data.enums import MarketIndicatorType, TaxonomyStatus
+from mahara_data.enums import MarketIndicatorType, OfferSource, OfferStatus, TaxonomyStatus
 from mahara_data.schemas.offer import NormalizedJobOffer
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -50,6 +53,12 @@ REQUIRED_FIELDS = ("title", "responsibilities", "location", "contract_type", "re
 
 class InterviewError(ValueError):
     pass
+
+
+class OfferPublishError(ValueError):
+    def __init__(self, message: str, *, status_code: int = 422) -> None:
+        super().__init__(message)
+        self.status_code = status_code
 
 
 def first_question() -> str:
@@ -180,6 +189,79 @@ async def generate_offer(
 def next_question(state: dict[str, Any]) -> str | None:
     field = current_field(state)
     return FIELD_QUESTIONS[field] if field else None
+
+
+def persist_published_offer(db: Session, offer: NormalizedJobOffer, employer_id: uuid.UUID) -> uuid.UUID:
+    if offer.employer_id not in (None, employer_id):
+        raise OfferPublishError("Offer employer does not match the authenticated employer", status_code=409)
+    if db.get(Employer, employer_id) is None:
+        raise OfferPublishError("Employer is not linked to a canonical employer record", status_code=409)
+    if db.get(Governorate, offer.location.governorate_code) is None:
+        raise OfferPublishError("Unknown governorate code")
+
+    skill_codes = [item.skill_code for item in offer.skills]
+    skills = (
+        db.query(Skill)
+        .filter(Skill.code.in_(skill_codes), Skill.status == TaxonomyStatus.VALIDATED)
+        .all()
+    )
+    skills_by_code = {skill.code: skill for skill in skills}
+    missing_skills = sorted(set(skill_codes) - skills_by_code.keys())
+    if missing_skills:
+        raise OfferPublishError(f"Unknown or unvalidated skill codes: {', '.join(missing_skills)}")
+
+    occupation = None
+    if offer.occupation_code:
+        occupation = db.query(Occupation).filter(Occupation.code == offer.occupation_code).first()
+        if occupation is None:
+            raise OfferPublishError("Unknown occupation code")
+
+    sector = None
+    if offer.sector_code:
+        sector = db.query(Sector).filter(Sector.code == offer.sector_code).first()
+        if sector is None:
+            raise OfferPublishError("Unknown sector code")
+
+    offer_id = offer.offer_id or uuid.uuid4()
+    row = db.get(JobOffer, offer_id)
+    if row is not None and row.employer_id != employer_id:
+        raise OfferPublishError("Offer belongs to another employer", status_code=409)
+    if row is None:
+        row = JobOffer(id=offer_id, employer_id=employer_id)
+        db.add(row)
+
+    row.title = offer.title
+    row.description_raw = offer.description
+    row.description_normalized = None
+    row.occupation_id = occupation.id if occupation else None
+    row.sector_id = sector.id if sector else None
+    row.contract_type = offer.contract_type
+    row.work_mode = offer.work_mode
+    row.governorate_code = offer.location.governorate_code
+    row.delegation = offer.location.delegation
+    row.positions_count = offer.positions_count
+    row.min_years_experience = offer.min_years_experience
+    row.education_level_min = offer.education_level_min
+    row.salary_min_tnd = offer.salary.min_tnd if offer.salary else None
+    row.salary_max_tnd = offer.salary.max_tnd if offer.salary else None
+    row.languages_required = [language.model_dump(mode="json") for language in offer.languages_required]
+    row.status = OfferStatus.PUBLISHED
+    row.source = OfferSource.EMPLOYER_FORM
+    row.published_at = offer.published_at
+    row.expires_at = offer.expires_at
+
+    db.query(JobOfferSkill).filter(JobOfferSkill.job_offer_id == offer_id).delete(synchronize_session=False)
+    db.add_all(
+        JobOfferSkill(
+            job_offer_id=offer_id,
+            skill_id=skills_by_code[item.skill_code].id,
+            requirement=item.requirement,
+            min_level=item.min_level,
+        )
+        for item in offer.skills
+    )
+    db.flush()
+    return offer_id
 
 
 def build_offer_review(

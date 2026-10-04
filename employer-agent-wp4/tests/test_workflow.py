@@ -1,14 +1,38 @@
 import asyncio
 import json
-from datetime import date
+import uuid
+from datetime import date, datetime
 from types import SimpleNamespace
 
+import pytest
+from fastapi import HTTPException
+from sqlalchemy import DateTime, ForeignKey, JSON, Uuid, create_engine, func
+from sqlalchemy.orm import Mapped, Session, mapped_column
+
+from mahara_data.db import Base
+from mahara_data.db.models.accounts import User
+from mahara_data.db.models.employers import Employer, JobOffer, JobOfferSkill
+from mahara_data.db.models.reference import Governorate
 from mahara_data.db.models.taxonomy import Skill
+from mahara_data.enums import CompanySize, SkillType, TaxonomyStatus, UserRole
 
 from mahara_data.db.models.market import MarketDataset, MarketIndicator
 from mahara_data.db.models.taxonomy import Occupation
 
+from employer_agent_wp4.router import create_employer_agent_router
 from employer_agent_wp4.workflow import build_offer_review, extract_answer, generate_offer
+
+
+class EmployerDraftSessionFixture(Base):
+    __tablename__ = "employer_draft_sessions"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    employer_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("employers.id"), nullable=False)
+    state: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    messages: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    draft: Mapped[dict | None] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
 class FakeLLM:
@@ -118,6 +142,75 @@ def test_incomplete_answers_are_returned_without_calling_llm():
     assert result is None
     assert "responsibilities" in missing
     assert client.calls == 0
+
+
+def test_published_offer_and_skills_are_persisted_in_wp1_tables():
+    engine = create_engine("sqlite://")
+    tables = [
+        User.__table__,
+        Governorate.__table__,
+        Skill.__table__,
+        Employer.__table__,
+        JobOffer.__table__,
+        JobOfferSkill.__table__,
+        EmployerDraftSessionFixture.__table__,
+    ]
+    Base.metadata.create_all(engine, tables=tables)
+
+    with Session(engine) as db:
+        user = User(email="employer@example.com", role=UserRole.EMPLOYER)
+        db.add(user)
+        db.flush()
+        employer = Employer(
+            user_id=user.id,
+            company_name="Carthage Digital",
+            email="employer@example.com",
+            password_hash="not-used-in-this-test",
+            sector="Technology",
+            company_size=CompanySize.SMALL,
+        )
+        governorate = Governorate(code="TN-11", name_fr="Tunis", name_ar="Tunis")
+        skill = Skill(
+            code="SK-0001",
+            label_fr="Accueil client",
+            skill_type=SkillType.HARD,
+            status=TaxonomyStatus.VALIDATED,
+        )
+        db.add_all([employer, governorate, skill])
+        db.flush()
+
+        draft_session = EmployerDraftSessionFixture(
+            employer_id=employer.id,
+            state={"mode": "chat"},
+            messages=[],
+            draft=offer_payload(),
+        )
+        draft_session.draft["employer_id"] = str(employer.id)
+        db.add(draft_session)
+        db.flush()
+
+        router = create_employer_agent_router(lambda: None, lambda: None, EmployerDraftSessionFixture)
+        review_offer = next(route.endpoint for route in router.routes if route.path.endswith("/review"))
+        publish = next(route.endpoint for route in router.routes if route.path.endswith("/publish"))
+        with pytest.raises(HTTPException) as error:
+            publish(session_id=draft_session.id, current=employer, db=db)
+        assert error.value.status_code == 409
+
+        review_offer(session_id=draft_session.id, current=employer, db=db)
+        response = publish(session_id=draft_session.id, current=employer, db=db)
+        db.refresh(draft_session)
+
+        persisted_id = uuid.UUID(response["draft"]["offer_id"])
+        persisted_offer = db.get(JobOffer, persisted_id)
+        persisted_skill = db.get(JobOfferSkill, (persisted_id, skill.id))
+        assert response["draft"]["status"] == "published"
+        assert draft_session.draft["status"] == "published"
+        assert persisted_offer is not None
+        assert persisted_offer.employer_id == employer.id
+        assert persisted_offer.title == "Vendeur en magasin"
+        assert persisted_offer.status.value == "published"
+        assert persisted_skill is not None
+        assert persisted_skill.requirement.value == "required"
 
 
 def test_answer_extraction_uses_lm_studio_json_schema_mode():

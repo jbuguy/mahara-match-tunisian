@@ -117,6 +117,12 @@ npm install
 npm run dev
 ```
 
+WP2 voice intake uses `faster-whisper` and `pydub`. Install FFmpeg and make sure
+`ffmpeg` is available on `PATH` so browser recordings can be decoded. The small
+Whisper model is downloaded the first time a voice response is transcribed.
+Fresh databases apply the onboarding-session migration through Docker Compose;
+for an existing database, run `python -m app.migrate` from `backend`.
+
 ### Production validation
 The repo keeps package-specific tooling isolated, but the platform still behaves like a coherent production system with a single canonical database and a shared API shell. Use the root backend for service-level validation, then run package-specific suites when changing module-local code.
 

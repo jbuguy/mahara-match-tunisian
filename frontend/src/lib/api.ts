@@ -16,7 +16,8 @@ export async function requestJson<T>(path: string, init: RequestInit = {}): Prom
   if (!response.ok) {
     const body = await response.json().catch(() => null)
     const detail = body?.detail
-    throw new Error(typeof detail === 'string' ? detail : `Request failed with status ${response.status}`)
+    const message = typeof detail === 'string' ? detail : detail?.message
+    throw new Error(typeof message === 'string' ? message : `Request failed with status ${response.status}`)
   }
 
   if (response.status === 204) return undefined as T

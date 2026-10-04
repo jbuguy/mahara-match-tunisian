@@ -24,6 +24,7 @@ def test_root_api_exposes_wp4_and_wp6_routes():
     assert "/employer-agent/sessions" in paths
     assert "/api/v1/me" in paths
     assert "/api/v1/me/profile" in paths
+    assert "/api/v1/onboarding/sessions" in paths
     assert "/api/v1/reference/governorates" in paths
     assert "/api/v1/me/cv" in paths
     assert "/api/v1/me/photo" in paths

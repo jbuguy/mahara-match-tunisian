@@ -1,5 +1,5 @@
 import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 
 import { requestJson } from '../lib/api'
 
@@ -15,6 +15,7 @@ type Profile = {
   literacy_level: string
   education_level: string | null
   years_experience: number | null
+  available_from: string | null
   summary: string | null
   consent_given_at: string | null
   languages: { code: string; level: string }[]
@@ -61,6 +62,13 @@ const educationOptions = [
 ]
 
 export function CandidatePage() {
+  const location = useLocation()
+  const onboardingDraft = (location.state as { wp2Draft?: {
+    jobTitle?: string
+    availableFrom?: string | null
+    governorateCode?: string | null
+    phone?: string | null
+  } } | null)?.wp2Draft
   const [identity, setIdentity] = useState<Identity | null>(null)
   const [governorates, setGovernorates] = useState<Governorate[]>([])
   const [fullName, setFullName] = useState('')
@@ -69,6 +77,7 @@ export function CandidatePage() {
   const [literacyLevel, setLiteracyLevel] = useState('literate')
   const [educationLevel, setEducationLevel] = useState('')
   const [yearsExperience, setYearsExperience] = useState('')
+  const [availableFrom, setAvailableFrom] = useState('')
   const [summary, setSummary] = useState('')
   const [consentGiven, setConsentGiven] = useState(false)
   const [fromCv, setFromCv] = useState(false)
@@ -108,6 +117,7 @@ export function CandidatePage() {
           setLiteracyLevel(profile.literacy_level)
           setEducationLevel(profile.education_level ?? '')
           setYearsExperience(profile.years_experience?.toString() ?? '')
+          setAvailableFrom(profile.available_from ?? '')
           setSummary(profile.summary ?? '')
           setConsentGiven(Boolean(profile.consent_given_at))
           setLanguages(profile.languages)
@@ -117,6 +127,14 @@ export function CandidatePage() {
           setDesiredOccupations(profile.desired_occupations)
         } catch (profileError) {
           if (!(profileError instanceof Error) || profileError.message !== 'profile not found') throw profileError
+        }
+        if (onboardingDraft) {
+          if (onboardingDraft.phone) setPhone(onboardingDraft.phone)
+          if (onboardingDraft.governorateCode) setGovernorateCode(onboardingDraft.governorateCode)
+          if (onboardingDraft.availableFrom) setAvailableFrom(onboardingDraft.availableFrom)
+          if (onboardingDraft.jobTitle) {
+            setSummary((current) => current || `Métier indiqué à l'accueil : ${onboardingDraft.jobTitle}`)
+          }
         }
       } catch (loadError) {
         if (active) setError(loadError instanceof Error ? loadError.message : 'Could not load your profile.')
@@ -183,6 +201,7 @@ export function CandidatePage() {
           literacy_level: literacyLevel,
           education_level: educationLevel || null,
           years_experience: yearsExperience === '' ? null : Number(yearsExperience),
+          available_from: availableFrom || null,
           summary: summary || null,
           languages,
           skills,
@@ -281,6 +300,7 @@ export function CandidatePage() {
           <label><span>Education</span><select value={educationLevel} onChange={(event) => setEducationLevel(event.target.value)}><option value="">Not specified</option>{educationOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
           <label><span>Years of experience</span><input type="number" min="0" max="80" value={yearsExperience} onChange={(event) => setYearsExperience(event.target.value)} /></label>
         </div>
+        <label><span>Available from</span><input type="date" value={availableFrom} onChange={(event) => setAvailableFrom(event.target.value)} /></label>
         <label><span>Professional summary</span><textarea rows={4} value={summary} onChange={(event) => setSummary(event.target.value)} /></label>
         <label className="consent-control"><input required type="checkbox" checked={consentGiven} onChange={(event) => setConsentGiven(event.target.checked)} /><span>I consent to Mahara Match storing and using this information to support my job search.</span></label>
         {notice && <p className="form-notice" role="status">{notice}</p>}

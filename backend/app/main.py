@@ -14,6 +14,7 @@ from shared_llm import LLMSettings, OpenAICompatibleClient
 from .config import get_settings
 from .database import Base, engine, get_db
 from .google_auth import router as google_auth_router
+from .wp2_integration import create_wp2_router
 from .models import (
     AuthIdentity,
     AuthProvider,
@@ -91,6 +92,7 @@ app.include_router(
     )
 )
 app.include_router(google_auth_router)
+app.include_router(create_wp2_router(get_db, get_current_user))
 register_wp6_routes(app, settings, get_db)
 
 
@@ -121,6 +123,7 @@ def detect_module_status(module_code: str) -> str:
     module_paths = {
         "wp1": repo_root / "data-layer-wp1",
         "wp4": repo_root / "employer-agent-wp4",
+        "wp2": repo_root / "onboarding-agent-wp2",
         "wp6": repo_root / "employee-module-wp6",
     }
     module_path = module_paths.get(module_code)
@@ -139,6 +142,16 @@ def build_module_registry() -> list[dict[str, object]]:
             "owner": "platform",
             "description": "Canonical PostgreSQL schema and shared JSON contracts",
             "status": detect_module_status("wp1"),
+            "shared_contracts": shared_status,
+            "contracts": wp1_contracts,
+            "contract_count": len(wp1_contracts),
+        },
+        {
+            "code": "wp2",
+            "name": "Candidate onboarding",
+            "owner": "platform",
+            "description": "Guided voice intake and candidate profile draft",
+            "status": detect_module_status("wp2"),
             "shared_contracts": shared_status,
             "contracts": wp1_contracts,
             "contract_count": len(wp1_contracts),
