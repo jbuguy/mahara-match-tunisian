@@ -14,9 +14,37 @@ from shared_llm import LLMSettings, OpenAICompatibleClient
 from .config import get_settings
 from .database import Base, engine, get_db
 from .google_auth import router as google_auth_router
-from .models import Employer, EmployerDraftSession
-from .schemas import EmployerLogin, EmployerProfile, EmployerSignup, EmployerUpdate, Token
-from .security import create_access_token, get_current_employer, hash_password, verify_password
+from .models import (
+    AuthIdentity,
+    AuthProvider,
+    Candidate,
+    Employer,
+    EmployerDraftSession,
+    User,
+    ensure_user_has_role,
+    get_or_create_candidate_for_user,
+    get_or_create_user,
+)
+from .schemas import (
+    CandidateLogin,
+    CandidateProfile,
+    CandidateSignup,
+    CandidateUpdate,
+    EmployerLogin,
+    EmployerProfile,
+    EmployerSignup,
+    EmployerUpdate,
+    Token,
+)
+from .security import (
+    create_access_token,
+    create_user_access_token,
+    get_current_employer,
+    get_current_user,
+    hash_password,
+    require_roles,
+    verify_password,
+)
 from .wp6_integration import register_wp6_routes
 
 from employer_agent_wp4 import create_employer_agent_router
@@ -245,10 +273,23 @@ def validate_wp2_onboarding(payload: dict[str, Any]) -> dict[str, object]:
 @app.post("/employers/signup", response_model=EmployerProfile, status_code=status.HTTP_201_CREATED)
 def signup(payload: EmployerSignup, db: Annotated[Session, Depends(get_db)]) -> Employer:
     email = payload.email.lower()
+    user = get_or_create_user(db, email, roles=["employer"], email_verified=False)
+    password_hash = hash_password(payload.password)
+    AuthIdentity.link_user(
+        db,
+        user,
+        provider=AuthProvider.PASSWORD,
+        provider_user_id=f"email:{email}",
+        email=email,
+        email_verified=False,
+        password_hash=password_hash,
+    )
+
     employer = Employer(
+        user_id=user.id,
         company_name=payload.company_name.strip(),
         email=email,
-        password_hash=hash_password(payload.password),
+        password_hash=password_hash,
         sector=payload.sector.strip(),
         company_size=payload.company_size,
         verified=False,
@@ -269,6 +310,73 @@ def login(payload: EmployerLogin, db: Annotated[Session, Depends(get_db)]) -> To
     if employer is None or not verify_password(payload.password, employer.password_hash):
         raise HTTPException(status_code=401, detail="Invalid email or password")
     return Token(access_token=create_access_token(employer.id))
+
+
+@app.post("/candidates/signup", response_model=CandidateProfile, status_code=status.HTTP_201_CREATED)
+def candidate_signup(payload: CandidateSignup, db: Annotated[Session, Depends(get_db)]) -> Candidate:
+    email = payload.email.lower()
+    user = get_or_create_user(db, email, roles=["candidate"], email_verified=False)
+    password_hash = hash_password(payload.password)
+    AuthIdentity.link_user(
+        db,
+        user,
+        provider=AuthProvider.PASSWORD,
+        provider_user_id=f"email:{email}",
+        email=email,
+        email_verified=False,
+        password_hash=password_hash,
+    )
+
+    candidate = get_or_create_candidate_for_user(db, user, onboarding_path=payload.onboarding_path or "cv_upload")
+    candidate.preferred_language = (payload.preferred_language or "fr").strip() or "fr"
+    candidate.governorate_code = payload.governorate_code.strip() if payload.governorate_code else None
+    db.commit()
+    db.refresh(candidate)
+    return candidate
+
+
+@app.post("/candidates/login", response_model=Token)
+def candidate_login(payload: CandidateLogin, db: Annotated[Session, Depends(get_db)]) -> Token:
+    email = payload.email.lower()
+    user = db.query(User).filter(User.email == email).first()
+    if user is None:
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    identity = (
+        db.query(AuthIdentity)
+        .filter(AuthIdentity.user_id == user.id, AuthIdentity.provider == AuthProvider.PASSWORD)
+        .first()
+    )
+    if identity is None or identity.password_hash is None or not verify_password(payload.password, identity.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    return Token(access_token=create_user_access_token(user))
+
+
+@app.get("/candidates/me", response_model=CandidateProfile)
+def get_candidate_profile(current: Annotated[User, Depends(require_roles("candidate"))], db: Annotated[Session, Depends(get_db)]) -> Candidate:
+    candidate = db.query(Candidate).filter(Candidate.user_id == current.id).first()
+    if candidate is None:
+        candidate = get_or_create_candidate_for_user(db, current)
+    return candidate
+
+
+@app.patch("/candidates/me", response_model=CandidateProfile)
+def update_candidate_profile(
+    payload: CandidateUpdate,
+    current: Annotated[User, Depends(require_roles("candidate"))],
+    db: Annotated[Session, Depends(get_db)],
+) -> Candidate:
+    candidate = db.query(Candidate).filter(Candidate.user_id == current.id).first()
+    if candidate is None:
+        candidate = get_or_create_candidate_for_user(db, current)
+
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(candidate, field, value.strip() if isinstance(value, str) else value)
+
+    db.commit()
+    db.refresh(candidate)
+    return candidate
 
 
 @app.get("/employers/me", response_model=EmployerProfile)

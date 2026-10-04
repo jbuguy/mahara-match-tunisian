@@ -1,8 +1,10 @@
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
+from app.database import SessionLocal
 from app.google_auth import _issue_access_token
 from app.main import app
+from app.models import AuthIdentity, AuthProvider, Candidate, User, ensure_user_has_role, get_or_create_candidate_for_user, get_or_create_user
 from mahara_wp6.auth import decode_token
 from mahara_wp6.config import Settings as WP6Settings
 
@@ -35,3 +37,32 @@ def test_google_access_token_matches_wp6_auth_contract():
 
     assert claims["sub"] == "candidate@example.com"
     assert claims["email"] == "candidate@example.com"
+
+
+def test_canonical_identity_layer_supports_shared_user_and_google_link():
+    with SessionLocal() as db:
+        user = get_or_create_user(db, "Candidate@Example.com", roles=["candidate"])
+
+        assert user.email == "candidate@example.com"
+        assert user.email_verified is True
+        assert "candidate" in user.roles
+
+        ensure_user_has_role(user, "employer")
+        assert {"candidate", "employer"} <= set(user.roles)
+
+        identity = AuthIdentity.link_user(
+            db,
+            user,
+            provider=AuthProvider.GOOGLE,
+            provider_user_id="google-123",
+            email="candidate@example.com",
+            email_verified=True,
+        )
+
+        assert identity.provider is AuthProvider.GOOGLE
+        assert identity.user_id == user.id
+        assert db.query(AuthIdentity).count() == 1
+
+        candidate = get_or_create_candidate_for_user(db, user, onboarding_path="cv_upload")
+        assert candidate.user_id == user.id
+        assert db.query(Candidate).count() == 1

@@ -12,6 +12,8 @@ from fastapi.responses import RedirectResponse
 from jwt import PyJWKClient
 
 from .config import Settings, get_settings
+from .database import get_db
+from .models import AuthIdentity, AuthProvider, User, get_or_create_user
 
 ISSUER = "mahara-match"
 AUDIENCE = "mahara-match-wp6"
@@ -126,6 +128,7 @@ async def finish_google_sign_in(
     state: str | None = None,
     error: str | None = None,
     settings: Settings = Depends(get_settings),
+    db=Depends(get_db),
     jwks: PyJWKClient = Depends(get_google_jwks_client),
 ) -> RedirectResponse:
     if error:
@@ -185,6 +188,17 @@ async def finish_google_sign_in(
         response = RedirectResponse(f"{settings.frontend_url.rstrip('/')}/auth/callback?error=google_email_missing", status_code=303)
         _clear_oauth_cookies(response, settings)
         return response
+
+    user = get_or_create_user(db, email, roles=["candidate"], email_verified=True)
+    AuthIdentity.link_user(
+        db,
+        user,
+        provider=AuthProvider.GOOGLE,
+        provider_user_id=str(google_claims.get("sub", "")),
+        email=email,
+        email_verified=True,
+    )
+    db.commit()
 
     access_token = _issue_access_token(email, google_claims.get("name"), google_claims.get("picture"), settings)
     response = RedirectResponse(f"{settings.frontend_url.rstrip('/')}/auth/callback#access_token={access_token}", status_code=303)
