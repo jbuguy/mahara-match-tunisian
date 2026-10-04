@@ -1,5 +1,16 @@
 fastapi==0.110.0
 uvicorn==0.28.0
+python-multipart>=0.0.9
+httpx<0.28
 openai-whisper==20231117
 pydub==0.25.1
 pygame==2.5.2
+
+
+
+je veux continuer mon travail et faire ceci dans mon sous projet  :Transcrire la réponse vocale (Speech-To-Text / STT)
+Quand l'utilisateur répond dans le micro, tu utilises OpenAI Whisper (disponible gratuitement en Python pour une exécution en local)
+Whisper comprend extrêmement bien la Derja tunisienne et les mots mixtes (comme "2 octobre", "Siliana", "agriculture").
+et avec les tets et tous ca 
+je veux aussi que tu connais que les reponse seront smple tel que l exple donné , 
+alors donne moi 

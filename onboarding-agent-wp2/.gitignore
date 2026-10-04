@@ -27,3 +27,4 @@ offres.csv
 # --- Logs & Fichiers temporaires ---
 *.log
 *.tmp
+audio_test_reponse/
