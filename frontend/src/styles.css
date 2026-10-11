@@ -168,6 +168,26 @@ button {
   padding: 32px;
 }
 
+.auth-card-polished { max-width: 680px; margin: 36px auto; padding: clamp(24px, 5vw, 42px); border-color: rgba(15, 110, 92, 0.14); box-shadow: 0 24px 64px rgba(18, 34, 26, 0.09); }
+.auth-intro > p:last-child { margin: -8px 0 22px; color: var(--ink-soft); line-height: 1.55; }
+.auth-choice-icon { display: grid !important; place-items: center; width: 38px; height: 38px; margin: 0 0 18px !important; border-radius: 12px; background: rgba(15, 110, 92, .09); color: var(--teal-strong) !important; font-size: 1.15rem !important; }
+.signup-role-grid .signup-choice { min-height: 205px; padding: 22px; border-radius: 18px; background: linear-gradient(145deg, #fff, #f7faf8); }
+.signup-role-grid .signup-choice h3 { font-size: 1.1rem; }
+.signup-role-grid .signup-choice p { color: var(--ink-soft); line-height: 1.5; }
+.signup-role-grid .signup-choice span:last-child { margin-top: 6px; }
+.signin-role-grid { margin-top: 8px; }
+.signin-role-grid .signup-choice { min-height: 155px; }
+.auth-method-card { padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: #fafbf9; }
+.auth-method-title { margin: 0 0 4px; font-weight: 700; }
+.auth-method-copy { margin: 0 0 14px; color: var(--ink-soft); font-size: .9rem; }
+.google-btn { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 48px; background: white; }
+.google-g { color: #4285f4; font-size: 1.15rem; font-weight: 800; }
+.auth-divider { margin: 22px 0; }
+.field-hint { color: var(--ink-soft); line-height: 1.4; }
+.auth-form input:focus, .auth-form select:focus { outline: 3px solid rgba(15, 110, 92, .16); border-color: var(--teal); }
+.auth-form button:disabled { cursor: wait; opacity: .7; }
+.text-button { margin: 4px 0; }
+
 .auth-intro h2,
 .panel-header h2,
 .detail-panel h3,
