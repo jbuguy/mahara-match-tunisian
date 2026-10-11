@@ -1,10 +1,11 @@
 import importlib
 import importlib.util
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Annotated
 
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
@@ -20,6 +21,14 @@ from .google_auth import router as google_auth_router
 from .wp2_integration import create_wp2_router
 from .wp3_integration import create_wp3_router
 from .wp4_voice import create_wp4_voice_router
+from .wp5.routers import analytics as wp5_analytics
+from .wp5.routers import ingestion as wp5_ingestion
+from .wp5.routers import market as wp5_market
+from .wp5.routers import monitoring as wp5_monitoring
+from .wp5.routers import occupations as wp5_occupations
+from .wp5.routers import suggestions as wp5_suggestions
+from .wp5.routers import taxonomy as wp5_taxonomy
+from .wp5.metrics import METRICS as WP5_METRICS
 from .models import (
     AuthIdentity,
     AuthProvider,
@@ -91,6 +100,20 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def record_platform_request_metrics(request: Request, call_next):
+    started = time.perf_counter()
+    route = request.scope.get("route")
+    label = f"{request.method} {getattr(route, 'path', request.url.path)}"
+    try:
+        response = await call_next(request)
+    except Exception:
+        WP5_METRICS.record(label, 500, (time.perf_counter() - started) * 1000)
+        raise
+    WP5_METRICS.record(label, response.status_code, (time.perf_counter() - started) * 1000)
+    return response
 app.include_router(
     create_employer_agent_router(
         get_db,
@@ -118,6 +141,16 @@ app.include_router(
     )
 )
 app.include_router(create_wp3_router(get_db, get_current_user, get_wp6_candidate_profile))
+for wp5_router in (
+    wp5_taxonomy.router,
+    wp5_suggestions.router,
+    wp5_occupations.router,
+    wp5_market.router,
+    wp5_ingestion.router,
+    wp5_analytics.router,
+    wp5_monitoring.router,
+):
+    app.include_router(wp5_router, prefix="/api/v1")
 
 
 def check_shared_contracts() -> str:
@@ -150,6 +183,7 @@ def detect_module_status(module_code: str) -> str:
         "wp2": repo_root / "onboarding-agent-wp2",
         "wp3": repo_root / "skill-matching-wp3",
         "wp6": repo_root / "employee-module-wp6",
+        "wp5": repo_root / "admin-ministry-wp5",
     }
     module_path = module_paths.get(module_code)
     if module_path and module_path.exists():
@@ -211,6 +245,16 @@ def build_module_registry() -> list[dict[str, object]]:
             "contracts": wp1_contracts,
             "contract_count": len(wp1_contracts),
         },
+        {
+            "code": "wp5",
+            "name": "Admin & Ministry",
+            "owner": "platform",
+            "description": "Governance of skills, occupations, market data and ministry analytics",
+            "status": detect_module_status("wp5"),
+            "shared_contracts": shared_status,
+            "contracts": wp1_contracts,
+            "contract_count": len(wp1_contracts),
+        },
     ]
 
 
@@ -222,6 +266,12 @@ def get_health() -> dict[str, str]:
         "environment": settings.environment,
         "version": settings.app_version,
     }
+
+
+@app.get("/api/v1/me/roles")
+def get_my_roles(current: Annotated[User, Depends(get_current_user)]) -> dict[str, list[str]]:
+    """Expose the signed-in user's effective platform roles for role-aware navigation."""
+    return {"roles": sorted({str(role).strip().lower() for role in current.roles})}
 
 
 @app.get("/ready")
