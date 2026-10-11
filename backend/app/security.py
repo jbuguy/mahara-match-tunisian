@@ -63,7 +63,7 @@ def get_current_user(
     try:
         payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
         email = str(payload.get("email") or payload.get("sub") or "").strip().lower()
-        if not email:
+        if not email or not payload.get("user_id"):
             raise credentials_error
     except (JWTError, ValueError):
         raise credentials_error from None

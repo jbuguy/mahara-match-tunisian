@@ -11,6 +11,7 @@ import { CandidateStartPage } from './pages/CandidateStartPage'
 import { MatchesPage } from './pages/MatchesPage'
 import { SignInPage } from './pages/SignInPage'
 import { SignUpPage } from './pages/SignUpPage'
+import { MinistryPage } from './pages/MinistryPage'
 
 type HealthResponse = {
   status: string
@@ -39,7 +40,7 @@ function PlatformShell({
   loading: boolean
 }) {
   const location = useLocation()
-  const [account, setAccount] = useState<{ kind: 'candidate'; hasProfile: boolean } | { kind: 'employer' } | null>(null)
+  const [account, setAccount] = useState<{ kind: 'candidate'; hasProfile: boolean } | { kind: 'employer' } | { kind: 'ministry' } | null>(null)
   const [accountLoading, setAccountLoading] = useState(true)
 
   useEffect(() => {
@@ -54,14 +55,20 @@ function PlatformShell({
         return
       }
       setAccountLoading(true)
-      const [candidate, employer] = await Promise.allSettled([
-        requestJson<{ has_profile: boolean }>('/api/v1/me'),
-        requestJson<{ email: string }>('/employers/me'),
-      ])
+      const roleResult = await Promise.allSettled([requestJson<{ roles: string[] }>('/api/v1/me/roles')])
       if (!active) return
-      if (candidate.status === 'fulfilled') setAccount({ kind: 'candidate', hasProfile: candidate.value.has_profile })
-      else if (employer.status === 'fulfilled') setAccount({ kind: 'employer' })
-      else setAccount(null)
+      const roles = roleResult.status === 'fulfilled' ? roleResult.value.roles : []
+      if (roles.includes('ministry_admin')) setAccount({ kind: 'ministry' })
+      else if (roles.includes('candidate')) {
+        const candidate = await Promise.allSettled([requestJson<{ has_profile: boolean }>('/api/v1/me')])
+        if (!active) return
+        setAccount(candidate.status === 'fulfilled' ? { kind: 'candidate', hasProfile: candidate.value.has_profile } : null)
+      } else if (roles.includes('employer')) setAccount({ kind: 'employer' })
+      else {
+        const employer = await Promise.allSettled([requestJson<{ email: string }>('/employers/me')])
+        if (!active) return
+        setAccount(employer.status === 'fulfilled' ? { kind: 'employer' } : null)
+      }
       setAccountLoading(false)
     }
 
@@ -101,6 +108,10 @@ function PlatformShell({
               <NavLink to="/dashboard" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>Overview</NavLink>
               <NavLink to="/employer" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>Offers</NavLink>
             </>}
+            {!accountLoading && account?.kind === 'ministry' && <>
+              <NavLink to="/dashboard" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>Overview</NavLink>
+              <NavLink to="/ministry" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>Ministry workspace</NavLink>
+            </>}
           </nav>
 
           <div className="sidebar-panel">
@@ -121,6 +132,7 @@ function PlatformShell({
             <Route path="/candidate" element={<CandidatePage />} />
             <Route path="/matches" element={<MatchesPage />} />
             <Route path="/employer" element={<EmployerPage />} />
+            <Route path="/ministry" element={<MinistryPage />} />
           </Routes>
         </section>
       </div>
