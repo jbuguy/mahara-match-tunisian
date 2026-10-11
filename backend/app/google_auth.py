@@ -18,13 +18,13 @@ from .models import AuthIdentity, AuthProvider, User, get_or_create_user
 ISSUER = "mahara-match"
 AUDIENCE = "mahara-match-wp6"
 router = APIRouter(prefix="/auth", tags=["auth"])
-GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
+GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/auth"
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 GOOGLE_ISSUERS = {"accounts.google.com", "https://accounts.google.com"}
 GOOGLE_JWKS_URL = "https://www.googleapis.com/oauth2/v3/certs"
 STATE_COOKIE = "mahara_oauth_state"
 VERIFIER_COOKIE = "mahara_oauth_verifier"
-COOKIE_PATH = "/auth/google"
+COOKIE_PATH = "/auth"
 TOKEN_LIFETIME = timedelta(minutes=60)
 
 
@@ -43,12 +43,20 @@ def _secure_cookie(settings: Settings) -> bool:
 
 def _clear_oauth_cookies(response: RedirectResponse, settings: Settings) -> None:
     for name in (STATE_COOKIE, VERIFIER_COOKIE):
-        response.delete_cookie(name, path=COOKIE_PATH, secure=_secure_cookie(settings), httponly=True, samesite="lax")
+        response.delete_cookie(
+            name,
+            path=COOKIE_PATH,
+            secure=_secure_cookie(settings),
+            httponly=True,
+            samesite="lax",
+        )
 
 
 def _decode_google_id_token(token: str, jwks: PyJWKClient, settings: Settings) -> dict:
     if not settings.google_client_id:
-        raise HTTPException(status_code=503, detail="Google authentication is not configured")
+        raise HTTPException(
+            status_code=503, detail="Google authentication is not configured"
+        )
     try:
         claims = jwt.decode(
             token,
@@ -58,9 +66,13 @@ def _decode_google_id_token(token: str, jwks: PyJWKClient, settings: Settings) -
             options={"require": ["exp", "sub", "email", "iss"]},
         )
     except jwt.PyJWKClientConnectionError as exc:
-        raise HTTPException(status_code=503, detail="Google authentication keys unavailable") from exc
+        raise HTTPException(
+            status_code=503, detail="Google authentication keys unavailable"
+        ) from exc
     except jwt.PyJWTError as exc:
-        raise HTTPException(status_code=401, detail="Invalid Google identity token") from exc
+        raise HTTPException(
+            status_code=401, detail="Invalid Google identity token"
+        ) from exc
 
     if claims.get("iss") not in GOOGLE_ISSUERS:
         raise HTTPException(status_code=401, detail="Invalid Google identity token")
@@ -69,9 +81,13 @@ def _decode_google_id_token(token: str, jwks: PyJWKClient, settings: Settings) -
     return claims
 
 
-def _issue_access_token(email: str, name: str | None, picture: str | None, settings: Settings) -> str:
+def _issue_access_token(
+    email: str, name: str | None, picture: str | None, settings: Settings
+) -> str:
     if not settings.jwt_secret or len(settings.jwt_secret.encode("utf-8")) < 32:
-        raise HTTPException(status_code=503, detail="Google authentication is not configured")
+        raise HTTPException(
+            status_code=503, detail="Google authentication is not configured"
+        )
     now = datetime.now(UTC)
     claims = {
         "sub": email,
@@ -87,13 +103,21 @@ def _issue_access_token(email: str, name: str | None, picture: str | None, setti
 
 
 @router.get("/google")
-def start_google_sign_in(settings: Settings = Depends(get_settings)) -> RedirectResponse:
+def start_google_sign_in(
+    settings: Settings = Depends(get_settings),
+) -> RedirectResponse:
     if not settings.google_client_id or not settings.google_client_secret:
-        raise HTTPException(status_code=503, detail="Google authentication is not configured")
+        raise HTTPException(
+            status_code=503, detail="Google authentication is not configured"
+        )
 
     state = secrets.token_urlsafe(32)
     verifier = secrets.token_urlsafe(64)
-    challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode("ascii")).digest()).rstrip(b"=").decode("ascii")
+    challenge = (
+        base64.urlsafe_b64encode(hashlib.sha256(verifier.encode("ascii")).digest())
+        .rstrip(b"=")
+        .decode("ascii")
+    )
 
     query = urlencode(
         {
@@ -132,12 +156,16 @@ async def finish_google_sign_in(
     jwks: PyJWKClient = Depends(get_google_jwks_client),
 ) -> RedirectResponse:
     if error:
-        response = RedirectResponse(f"{settings.frontend_url.rstrip('/')}/auth/callback?error={error}", status_code=303)
+        response = RedirectResponse(
+            f"{settings.frontend_url.rstrip('/')}/auth/callback?error={error}",
+            status_code=303,
+        )
         _clear_oauth_cookies(response, settings)
         return response
 
     expected_state = request.cookies.get(STATE_COOKIE)
     verifier = request.cookies.get(VERIFIER_COOKIE)
+
     if not code or not state or not expected_state or not secrets.compare_digest(state, expected_state) or not verifier:
         response = RedirectResponse(f"{settings.frontend_url.rstrip('/')}/auth/callback?error=oauth_state_invalid", status_code=303)
         _clear_oauth_cookies(response, settings)
@@ -163,13 +191,19 @@ async def finish_google_sign_in(
             token_response.raise_for_status()
             token_data = token_response.json()
     except (httpx.HTTPError, ValueError):
-        response = RedirectResponse(f"{settings.frontend_url.rstrip('/')}/auth/callback?error=google_token_exchange_failed", status_code=303)
+        response = RedirectResponse(
+            f"{settings.frontend_url.rstrip('/')}/auth/callback?error=google_token_exchange_failed",
+            status_code=303,
+        )
         _clear_oauth_cookies(response, settings)
         return response
 
     identity_token = token_data.get("id_token")
     if not isinstance(identity_token, str):
-        response = RedirectResponse(f"{settings.frontend_url.rstrip('/')}/auth/callback?error=google_identity_missing", status_code=303)
+        response = RedirectResponse(
+            f"{settings.frontend_url.rstrip('/')}/auth/callback?error=google_identity_missing",
+            status_code=303,
+        )
         _clear_oauth_cookies(response, settings)
         return response
 
@@ -185,7 +219,10 @@ async def finish_google_sign_in(
 
     email = str(google_claims.get("email", "")).strip().lower()
     if not email:
-        response = RedirectResponse(f"{settings.frontend_url.rstrip('/')}/auth/callback?error=google_email_missing", status_code=303)
+        response = RedirectResponse(
+            f"{settings.frontend_url.rstrip('/')}/auth/callback?error=google_email_missing",
+            status_code=303,
+        )
         _clear_oauth_cookies(response, settings)
         return response
 
@@ -200,8 +237,13 @@ async def finish_google_sign_in(
     )
     db.commit()
 
-    access_token = _issue_access_token(email, google_claims.get("name"), google_claims.get("picture"), settings)
-    response = RedirectResponse(f"{settings.frontend_url.rstrip('/')}/auth/callback#access_token={access_token}", status_code=303)
+    access_token = _issue_access_token(
+        email, google_claims.get("name"), google_claims.get("picture"), settings
+    )
+    response = RedirectResponse(
+        f"{settings.frontend_url.rstrip('/')}/auth/callback#access_token={access_token}",
+        status_code=303,
+    )
     response.headers["Cache-Control"] = "no-store"
     response.headers["Referrer-Policy"] = "no-referrer"
     _clear_oauth_cookies(response, settings)
