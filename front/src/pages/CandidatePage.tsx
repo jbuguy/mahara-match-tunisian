@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom'
 
 import { requestJson, ONBOARDING_SESSION_KEY } from '../lib/api'
 import { useVoiceInput } from '../lib/useVoiceInput'
+import { ChatPanel, type ChatMessage } from '../components/ChatPanel'
 
 type Identity = { email: string; name: string | null; has_profile: boolean }
 type Governorate = { code: string; name_fr: string; name_ar: string }
@@ -37,7 +38,6 @@ type CvDraft = {
   }
   unmatched_words: string[]
 }
-type AssistantMessage = { role: 'user' | 'assistant'; content: string }
 type OnboardingSession = { session_id: string; termine: boolean; answers: Record<string, string> }
 type OnboardingDraft = {
   sessionId?: string
@@ -96,7 +96,7 @@ export function CandidatePage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [importingCv, setImportingCv] = useState(false)
-  const [assistantMessages, setAssistantMessages] = useState<AssistantMessage[]>([])
+  const [assistantMessages, setAssistantMessages] = useState<ChatMessage[]>([])
   const [assistantInput, setAssistantInput] = useState('')
   const [assistantError, setAssistantError] = useState('')
   const [assistantPending, setAssistantPending] = useState(false)
@@ -371,22 +371,30 @@ export function CandidatePage() {
         {error && <p className="form-error" role="alert">{error}</p>}
         <button className="primary-btn" type="submit" disabled={saving}>{saving ? 'Saving…' : 'Save profile'}</button>
       </form>
-      <section id="assistant" className="detail-panel assistant-chat">
-        <div><p className="eyebrow">WP6 · Profile assistant</p><h3>Get help completing your profile</h3></div>
-        <div className="assistant-transcript" aria-live="polite">{assistantMessages.map((item, index) => <div className={`conversation-message ${item.role}`} key={`${index}-${item.role}`}><span>{item.role === 'assistant' ? 'Mahara' : 'You'}</span><p>{item.content}</p></div>)}{assistantMessages.length === 0 && <p>Ask for help describing your experience, skills, or next career step.</p>}</div>
-        <form className="conversation-form" onSubmit={askAssistant}>
-          <textarea aria-label="Message to profile assistant" rows={2} value={assistantInput} onChange={(event) => setAssistantInput(event.target.value)} placeholder="Write in French, Arabic, or Derja…" required />
-          {assistantVoice.error && <p className="form-error" role="alert">{assistantVoice.error}</p>}
-          <div className="assistant-chat-tools">
-            <button className={assistantVoice.recording ? 'secondary-btn voice-recording' : 'secondary-btn'} type="button" onClick={assistantVoice.recording ? assistantVoice.stop : assistantVoice.start} disabled={assistantPending || assistantVoice.transcribing}>
-              {assistantVoice.recording ? 'Stop speaking' : assistantVoice.transcribing ? 'Transcribing…' : 'Parler'}
-            </button>
-            <button className="secondary-btn" type="submit" disabled={assistantPending || assistantVoice.transcribing || !assistantInput.trim()}>{assistantPending ? 'Thinking…' : 'Ask assistant'}</button>
-          </div>
-          {assistantVoice.recording && <p role="status">Recording. Stop when you are done; transcripts can be edited before sending.</p>}
-        </form>
-        {assistantError && <p className="form-error" role="alert">{assistantError}</p>}
-      </section>
+      <div id="assistant">
+        <ChatPanel
+          variant="dedicated"
+          eyebrow="WP6 · Profile assistant"
+          title="Get help completing your profile"
+          description="Talk through your experience and review the profile fields before saving."
+          messages={assistantMessages}
+          value={assistantInput}
+          onValueChange={setAssistantInput}
+          onSubmit={askAssistant}
+          pending={assistantPending || assistantVoice.transcribing}
+          pendingLabel={assistantVoice.transcribing ? 'Transcribing…' : 'Thinking…'}
+          error={assistantError || assistantVoice.error}
+          placeholder="Write in French, Arabic, or Derja…"
+          inputLabel="Message to profile assistant"
+          emptyMessage="Ask for help describing your experience, skills, or next career step."
+          submitLabel="Ask assistant"
+          composerDisabled={assistantVoice.transcribing}
+          composerActions={<button className={assistantVoice.recording ? 'secondary-btn voice-recording' : 'secondary-btn'} type="button" onClick={assistantVoice.recording ? assistantVoice.stop : assistantVoice.start} disabled={assistantPending || assistantVoice.transcribing}>
+            {assistantVoice.recording ? 'Stop speaking' : 'Parler'}
+          </button>}
+          statusNote={assistantVoice.recording ? <p className="chat-panel-note" role="status">Recording. Stop when you are done; you can edit the transcript before sending.</p> : null}
+        />
+      </div>
     </div>
   )
 }

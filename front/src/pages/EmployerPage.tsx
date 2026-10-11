@@ -3,8 +3,8 @@ import { Link } from 'react-router-dom'
 
 import { decideApplication, getEmployerApplications, requestJson, type EmployerApplication } from '../lib/api'
 import { useVoiceInput } from '../lib/useVoiceInput'
+import { ChatPanel, type ChatMessage } from '../components/ChatPanel'
 
-type ChatMessage = { role: 'assistant' | 'user'; content: string }
 type OfferDraft = { title: string; description: string; status: string; location?: { governorate_code?: string; delegation?: string | null } }
 type AgentSession = { id: string; messages: ChatMessage[]; complete: boolean; draft: OfferDraft | null }
 
@@ -129,21 +129,29 @@ export function EmployerPage() {
       </section>
       {!session && <section className="detail-panel"><h3>Offer assistant</h3><p>Build a job offer with the guided interview. Review the generated draft before publishing.</p><button className="secondary-btn" type="button" onClick={startOffer} disabled={pending}>{pending ? 'Starting…' : 'Start guided offer'}</button></section>}
       {session && <div className="journey-grid">
-        <section className="detail-panel offer-conversation">
-          <h3>Guided offer interview</h3>
-          <div className="conversation-log" aria-live="polite">{session.messages.map((item, index) => <div className={`conversation-message ${item.role}`} key={`${index}-${item.role}`}><span>{item.role === 'assistant' ? 'Mahara' : 'You'}</span><p>{item.content}</p></div>)}</div>
-          {!session.draft && <form className="conversation-form" onSubmit={sendMessage}>
-            <textarea aria-label="Your answer" rows={3} value={message} onChange={(event) => setMessage(event.target.value)} placeholder="Write your answer…" required />
-            {voice.error && <p className="form-error" role="alert">{voice.error}</p>}
-            {voice.recording && <p role="status">Recording. Stop when you are done; the transcript can be edited before sending.</p>}
-            <div className="assistant-chat-tools">
-              <button className={voice.recording ? 'secondary-btn voice-recording' : 'secondary-btn'} type="button" onClick={voice.recording ? voice.stop : voice.start} disabled={pending || voice.transcribing}>
-                {voice.recording ? 'Stop speaking' : voice.transcribing ? 'Transcribing…' : 'Parler'}
-              </button>
-              <button className="primary-btn" type="submit" disabled={pending || voice.transcribing || !message.trim()}>{pending ? 'Sending…' : 'Send answer'}</button>
-            </div>
-          </form>}
-        </section>
+        <ChatPanel
+          variant="compact"
+          className="offer-conversation"
+          eyebrow="Employer · guided setup"
+          title="Guided offer interview"
+          description="Answer a few questions, then review the generated offer before publishing."
+          messages={session.messages}
+          value={message}
+          onValueChange={setMessage}
+          onSubmit={sendMessage}
+          pending={pending || voice.transcribing}
+          pendingLabel={voice.transcribing ? 'Transcribing…' : 'Sending…'}
+          error={voice.error}
+          placeholder="Write your answer…"
+          inputLabel="Your answer"
+          emptyMessage="Start by answering Mahara’s first question."
+          submitLabel="Send answer"
+          composerDisabled={Boolean(session.draft) || voice.transcribing}
+          composerActions={<button className={voice.recording ? 'secondary-btn voice-recording' : 'secondary-btn'} type="button" onClick={voice.recording ? voice.stop : voice.start} disabled={pending || voice.transcribing}>
+            {voice.recording ? 'Stop speaking' : 'Parler'}
+          </button>}
+          statusNote={voice.recording ? <p className="chat-panel-note" role="status">Recording. Stop when you are done; you can edit the transcript before sending.</p> : null}
+        />
         <section className="detail-panel">
           <h3>{session.draft ? 'Offer draft' : 'Your progress'}</h3>
           {session.draft ? <div className="job-card"><h4>{session.draft.title}</h4><p>{session.draft.location?.governorate_code ?? 'Location to confirm'}{session.draft.location?.delegation ? ` · ${session.draft.location.delegation}` : ''}</p><p>{session.draft.description}</p><span className="module-tag">{session.draft.status}</span>{session.draft.status !== 'published' && <button className="primary-btn publish-btn" type="button" onClick={publishOffer} disabled={pending}>{pending ? 'Publishing…' : 'Publish offer'}</button>}</div> : <p>{session.complete ? 'The interview is complete; the assistant is preparing the draft.' : 'Answer the assistant’s questions. Your offer is not published until you confirm it.'}</p>}

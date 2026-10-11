@@ -71,6 +71,7 @@ llm_client = OpenAICompatibleClient(
         model=settings.llm_model,
         api_key=settings.llm_api_key,
         timeout_seconds=settings.llm_timeout_seconds,
+        embedding_model=settings.llm_embedding_model,
     )
 )
 
@@ -130,7 +131,7 @@ app.include_router(create_offer_router(get_db, get_current_user))
 app.include_router(create_onboarding_router(get_db, get_current_user))
 read_candidate_profile = register_employee_routes(app, settings, get_db)
 app.include_router(create_employer_voice_router())
-app.include_router(create_matching_router(get_db, get_current_user, read_candidate_profile))
+app.include_router(create_matching_router(get_db, get_current_user, read_candidate_profile, llm_client=llm_client))
 for ministry_router in (
     ministry_taxonomy.router,
     ministry_suggestions.router,
