@@ -1,135 +1,69 @@
-# mahara match — AI-Powered Job Matching Platform (Tunisia)
+# Mahara Match
 
-An AI-powered platform tackling youth unemployment in Tunisia by addressing four distinct sub-problems: degree/skills mismatch, hiring discrimination, women exiting the labor force, and the gap between job-seeker expectations and market reality — for **both skilled/graduate and unskilled/informal workers**.
+Mahara Match is one React frontend and one FastAPI backend for candidate onboarding, job matching, employer hiring, and ministry governance. The frontend is in `front/`; backend feature modules, shared contracts, and providers are in `back/`.
 
-> Status: Academic project (final deliverable = deployed platform, not just a prototype).
+## Features
 
----
+- Candidate sign-in, profile editing, voice onboarding, CV import, assistant, job matches, roadmaps, and applications.
+- Employer offer drafting, voice input, publishing, and applicant review.
+- Ministry skills and occupation governance, market data ingestion, analytics, and monitoring.
+- Shared PostgreSQL models/contracts, authentication, database sessions, error handling, LLM clients, and voice helpers.
 
-## Problem statement
+## Local setup
 
-Unemployment in Tunisia isn't one problem — it's four:
+Requirements: Python 3.11+, Node.js 18+, and PostgreSQL. Configure `back/.env` from `back/.env.example`; set `DATABASE_URL` and a strong `JWT_SECRET`. Optional Google OAuth, Groq, and OpenAI-compatible LLM settings are documented in that file.
 
-| # | Sub-problem | Target group |
-|---|---|---|
-| A | Degree/skills mismatch — graduate unemployment rising (24.2%, up from 22.5%) despite falling overall unemployment | Graduates |
-| B | Hiring discrimination — 14.2% unemployment for male graduates vs 32% for equally qualified women | Graduates, esp. women |
-| C | Women exiting the labor force — ~29% female labor participation vs ~64% male; 71%+ of working-age women outside the labor market entirely | Women |
-| D | Expectations vs. market reality — search friction, sector avoidance, ~2/3 of youth prefer entrepreneurship over existing jobs | Skilled & unskilled |
+Apply ordered SQL migrations and start the API in one terminal:
 
-**Design principle**: we explicitly serve both skilled/graduate workers *and* unskilled/informal workers, who are easier to overlook (no CV, no formal history, possible literacy constraints). Every feature is checked against: *"does this work for someone with no formal CV?"*
-
----
-
-## Architecture: Work Packages
-
-| WP | Name | Scope |
-|---|---|---|
-| WP1 | Data Layer | — | Shared schema, storage, logs |
-| WP2 | Onboarding Agent | — | Dialect-first conversational onboarding, shared LLM |
-| WP3 | Skill Matching Engine | — | Skill profile extraction, scoring, matching |
-| **WP4** | **Employer Module** | Employer accounts, AI-assisted job posting, bias check, candidate dashboard, feedback loop |
-| WP5 | — | — |
-| WP6 | Employee Module  | Job-seeker-facing experience |
-
-Each WP has its own service/module and README under `/services/*` 
-
----
-
-## AI Features
-
-| Feature | Sub-problems addressed | WP |
-|---|---|---|
-| Employer-side agent (conversational job-post generation) | B, D | WP4 |
-| Case-worker agent (multi-week plan for informal workers) | C, D | WP6/WP2 |
-| Bias check on job posts | B | WP4 |
-| Skill-to-job matcher | A, D | WP3 |
-| Interview + negotiation prep agent | A, D | WP6 |
-| Path-builder for informal workers | C, D | WP6/WP2 |
-| Sector reality simulator | D | WP6 |
-| Fraud/scam post detection | — | WP4 (stretch) |
-
-Feature list is a working hypothesis — to be validated with real users (both skilled and unskilled) before finalizing.
-
----
-
-## Tech stack
-
-- **Backend**: FastAPI (Python)
-- **Frontend**: React / Next.js
-- **Database**: PostgreSQL (+ pgvector where needed)
-- **Vector search**: pgvector in PostgreSQL; no separate vector database is needed for the current schema
-- **LLM serving**: vLLM / TGI / Ollama — one shared model endpoint, consumed by all WPs (avoid duplicating model hosting per WP)
-- **Models**: Open-weight, Arabic/Derja-capable (e.g. Jais, AceGPT, or Qwen2.5/Llama 3.1 as multilingual fallback)
-- **Auth**: JWT
-- **Containerization**: Docker / Docker Compose
-- **CI/CD**: GitHub Actions
-- **Deployment target**: [cloud provider TBD — AWS/GCP/Azure/university cloud]
-
----
-
-## Data strategy
-
-Hybrid approach:
-1. **MVP phase**: open datasets (e.g. O*NET, BLS) to validate core flows (matching, sector preview, skill mapping) with low legal risk.
-2. **In parallel**: build a Tunisia-compliant pipeline — prioritize partnerships/licensed APIs over scraping, add Tunisia-specific sector taxonomy, cover French/Arabic/Tunisian dialect, validate against a small curated sample of real Tunisian job posts.
-
-No PII stored unless strictly necessary and consented; anonymized/aggregated analytics preferred.
-
----
-
-## Getting started
-
-### Prerequisites
-- Docker & Docker Compose
-- Python 3.11+
-- Node.js 18+ (frontend)
-- Access to the shared LLM endpoint (see `/docs/llm-access.md`)
-
-### Local setup
-```bash
-git clone [repo-url]
-cd [repo-name]
-cp .env.example .env   # fill in DB creds, LLM endpoint, JWT secret
-docker compose up --build
+```powershell
+cd back
+python -m pip install -r requirements.txt
+python -m app.migrate
+python -m uvicorn app.main:app --reload --port 8000
 ```
 
-### Running a single WP service (e.g. WP4)
-```bash
-cd services/wp4-employer-module
-uvicorn app.main:app --reload
-```
----
+Start the frontend in another terminal:
 
-## Repo structure (proposed)
-
-```
-/services
-  /wp1-data-layer
-  /wp2-onboarding-agent
-  /wp3-skill-matching
-  /wp4-employer-module
-  /wp6-employee-module
-/docs
-  llm-access.md
-  data-strategy.md
-  deployment.md
-/infra
-  docker-compose.yml
-.github/workflows/
+```powershell
+cd front
+npm install
+npm run dev
 ```
 
----
+For voice transcription, install FFmpeg and ensure `ffmpeg` is on `PATH`. The faster-whisper model is downloaded on first use. LLM features require the configured provider; the app can start without external provider credentials.
 
-## Contributing
+## Verification
 
-- One feature branch per user story (e.g. `wp4/employer-account-creation`)
-- PRs require at least one review
-- Don't modify another WP's shared schema/tables without flagging it in the relevant Slack channel first
-- Keep each WP's README up to date with its own endpoints/setup
+```powershell
+cd back
+python -m pytest -q
+```
 
----
+```powershell
+cd front
+npm run build
+```
 
-## License
+## Repository layout
 
-[TBD]
+```text
+back/
+  app/
+    features/
+      employee/       # candidate profile, CV, assistant, shared employee API
+      employer/       # employer agent and voice transcription route
+      matching/       # ranking, roadmap, and matching API
+      onboarding/     # voice intake, transcription, question audio, offer text
+      ministry/       # ministry governance and analytics
+  mahara_data/        # canonical ORM models and Pydantic contracts
+  mahara_voice/       # shared audio utilities
+  shared_llm/         # shared OpenAI-compatible client
+  contracts/          # published JSON Schema documents
+front/
+  src/
+    lib/              # shared API client and browser helpers
+    pages/            # unified routes and feature pages
+migrations/           # ordered PostgreSQL migrations
+```
+
+Historical work-package design documents are retained under `docs/work-packages/`; they are not imported or launched by the application.
