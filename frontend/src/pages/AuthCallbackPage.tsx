@@ -18,8 +18,8 @@ export function AuthCallbackPage() {
 
     if (accessToken) {
       localStorage.setItem('mahara_access_token', accessToken)
-      void requestJson('/api/v1/me')
-        .then(() => navigate('/dashboard', { replace: true }))
+      void requestJson<{ has_profile: boolean }>('/api/v1/me')
+        .then((account) => navigate(account.has_profile ? '/dashboard' : '/candidate/start', { replace: true }))
         .catch(() => navigate('/dashboard', { replace: true }))
       return
     }

@@ -17,18 +17,36 @@ Installation :
     (pydub nécessite ffmpeg installé sur la machine : https://ffmpeg.org/download.html)
 """
 
+import importlib
+import logging
 import os
 import re
+import threading
 from dataclasses import dataclass
 from typing import Optional
 
-from faster_whisper import WhisperModel
 from pydub import AudioSegment
 from rapidfuzz import fuzz, process
 
-print("Chargement du modèle Whisper 'small' (faster-whisper, CPU, int8)...")
-model = WhisperModel("small", device="cpu", compute_type="int8")
-print("Modèle prêt !")
+logger = logging.getLogger(__name__)
+_model_lock = threading.Lock()
+_inference_slots = threading.BoundedSemaphore(max(1, int(os.getenv("WP2_STT_CONCURRENCY", "1"))))
+
+
+def _get_model():
+    global model
+    if model is None:
+        with _model_lock:
+            if model is None:
+                faster_whisper = importlib.import_module("faster_whisper")
+                model_name = os.getenv("WP2_STT_MODEL", "small")
+                device = os.getenv("WP2_STT_DEVICE", "cpu")
+                compute_type = os.getenv("WP2_STT_COMPUTE_TYPE", "int8")
+                logger.info("Loading WP2 transcription model %s (%s/%s)", model_name, device, compute_type)
+                model = faster_whisper.WhisperModel(model_name, device=device, compute_type=compute_type)
+    return model
+
+model = None
 
 GOUVERNORATS = [
     "Tunis", "Ariana", "Ben Arous", "Manouba", "Nabeul", "Zaghouan", "Bizerte",
@@ -126,18 +144,21 @@ def transcrire_brut(chemin_audio: str, type_reponse: str = "") -> str:
     if not os.path.exists(chemin_audio):
         raise FileNotFoundError(f"Fichier introuvable : {chemin_audio}")
     chemin_final = preparer_audio_court(chemin_audio)
-    segments, _info = model.transcribe(
-        chemin_final,
-        language="ar",
-        initial_prompt=construire_prompt(type_reponse),
-        temperature=(0.0, 0.2, 0.4, 0.6, 0.8, 1.0),
-        condition_on_previous_text=False,
-        vad_filter=False,
-        beam_size=5,
-    )
-    texte = " ".join(seg.text for seg in segments).strip()
-    if chemin_final != chemin_audio and os.path.exists(chemin_final):
-        os.remove(chemin_final)
+    try:
+        with _inference_slots:
+            segments, _info = _get_model().transcribe(
+                chemin_final,
+                language="ar",
+                initial_prompt=construire_prompt(type_reponse),
+                temperature=(0.0, 0.2, 0.4, 0.6, 0.8, 1.0),
+                condition_on_previous_text=False,
+                vad_filter=False,
+                beam_size=5,
+            )
+            texte = " ".join(seg.text for seg in segments).strip()
+    finally:
+        if chemin_final != chemin_audio and os.path.exists(chemin_final):
+            os.remove(chemin_final)
     return texte
 
 

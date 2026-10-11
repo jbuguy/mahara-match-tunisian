@@ -1,0 +1,12 @@
+[project]
+name = "mahara-shared-voice"
+version = "0.1.0"
+description = "Shared audio input and transcription primitives for Mahara Match work packages"
+requires-python = ">=3.11"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["mahara_voice*"]

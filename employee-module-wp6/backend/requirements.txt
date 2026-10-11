@@ -8,6 +8,7 @@ python-multipart
 pypdf
 python-docx
 groq
+-e ../../shared-voice
 pytest
 httpx
 httpx2
