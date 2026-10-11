@@ -11,6 +11,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
+from mahara_voice import read_limited
 
 from mahara_data.db.models.candidates import ConversationSession
 from mahara_data.enums import ConversationChannel, OnboardingPath, ProcessingStatus
@@ -166,7 +167,7 @@ def create_wp2_router(get_db: Any, get_current_user: Any) -> APIRouter:
         if question is None:
             raise HTTPException(status_code=409, detail="Cette session est déjà terminée")
 
-        content = audio.file.read(MAX_AUDIO_BYTES + 1)
+        content = read_limited(audio.file, MAX_AUDIO_BYTES)
         if not content:
             raise HTTPException(
                 status_code=400,

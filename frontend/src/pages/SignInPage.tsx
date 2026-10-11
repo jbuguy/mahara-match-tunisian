@@ -26,7 +26,12 @@ export function SignInPage() {
       })
       localStorage.setItem('mahara_access_token', token.access_token)
       window.dispatchEvent(new Event('mahara-auth-changed'))
-      navigate('/dashboard', { replace: true })
+      if (role === 'candidate') {
+        const account = await requestJson<{ has_profile: boolean }>('/api/v1/me')
+        navigate(account.has_profile ? '/dashboard' : '/candidate/start', { replace: true })
+      } else {
+        navigate('/dashboard', { replace: true })
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to sign in. Check your details and try again.')
     } finally {

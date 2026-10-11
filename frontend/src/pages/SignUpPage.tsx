@@ -28,7 +28,7 @@ export function SignUpPage() {
       if (role === 'candidate') {
         await requestJson('/candidates/signup', {
           method: 'POST',
-          body: JSON.stringify({ full_name: fullName.trim(), email, password, onboarding_path: 'voice' }),
+          body: JSON.stringify({ full_name: fullName.trim(), email, password, onboarding_path: 'cv_upload' }),
         })
       } else {
         await requestJson('/employers/signup', {
@@ -41,7 +41,7 @@ export function SignUpPage() {
       })
       localStorage.setItem('mahara_access_token', token.access_token)
       window.dispatchEvent(new Event('mahara-auth-changed'))
-      navigate('/dashboard', { replace: true })
+      navigate(role === 'candidate' ? '/candidate/start' : '/dashboard', { replace: true })
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'Unable to create your account. Please try again.')
     } finally {
