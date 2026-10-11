@@ -1,19 +1,18 @@
 """Published-offer queries for the candidate journey."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
-
-from sqlalchemy import or_
-from sqlalchemy.orm import Session
 
 from mahara_data.db.models.employers import Application, JobOffer, JobOfferSkill
 from mahara_data.db.models.matching import MatchResult
 from mahara_data.db.models.taxonomy import Skill
 from mahara_data.enums import OfferStatus
+from sqlalchemy import or_
+from sqlalchemy.orm import Session
 
 
 def list_published_offers(db: Session, candidate_id: UUID):
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return (
         db.query(JobOffer, MatchResult, Application)
         .outerjoin(
@@ -26,8 +25,14 @@ def list_published_offers(db: Session, candidate_id: UUID):
             JobOffer.status == OfferStatus.PUBLISHED,
             or_(JobOffer.expires_at.is_(None), JobOffer.expires_at > now),
         )
-        .outerjoin(Application, (Application.job_offer_id == JobOffer.id) & (Application.candidate_id == candidate_id))
-        .order_by(MatchResult.score_global.desc().nullslast(), JobOffer.published_at.desc())
+        .outerjoin(
+            Application,
+            (Application.job_offer_id == JobOffer.id)
+            & (Application.candidate_id == candidate_id),
+        )
+        .order_by(
+            MatchResult.score_global.desc().nullslast(), JobOffer.published_at.desc()
+        )
         .all()
     )
 

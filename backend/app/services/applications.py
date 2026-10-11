@@ -2,18 +2,24 @@
 
 import uuid
 
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
-
 from mahara_data.db.models.candidates import Candidate
-from mahara_data.db.models.employers import Application, Employer, HiringFeedback, JobOffer
+from mahara_data.db.models.employers import (
+    Application,
+    Employer,
+    HiringFeedback,
+    JobOffer,
+)
 from mahara_data.db.models.matching import MatchResult
 from mahara_data.enums import ApplicationStatus, HiringDecision, OfferStatus
 from mahara_data.schemas.application import (
     ApplicationCreate,
     ApplicationRead,
+)
+from mahara_data.schemas.application import (
     HiringFeedback as HiringFeedbackContract,
 )
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 from ..repositories import applications as repository
 

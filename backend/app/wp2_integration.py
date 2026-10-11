@@ -10,11 +10,10 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
-from sqlalchemy.orm import Session
-from mahara_voice import read_limited
-
 from mahara_data.db.models.candidates import ConversationSession
 from mahara_data.enums import ConversationChannel, OnboardingPath, ProcessingStatus
+from mahara_voice import read_limited
+from sqlalchemy.orm import Session
 
 from .models import Candidate, CandidateOnboardingSession
 

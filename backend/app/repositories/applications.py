@@ -9,14 +9,11 @@ from mahara_data.db.models.candidates import Candidate, CandidatePII
 from mahara_data.db.models.employers import Application, HiringFeedback, JobOffer
 from mahara_data.db.models.matching import MatchResult
 from mahara_data.db.models.platform import AuditLog
-from mahara_data.repositories.accounts import get_candidate_for_user as shared_get_candidate_for_user
+
+from .accounts import get_candidate_for_user
 
 
-def get_candidate_for_user(db: Session, user_id: UUID) -> Candidate | None:
-    return shared_get_candidate_for_user(db, user_id)
-
-
-def list_candidate_applications(db: Session, candidate_id: UUID) -> list[tuple[Application, JobOffer, MatchResult | None]]:
+def list_candidate_applications(db: Session, candidate_id: UUID):
     return (
         db.query(Application, JobOffer, MatchResult)
         .join(JobOffer, JobOffer.id == Application.job_offer_id)
@@ -27,9 +24,7 @@ def list_candidate_applications(db: Session, candidate_id: UUID) -> list[tuple[A
     )
 
 
-def list_employer_applications(
-    db: Session, employer_id: UUID
-) -> list[tuple[Application, JobOffer, Candidate, CandidatePII | None, MatchResult | None]]:
+def list_employer_applications(db: Session, employer_id: UUID):
     return (
         db.query(Application, JobOffer, Candidate, CandidatePII, MatchResult)
         .join(JobOffer, JobOffer.id == Application.job_offer_id)
@@ -46,7 +41,9 @@ def get_offer(db: Session, offer_id: UUID) -> JobOffer | None:
     return db.get(JobOffer, offer_id)
 
 
-def get_current_match(db: Session, candidate_id: UUID, offer_id: UUID) -> MatchResult | None:
+def get_current_match(
+    db: Session, candidate_id: UUID, offer_id: UUID
+) -> MatchResult | None:
     return (
         db.query(MatchResult)
         .filter(
@@ -87,7 +84,9 @@ def audit_candidate_identity_reads(
     *,
     actor_user_id: UUID | None,
     employer_id: UUID,
-    applications: list[tuple[Application, JobOffer, Candidate, CandidatePII | None, MatchResult | None]],
+    applications: list[
+        tuple[Application, JobOffer, Candidate, CandidatePII | None, MatchResult | None]
+    ],
 ) -> None:
     audited = False
     for application, offer, candidate, pii, _match in applications:
