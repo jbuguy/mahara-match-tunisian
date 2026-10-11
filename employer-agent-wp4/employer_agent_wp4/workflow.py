@@ -9,8 +9,13 @@ from typing import Any
 from mahara_data.db.models.employers import Employer, JobOffer, JobOfferSkill
 from mahara_data.db.models.market import MarketDataset, MarketIndicator
 from mahara_data.db.models.reference import Governorate, Sector
-from mahara_data.db.models.taxonomy import Occupation, Skill
-from mahara_data.enums import MarketIndicatorType, OfferSource, OfferStatus, TaxonomyStatus
+from mahara_data.db.models.taxonomy import Occupation
+from mahara_data.repositories.taxonomy import (
+    get_skills_by_codes,
+    get_validated_skills_by_codes,
+    list_validated_skills,
+)
+from mahara_data.enums import MarketIndicatorType, OfferSource, OfferStatus
 from mahara_data.schemas.offer import NormalizedJobOffer
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -140,8 +145,7 @@ async def generate_offer(
     if missing:
         return None, missing
 
-    query = db.query(skills_model)
-    validated_skills = query.filter(skills_model.status == TaxonomyStatus.VALIDATED).all()
+    validated_skills = list_validated_skills(db)
     if not validated_skills:
         return None, ["validated_skill_taxonomy"]
     allowed_skills = [
@@ -200,11 +204,7 @@ def persist_published_offer(db: Session, offer: NormalizedJobOffer, employer_id:
         raise OfferPublishError("Unknown governorate code")
 
     skill_codes = [item.skill_code for item in offer.skills]
-    skills = (
-        db.query(Skill)
-        .filter(Skill.code.in_(skill_codes), Skill.status == TaxonomyStatus.VALIDATED)
-        .all()
-    )
+    skills = get_validated_skills_by_codes(db, skill_codes)
     skills_by_code = {skill.code: skill for skill in skills}
     missing_skills = sorted(set(skill_codes) - skills_by_code.keys())
     if missing_skills:
@@ -383,7 +383,7 @@ def build_offer_review(
     skill_labels = {}
     if skill_codes:
         try:
-            for skill in db.query(Skill).filter(Skill.code.in_(skill_codes)).all():
+            for skill in get_skills_by_codes(db, skill_codes):
                 skill_labels[skill.code] = skill.label_fr
         except SQLAlchemyError:
             db.rollback()

@@ -17,14 +17,6 @@ function ComingSoon({ title }: { title: string }) {
   )
 }
 
-export function OffresPage() {
-  return <ComingSoon title="Offres d'emploi" />
-}
-
-export function CandidaturesPage() {
-  return <ComingSoon title="Mes candidatures" />
-}
-
 export function FormationPage() {
   return <ComingSoon title="Formation" />
 }

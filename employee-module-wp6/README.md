@@ -61,7 +61,7 @@ The seed script only runs when `APP_ENV` is `dev` or `development`. Running it a
 The profile and reference tests use the database from `DATABASE_URL`. Each test runs inside a transaction that is rolled back,
 so nothing is kept. They are skipped when the database can't be reached (`-rs` shows why).
 
-Check it: <http://localhost:8006/api/v1/health> should return `{"status":"ok","governorates":24}`.
+Check the integrated root API at <http://localhost:8000/api/v1/health>; it should return `{"status":"ok","governorates":24}`. The WP6 frontend defaults to this root API. If you deliberately run the standalone WP6 backend on port 8006, set `VITE_API_BASE_URL=http://localhost:8006` in the frontend environment.
 
 On start, the backend opens a few PostgreSQL connections in the background so the first requests aren't the slowest.
 On Windows, if a change doesn't seem to take effect,

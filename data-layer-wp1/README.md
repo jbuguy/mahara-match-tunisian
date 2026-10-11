@@ -16,6 +16,7 @@ mahara_data/
   enums.py          shared enums (mirrored as Postgres enum types)
   reference.py      governorates, proficiency scale, embedding dim, scoring weights
   db/models/        SQLAlchemy 2 models, one module per domain
+  repositories/     reusable SQLAlchemy queries over the canonical models
   schemas/          Pydantic v2 contracts, one module per domain
 contracts/          generated JSON Schemas + example payloads
 scripts/            export_json_schemas.py
@@ -42,8 +43,10 @@ pip install -e ../data-layer-wp1
 ```python
 from mahara_data.schemas import CandidateProfile, MatchResult
 from mahara_data.db.models import Candidate, JobOffer
+from mahara_data.repositories.accounts import get_candidate_for_user
 
 profile = CandidateProfile.model_validate_json(payload)   # rejects unknown fields and invalid codes
+candidate = get_candidate_for_user(db, user_id)            # shared canonical account lookup
 ```
 
 Teams that don't use Python can validate against `contracts/*.schema.json`.

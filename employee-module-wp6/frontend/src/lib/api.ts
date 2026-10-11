@@ -1,6 +1,6 @@
 import { clearAuthSession, getAccessToken } from './session'
 
-export const API_BASE_URL: string = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8006'
+export const API_BASE_URL: string = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
 
 export class ApiError extends Error {
   status: number
@@ -46,6 +46,57 @@ export async function getHealth(): Promise<Health> {
 }
 
 export type Me = { id: string; email: string; name: string | null; has_profile: boolean }
+
+export type JobOffer = {
+  offer_id: string
+  title: string
+  description: string
+  contract_type: string
+  work_mode: string
+  governorate_code: string
+  delegation: string | null
+  positions_count: number
+  min_years_experience: number
+  education_level_min: string | null
+  salary_min_tnd: number | null
+  salary_max_tnd: number | null
+  published_at: string | null
+  match_score: number | null
+  application_status: string | null
+  skills: { code: string; label_fr: string; requirement: 'required' | 'preferred'; min_level: number }[]
+}
+
+export type CandidateApplication = {
+  application_id: string
+  candidate_id: string
+  job_offer_id: string
+  title: string
+  match_id: string | null
+  score_global: number | null
+  status: string
+  applied_at: string
+  updated_at: string
+}
+
+export function getOffers(): Promise<JobOffer[]> {
+  return api<JobOffer[]>('/me/offers')
+}
+
+export function refreshMatches(): Promise<unknown> {
+  return api('/me/matches')
+}
+
+export function applyToOffer(jobOfferId: string): Promise<CandidateApplication> {
+  return api<CandidateApplication>('/me/applications', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ job_offer_id: jobOfferId }),
+  })
+}
+
+export function getApplications(): Promise<CandidateApplication[]> {
+  return api<CandidateApplication[]>('/me/applications')
+}
 
 /**
  * Calls made while the same call is still running share its answer (React's StrictMode runs effects
