@@ -6,7 +6,7 @@ from typing import Any
 
 from fastapi import FastAPI
 
-from .models import Candidate
+from mahara_data.db.models.candidates import Candidate
 
 
 def register_wp6_routes(app: FastAPI, settings: Any, root_get_db: Any) -> Any:

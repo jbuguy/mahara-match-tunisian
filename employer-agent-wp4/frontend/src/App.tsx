@@ -10,6 +10,20 @@ interface EmployerAccount {
   email: string;
 }
 
+interface EmployerApplication {
+  application_id: string;
+  candidate_id: string;
+  candidate_name: string | null;
+  candidate_email: string | null;
+  candidate_phone: string | null;
+  match_id: string | null;
+  score_global: number | null;
+  job_offer_id: string;
+  title: string;
+  status: string;
+  applied_at: string;
+}
+
 interface InterviewField {
   name: string;
   label: string;
@@ -44,6 +58,7 @@ export function App() {
   const [notice, setNotice] = useState('');
   const [pending, setPending] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [activeArea, setActiveArea] = useState<'offers' | 'applications'>('offers');
 
   useEffect(() => {
     if (!drawerOpen) return;
@@ -122,7 +137,13 @@ export function App() {
   function selectNavigation(label: string) {
     setDrawerOpen(false);
     if (label === 'Offres') {
+      setActiveArea('offers');
       newOffer();
+      return;
+    }
+    if (label === 'Candidatures') {
+      setActiveArea('applications');
+      setNotice('');
       return;
     }
     setNotice(`${label} : bientôt disponible.`);
@@ -168,18 +189,18 @@ export function App() {
         <button className="drawer-backdrop" type="button" aria-label="Fermer le menu" onClick={() => setDrawerOpen(false)} />
         <aside className="mobile-drawer" role="dialog" aria-modal="true" aria-label="Navigation principale">
           <div className="drawer-heading"><a className="brand-lockup" href="#workspace" onClick={(event) => { event.preventDefault(); selectNavigation('Offres'); }}><span className="brand-mark"><BriefcaseBusiness size={18} /></span><span>Mahara</span></a><button className="icon-action" type="button" aria-label="Fermer le menu" onClick={() => setDrawerOpen(false)}><X size={18} /></button></div>
-          <EmployerNavigation onSelect={selectNavigation} />
+          <EmployerNavigation onSelect={selectNavigation} activeArea={activeArea} />
         </aside>
       </>}
       <aside className="desktop-sidebar">
         <a className="brand-lockup" href="#workspace" onClick={(event) => { event.preventDefault(); selectNavigation('Offres'); }}><span className="brand-mark"><BriefcaseBusiness size={18} /></span><span>Mahara</span></a>
-        <EmployerNavigation onSelect={selectNavigation} />
+        <EmployerNavigation onSelect={selectNavigation} activeArea={activeArea} />
       </aside>
       <div className="app-content">
         <header className="app-header">
           <button className="mobile-menu-button" type="button" aria-label="Ouvrir le menu" aria-expanded={drawerOpen} onClick={() => setDrawerOpen(true)}><Menu size={21} /></button>
           <span className="mobile-brand"><span className="brand-mark"><BriefcaseBusiness size={17} /></span>Mahara</span>
-          <h1 className="page-title">Offres</h1>
+          <h1 className="page-title">{activeArea === 'applications' ? 'Candidatures reçues' : 'Offres'}</h1>
           <div className="header-actions">
             {session && <span className="session-chip"><span className="live-dot" />{stage === 'review' ? 'Brouillon à relire' : 'Offre en cours'}</span>}
             <details className="account-menu"><summary><span className="account-avatar">{accountInitials}</span><span className="account-copy"><strong>{accountName}</strong><small>{employer?.email ?? 'Espace entreprise'}</small></span></summary><div className="account-popover"><button type="button" onClick={signOut}><LogOut size={16} />Se déconnecter</button></div></details>
@@ -187,6 +208,7 @@ export function App() {
         </header>
         <main className="workspace" id="workspace">
         {notice && <div className="notice" role="status"><CircleHelp size={17} />{notice}<button type="button" aria-label="Fermer" onClick={() => setNotice('')}><X size={16} /></button></div>}
+        {activeArea === 'applications' && token ? <EmployerApplications token={token} onNotice={setNotice} /> : <>
         {stage === 'choose' && <ModePicker mode={mode} setMode={setMode} onStart={startSession} pending={pending} />}
         {stage === 'interview' && session && token && <InterviewWorkspace
           session={session}
@@ -206,13 +228,14 @@ export function App() {
           onNewOffer={newOffer}
         />}
         {stage === 'review' && session && !session.draft && <section className="generation-state"><CircleHelp size={24} /><h1>Le brouillon n'est pas encore disponible</h1><p>Les réponses sont conservées dans cette session. Vous pouvez démarrer une nouvelle offre pendant que le référentiel est vérifié.</p><button className="button-primary" type="button" onClick={newOffer}>Commencer une autre offre <ArrowRight size={16} /></button></section>}
+        </>}
         </main>
       </div>
     </div>
   );
 }
 
-function EmployerNavigation({ onSelect }: { onSelect: (label: string) => void }) {
+function EmployerNavigation({ onSelect, activeArea }: { onSelect: (label: string) => void; activeArea: 'offers' | 'applications' }) {
   const items = [
     { label: 'Accueil', icon: Home },
     { label: 'Offres', icon: BriefcaseBusiness },
@@ -220,7 +243,47 @@ function EmployerNavigation({ onSelect }: { onSelect: (label: string) => void })
     { label: 'Formation', icon: GraduationCap },
     { label: 'Profil', icon: UserRound },
   ];
-  return <nav className="primary-navigation" aria-label="Navigation principale"><span className="navigation-caption">ESPACE RECRUTEUR</span>{items.map(({ label, icon: Icon }) => <button className={`navigation-item ${label === 'Offres' ? 'active' : ''}`} type="button" key={label} aria-current={label === 'Offres' ? 'page' : undefined} onClick={() => onSelect(label)}><Icon size={18} /><span>{label}</span>{label !== 'Offres' && <small>Bientôt</small>}</button>)}</nav>;
+  return <nav className="primary-navigation" aria-label="Navigation principale"><span className="navigation-caption">ESPACE RECRUTEUR</span>{items.map(({ label, icon: Icon }) => {
+    const active = label === (activeArea === 'offers' ? 'Offres' : 'Candidatures');
+    return <button className={`navigation-item ${active ? 'active' : ''}`} type="button" key={label} aria-current={active ? 'page' : undefined} onClick={() => onSelect(label)}><Icon size={18} /><span>{label}</span>{label !== 'Offres' && label !== 'Candidatures' && <small>Bientôt</small>}</button>;
+  })}</nav>;
+}
+
+function EmployerApplications({ token, onNotice }: { token: string; onNotice: (message: string) => void }) {
+  const [items, setItems] = useState<EmployerApplication[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [pending, setPending] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    apiRequest<EmployerApplication[]>('/api/v1/employer/applications', token)
+      .then((rows) => { if (active) setItems(rows); })
+      .catch((error) => { if (active) onNotice(explainError(error)); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [token, onNotice]);
+
+  async function decide(applicationId: string, decision: 'shortlisted' | 'rejected' | 'hired') {
+    setPending(applicationId);
+    onNotice('');
+    try {
+      const result = await apiRequest<{ application_id: string; status: string }>(`/api/v1/employer/applications/${applicationId}`, token, {
+        method: 'PATCH', body: JSON.stringify({ decision }),
+      });
+      setItems((current) => current.map((item) => item.application_id === applicationId ? { ...item, status: result.status } : item));
+      onNotice('La décision a été enregistrée.');
+    } catch (error) {
+      onNotice(explainError(error));
+    } finally {
+      setPending(null);
+    }
+  }
+
+  if (loading) return <p className="application-state">Chargement des candidatures…</p>;
+  if (!items.length) return <section className="generation-state"><ClipboardList size={24} /><h1>Aucune candidature pour le moment</h1><p>Les candidatures apparaîtront ici après la publication de vos offres.</p></section>;
+
+  const labels: Record<string, string> = { submitted: 'Nouvelle', viewed: 'Consultée', shortlisted: 'Présélectionnée', interview: 'Entretien', offer_made: 'Offre faite', hired: 'Recrutée', rejected: 'Non retenue' };
+  return <section className="employer-applications">{items.map((item) => <article key={item.application_id} className="employer-application-card"><div><p className="eyebrow">{item.title}</p><h2>{item.candidate_name || 'Candidat'}</h2><p className="application-contact">{item.candidate_email || 'E-mail non renseigné'}{item.candidate_phone ? ` · ${item.candidate_phone}` : ''}</p><p className="application-meta">{labels[item.status] ?? item.status}{item.score_global !== null ? ` · Compatibilité ${Math.round(item.score_global)} %` : ''} · {new Date(item.applied_at).toLocaleDateString('fr-TN')}</p></div><div className="application-actions"><button className="icon-action" type="button" disabled={pending !== null} onClick={() => void decide(item.application_id, 'shortlisted')}>Présélectionner</button><button className="icon-action" type="button" disabled={pending !== null} onClick={() => void decide(item.application_id, 'rejected')}>Refuser</button><button className="button-primary" type="button" disabled={pending !== null} onClick={() => void decide(item.application_id, 'hired')}>{pending === item.application_id ? 'Enregistrement…' : 'Recruter'}</button></div></article>)}</section>;
 }
 
 function ModePicker({ mode, setMode, onStart, pending }: { mode: InterviewMode; setMode: (mode: InterviewMode) => void; onStart: () => void; pending: boolean }) {

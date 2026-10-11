@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 
 import { AuthContext, type AuthState } from '@/lib/auth-context'
+import { API_BASE_URL } from '@/lib/api'
 import { clearAuthSession, restoreAuthSession, type Session } from '@/lib/session'
 
 async function signInWithGoogle() {
-  window.location.assign(`${import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8006'}/api/v1/auth/google`)
+  window.location.assign(`${API_BASE_URL}/api/v1/auth/google`)
 }
 
 async function signOut() {

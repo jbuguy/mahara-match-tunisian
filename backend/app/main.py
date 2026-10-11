@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from shared_llm import LLMSettings, OpenAICompatibleClient
 
 from .applications import create_application_router
+from .offers import create_offer_router
 from .config import get_settings
 from .database import get_db
 from .google_auth import router as google_auth_router
@@ -99,7 +100,11 @@ app.include_router(
     )
 )
 app.include_router(google_auth_router)
+# WP6's existing frontend starts OAuth under /api/v1; retain that route while
+# the platform's canonical callback remains /auth/google/callback.
+app.include_router(google_auth_router, prefix="/api/v1", include_in_schema=False)
 app.include_router(create_application_router(get_db, get_current_user, get_current_employer))
+app.include_router(create_offer_router(get_db, get_current_user))
 app.include_router(create_wp2_router(get_db, get_current_user))
 get_wp6_candidate_profile = register_wp6_routes(app, settings, get_db)
 wp6_voice = importlib.import_module("mahara_wp6.services.voice")

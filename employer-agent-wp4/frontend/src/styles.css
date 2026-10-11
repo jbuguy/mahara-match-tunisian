@@ -146,6 +146,20 @@ button:disabled { cursor: wait; opacity: .62; }
 .review-heading > div > p:last-child { max-width: 60ch; }
 .draft-stamp { flex: 0 0 auto; padding: 9px 12px; border: 1px solid #d2a172; color: #a96a38; font-size: 8px; font-weight: 700; letter-spacing: 0; line-height: 1.6; text-align: center; transform: rotate(2deg); }
 .published-stamp { border-color: #8caf99; color: var(--green); transform: rotate(-1deg); }
+.employer-applications { display: grid; gap: 14px; }
+.employer-application-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 18px; padding: 20px; border: 1px solid var(--line); background: var(--white); }
+.employer-application-card h2 { margin: 0; font: 400 22px/1.2 var(--serif); }
+.employer-application-card .eyebrow { margin-bottom: 8px; }
+.application-contact, .application-meta { margin: 7px 0 0; color: var(--muted); font-size: 12px; }
+.application-meta { font-size: 10px; }
+.application-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.application-actions .icon-action { width: auto; min-height: 40px; padding: 0 11px; font-size: 11px; }
+.application-actions .button-primary { min-height: 40px; padding: 0 13px; font-size: 11px; }
+.application-state { padding: 18px; border: 1px solid var(--line); background: var(--white); color: var(--muted); font-size: 13px; }
+@media (max-width: 700px) {
+  .employer-application-card { grid-template-columns: 1fr; }
+  .application-actions { justify-content: flex-start; }
+}
 .review-layout { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(280px, .75fr); gap: 52px; align-items: start; }
 .offer-editor { min-width: 0; }
 .editor-section-heading { display: flex; gap: 12px; align-items: center; margin: 0 0 19px; }
