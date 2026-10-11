@@ -1,6 +1,6 @@
 -- WP1 Data Layer - shared schema v1.0
--- Source of truth for Python: data-layer-wp1/mahara_data/db/models
--- Keep in sync: data-layer-wp1/tests/test_migration_sync.py fails on drift.
+-- Source of truth for Python: back/mahara_data/db/models
+-- Keep in sync: back/tests/test_migrate.py fails on drift.
 --
 -- Compatible with WP4's 20260920000000_create_employers.sql: `company_size` and
 -- `employers` are created only if missing, then extended with WP1 columns.
