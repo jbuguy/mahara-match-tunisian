@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy.orm import Session
 
 from mahara_data.db.models.taxonomy import Skill
+from mahara_data.repositories.taxonomy import get_validated_skills_by_codes
 from mahara_data.schemas.offer import NormalizedJobOffer
 from shared_llm import LLMError, OpenAICompatibleClient
 
@@ -29,6 +30,7 @@ from .workflow import (
     next_question,
     persist_published_offer,
 )
+from .offer_rag import suggest_offer_improvements
 
 
 class MessageRequest(BaseModel):
@@ -150,7 +152,7 @@ def create_employer_agent_router(
         return _session_response(session)
 
     @router.get("/sessions/{session_id}/review")
-    def get_offer_review(
+    async def get_offer_review(
         session_id: uuid.UUID,
         current: Any = Depends(get_current_employer),
         db: Session = Depends(get_db),
@@ -159,6 +161,18 @@ def create_employer_agent_router(
         if session.draft is None:
             raise HTTPException(status_code=409, detail="This session does not have a generated draft")
         review = build_offer_review(db, session.draft)
+        try:
+            review["rag"] = await suggest_offer_improvements(db, client, session.draft)
+        except Exception:
+            # Keep the existing deterministic review useful when embeddings or
+            # model inference are unavailable; RAG advice is an optional layer.
+            db.rollback()
+            review["rag"] = {
+                "status": "unavailable",
+                "message": "AI suggestions are unavailable right now. The offer draft and standard review are still available.",
+                "suggestions": [],
+                "sources": [],
+            }
         state = dict(session.state or {})
         state["reviewed_draft_fingerprint"] = _draft_fingerprint(session.draft)
         session.state = state
@@ -180,10 +194,20 @@ def create_employer_agent_router(
         candidate = dict(payload.draft)
         original_skill_codes = {skill["skill_code"] for skill in session.draft.get("skills", [])}
         edited_skill_codes = {skill.get("skill_code") for skill in candidate.get("skills", [])}
-        if not edited_skill_codes.issubset(original_skill_codes):
+        added_skill_codes = edited_skill_codes - original_skill_codes
+        if added_skill_codes:
+            validated = {
+                skill.code for skill in get_validated_skills_by_codes(db, added_skill_codes)
+            }
+            if validated != added_skill_codes:
+                raise HTTPException(
+                    status_code=422,
+                    detail="New skills must be resolved against the validated WP1 taxonomy before editing",
+                )
+        if not original_skill_codes.issubset(edited_skill_codes):
             raise HTTPException(
                 status_code=422,
-                detail="New skills must be resolved against the validated WP1 taxonomy before editing",
+                detail="Existing offer skills cannot be removed in this editor",
             )
         candidate["employer_id"] = str(current.id)
         candidate["status"] = "draft"

@@ -394,6 +394,72 @@ button {
   background: rgba(248, 247, 243, 0.8);
 }
 
+.offer-rag-review {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.offer-rag-review h4,
+.offer-rag-suggestion p {
+  margin: 0;
+}
+
+.offer-rag-suggestion {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+  background: rgba(248, 247, 243, 0.8);
+}
+
+.offer-rag-suggestion small,
+.offer-rag-review > small {
+  color: var(--ink-soft);
+}
+
+.employer-offer-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.employer-offer-card,
+.candidate-application-detail {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px;
+  background: rgba(248, 247, 243, 0.8);
+}
+
+.employer-offer-card h4,
+.candidate-application-detail h4 {
+  margin: 0 0 8px;
+}
+
+.employer-offer-card p,
+.employer-offer-card small,
+.candidate-application-detail p,
+.candidate-application-detail li {
+  color: var(--ink-soft);
+}
+
+.candidate-application-detail {
+  flex-basis: 100%;
+  width: 100%;
+  display: grid;
+  gap: 10px;
+}
+
+.candidate-application-detail ul {
+  margin: 6px 0 0;
+  padding-left: 20px;
+}
+
+.candidate-match-detail {
+  border-left: 3px solid var(--accent);
+  padding: 8px 12px;
+}
+
 .match-results {
   padding-top: 4px;
   padding-bottom: 4px;
@@ -415,6 +481,7 @@ button {
 
 .application-item {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 16px;

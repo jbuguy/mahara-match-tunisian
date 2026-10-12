@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     llm_base_url: str = "http://localhost:1234/v1"
     llm_model: str = "local-model"
+    llm_embedding_model: str = "multilingual-e5-base"
     llm_api_key: str | None = None
     llm_timeout_seconds: float = 60.0
     groq_api_key: str | None = None

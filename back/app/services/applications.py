@@ -2,7 +2,14 @@
 
 import uuid
 
-from mahara_data.db.models.candidates import Candidate
+from mahara_data.db.models.candidates import (
+    Candidate,
+    CandidateDesiredOccupation,
+    CandidateEducation,
+    CandidateExperience,
+    CandidatePII,
+    CandidateSkill,
+)
 from mahara_data.db.models.employers import (
     Application,
     Employer,
@@ -10,6 +17,9 @@ from mahara_data.db.models.employers import (
     JobOffer,
 )
 from mahara_data.db.models.matching import MatchResult
+from mahara_data.db.models.matching import SkillGap
+from mahara_data.db.models.taxonomy import Occupation, Skill
+from mahara_data.db.models.reference import Governorate
 from mahara_data.enums import ApplicationStatus, HiringDecision, OfferStatus
 from mahara_data.schemas.application import (
     ApplicationCreate,
@@ -116,6 +126,103 @@ def list_employer_applications(db: Session, *, employer: Employer) -> list[dict]
         }
         for application, offer, candidate, pii, match in rows
     ]
+
+
+def get_employer_application_detail(db: Session, *, employer: Employer, application_id: uuid.UUID) -> dict:
+    application = repository.get_application_for_employer(db, application_id, employer.id)
+    if application is None:
+        raise ApplicationWorkflowError(404, "Application not found")
+    offer = repository.get_offer(db, application.job_offer_id)
+    candidate = db.get(Candidate, application.candidate_id)
+    if offer is None or candidate is None or candidate.deleted_at is not None:
+        raise ApplicationWorkflowError(404, "Application not found")
+
+    pii = db.get(CandidatePII, candidate.id)
+    match = db.get(MatchResult, application.match_result_id) if application.match_result_id else None
+    repository.audit_candidate_identity_reads(
+        db,
+        actor_user_id=getattr(employer, "user_id", None),
+        employer_id=employer.id,
+        applications=[(application, offer, candidate, pii, match)],
+    )
+
+    skills = (
+        db.query(CandidateSkill, Skill)
+        .join(Skill, Skill.id == CandidateSkill.skill_id)
+        .filter(CandidateSkill.candidate_id == candidate.id)
+        .order_by(Skill.label_fr)
+        .all()
+    )
+    experiences = db.query(CandidateExperience).filter(
+        CandidateExperience.candidate_id == candidate.id
+    ).order_by(CandidateExperience.start_date.desc().nullslast()).all()
+    education = db.query(CandidateEducation).filter(
+        CandidateEducation.candidate_id == candidate.id
+    ).order_by(CandidateEducation.graduation_year.desc().nullslast()).all()
+    desired = (
+        db.query(Occupation)
+        .join(CandidateDesiredOccupation, CandidateDesiredOccupation.occupation_id == Occupation.id)
+        .filter(CandidateDesiredOccupation.candidate_id == candidate.id)
+        .order_by(CandidateDesiredOccupation.priority)
+        .all()
+    )
+    gaps = []
+    if match is not None:
+        gaps = [
+            {"skill_code": skill.code, "label": skill.label_fr, "gap_type": gap.gap_type.value,
+             "requirement": gap.requirement.value, "required_level": gap.required_level,
+             "current_level": gap.current_level}
+            for gap, skill in db.query(SkillGap, Skill)
+            .join(Skill, Skill.id == SkillGap.skill_id)
+            .filter(SkillGap.match_result_id == match.id)
+            .all()
+        ]
+    governorate = db.get(Governorate, candidate.governorate_code) if candidate.governorate_code else None
+    return {
+        "application_id": str(application.id),
+        "status": application.status.value,
+        "applied_at": application.applied_at.isoformat(),
+        "cover_note": application.cover_note,
+        "job_offer": {"job_offer_id": str(offer.id), "title": offer.title},
+        "candidate": {
+            "candidate_id": str(candidate.id),
+            "name": pii.full_name if pii else None,
+            "email": pii.email if pii else None,
+            "phone": pii.phone if pii else None,
+            "summary": candidate.summary,
+            "governorate": governorate.name_fr if governorate else None,
+            "education_level": candidate.education_level.value if candidate.education_level else None,
+            "years_experience": float(candidate.years_experience) if candidate.years_experience is not None else None,
+            "languages": candidate.languages,
+            "available_from": candidate.available_from.isoformat() if candidate.available_from else None,
+            "skills": [
+                {"code": skill.code, "label": skill.label_fr, "level": link.level,
+                 "source": link.source.value, "confidence": float(link.confidence)}
+                for link, skill in skills
+            ],
+            "experience": [
+                {"title": item.job_title_raw, "description": item.description,
+                 "duration_months": item.duration_months, "informal": item.is_informal}
+                for item in experiences
+            ],
+            "education": [
+                {"level": item.level.value, "field_of_study": item.field_of_study,
+                 "graduation_year": item.graduation_year}
+                for item in education
+            ],
+            "desired_occupations": [
+                {"code": item.code, "title": item.title_fr} for item in desired
+            ],
+        },
+        "match": None if match is None else {
+            "match_id": str(match.id), "score_global": float(match.score_global),
+            "breakdown": {"hard_skills": float(match.score_hard_skills),
+                          "experience": float(match.score_experience),
+                          "soft_skills": float(match.score_soft_skills),
+                          "location": float(match.score_location)},
+            "computed_at": match.computed_at.isoformat(), "gaps": gaps,
+        },
+    }
 
 
 def record_employer_decision(

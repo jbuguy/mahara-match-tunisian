@@ -61,8 +61,56 @@ export type CandidateApplication = {
 
 export type EmployerApplication = CandidateApplication & {
   candidate_id: string
+  candidate_name: string | null
+  candidate_email: string | null
+  candidate_phone: string | null
   match_id: string | null
   score_global: number | null
+}
+
+export type EmployerOffer = {
+  job_offer_id: string
+  title: string
+  status: string
+  published_at: string | null
+  expires_at: string | null
+  applications_count: number
+  submitted_count: number
+  shortlisted_count: number
+  hired_count: number
+  rejected_count: number
+  top_match_score: number | null
+}
+
+export type EmployerApplicationDetail = {
+  application_id: string
+  status: string
+  applied_at: string
+  cover_note: string | null
+  job_offer: { job_offer_id: string; title: string }
+  candidate: {
+    candidate_id: string
+    name: string | null
+    email: string | null
+    phone: string | null
+    summary: string | null
+    governorate: string | null
+    education_level: string | null
+    years_experience: number | null
+    languages: { code: string; level: number }[]
+    available_from: string | null
+    desired_occupations: { code: string; title: string }[]
+    skills: { code: string; label: string; level: number; source: string; confidence: number }[]
+    experience: { title: string; description: string | null; duration_months: number | null; informal: boolean }[]
+    education: { level: string; field_of_study: string | null; graduation_year: number | null }[]
+  }
+  match: null | {
+    match_id: string
+    score_global: number
+    breakdown: { hard_skills: number; experience: number; soft_skills: number; location: number }
+    computed_at: string
+    gaps: { skill_code: string; label: string; gap_type: string; requirement: string; required_level: number; current_level: number | null }[]
+  }
 }
 
 export async function requestJson<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -110,6 +158,14 @@ export function applyToOffer(jobOfferId: string): Promise<CandidateApplication> 
 
 export function getEmployerApplications(): Promise<EmployerApplication[]> {
   return requestJson<EmployerApplication[]>('/api/v1/employer/applications')
+}
+
+export function getEmployerOffers(): Promise<EmployerOffer[]> {
+  return requestJson<EmployerOffer[]>('/api/v1/employer/offers')
+}
+
+export function getEmployerApplication(applicationId: string): Promise<EmployerApplicationDetail> {
+  return requestJson<EmployerApplicationDetail>(`/api/v1/employer/applications/${encodeURIComponent(applicationId)}`)
 }
 
 export function decideApplication(
