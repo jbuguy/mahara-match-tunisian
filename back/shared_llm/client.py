@@ -13,6 +13,7 @@ class LLMSettings:
     model: str = "local-model"
     api_key: str | None = None
     timeout_seconds: float = 60.0
+    embedding_model: str = "multilingual-e5-base"
 
     @classmethod
     def from_env(cls) -> "LLMSettings":
@@ -21,6 +22,7 @@ class LLMSettings:
             model=os.getenv("LLM_MODEL", cls.model),
             api_key=os.getenv("LLM_API_KEY"),
             timeout_seconds=float(os.getenv("LLM_TIMEOUT_SECONDS", "60")),
+            embedding_model=os.getenv("LLM_EMBEDDING_MODEL", "multilingual-e5-base"),
         )
 
 
@@ -78,3 +80,21 @@ class OpenAICompatibleClient:
         if not isinstance(content, str) or not content.strip():
             raise LLMError("The configured LLM endpoint returned an empty completion")
         return content.strip()
+
+    async def create_embedding(self, text: str) -> list[float]:
+        headers = {}
+        if self.settings.api_key:
+            headers["Authorization"] = f"Bearer {self.settings.api_key}"
+        try:
+            response = await self._http_client.post(
+                f"{self.settings.base_url.rstrip('/')}/embeddings",
+                json={"model": self.settings.embedding_model, "input": text},
+                headers=headers,
+            )
+            response.raise_for_status()
+            vector = response.json()["data"][0]["embedding"]
+            if not isinstance(vector, list) or not vector or not all(isinstance(value, (int, float)) for value in vector):
+                raise ValueError("Embedding response did not contain a numeric vector")
+            return [float(value) for value in vector]
+        except (httpx.HTTPError, KeyError, IndexError, TypeError, ValueError) as error:
+            raise LLMError("The configured LLM endpoint did not return a valid embedding") from error

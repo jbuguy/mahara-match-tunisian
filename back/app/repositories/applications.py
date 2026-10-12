@@ -31,8 +31,8 @@ def list_employer_applications(db: Session, employer_id: UUID):
         .join(Candidate, Candidate.id == Application.candidate_id)
         .outerjoin(CandidatePII, CandidatePII.candidate_id == Candidate.id)
         .outerjoin(MatchResult, MatchResult.id == Application.match_result_id)
-        .filter(JobOffer.employer_id == employer_id)
-        .order_by(Application.applied_at.desc())
+        .filter(JobOffer.employer_id == employer_id, Candidate.deleted_at.is_(None))
+        .order_by(MatchResult.score_global.desc().nullslast(), Application.applied_at.desc())
         .all()
     )
 

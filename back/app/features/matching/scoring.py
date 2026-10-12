@@ -6,7 +6,10 @@ from pathlib import Path
 
 WEIGHTS = {"hard_skills": 0.50, "experience": 0.20, "soft_skills": 0.15, "location": 0.15}
 REQ_W = {"required": 1.0, "preferred": 0.5}
-MODEL_VERSION = "wp3-hybrid-0.1"
+MODEL_VERSION = "wp3-hybrid-0.2"
+# Only taxonomy-curated relations earn partial credit. Broader/related skills
+# are useful evidence of transfer, but do not satisfy a job requirement.
+RELATED_SKILL_CREDIT = {"related": 0.4, "broader": 0.55, "equivalent": 1.0}
 SKILL_CODES_PATH = Path(__file__).with_name("skill_codes.json")
 with SKILL_CODES_PATH.open(encoding="utf-8") as skill_codes_file:
     SKILL_CODES = json.load(skill_codes_file)
@@ -60,8 +63,9 @@ def _niveaux_candidat(profil):
     return {cle_competence(s): s["level"] for s in profil.get("skills", [])}
 
 
-def _score_competences(profil, offre, soft):
+def _score_competences(profil, offre, soft, related_skills=None):
     cand = _niveaux_candidat(profil)
+    related_skills = related_skills or {}
     total = obtenu = 0.0
     for s in offre.get("skills", []):
         if est_soft(s) != soft:
@@ -69,7 +73,19 @@ def _score_competences(profil, offre, soft):
         poids = REQ_W[s["requirement"]]
         niveau_requis = s.get("min_level", 1)
         total += poids
-        obtenu += poids * min(cand.get(cle_competence(s), 0) / niveau_requis, 1.0)
+        exact_level = cand.get(cle_competence(s), 0)
+        best_level_credit = min(exact_level / niveau_requis, 1.0)
+        if not soft and best_level_credit < 1.0:
+            # Credit at most one source skill, so several weakly related skills
+            # cannot add up to a false claim that the requirement is satisfied.
+            source_credits = related_skills.get(cle_competence(s), {})
+            if source_credits:
+                best_level_credit = max(
+                    best_level_credit,
+                    *(min(cand.get(code, 0) / niveau_requis, 1.0) * credit
+                      for code, credit in source_credits.items()),
+                )
+        obtenu += poids * best_level_credit
     return 100.0 if total == 0 else round(100 * obtenu / total, 1)
 
 
@@ -114,9 +130,9 @@ def detecter_gaps(profil, offre):
     return gaps
 
 
-def calculer_match(profil, offre):
+def calculer_match(profil, offre, related_skills=None):
     b = {
-        "hard_skills": _score_competences(profil, offre, soft=False),
+        "hard_skills": _score_competences(profil, offre, soft=False, related_skills=related_skills),
         "experience": score_experience(profil, offre),
         "soft_skills": _score_competences(profil, offre, soft=True),
         "location": score_localisation(profil, offre),
@@ -133,10 +149,10 @@ def calculer_match(profil, offre):
     }
 
 
-def classer_offres(profil, offres):
+def classer_offres(profil, offres, related_skills=None):
     """Calcule le match pour chaque offre et trie du meilleur au moins bon."""
     items = sorted(
-        (calculer_match(profil, o) for o in offres),
+        (calculer_match(profil, o, related_skills=related_skills) for o in offres),
         key=lambda m: m["score_global"],
         reverse=True,
     )

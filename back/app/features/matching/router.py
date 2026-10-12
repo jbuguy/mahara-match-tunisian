@@ -3,13 +3,13 @@ from typing import Annotated, Any, Callable
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import or_
-from sqlalchemy.orm import Session
+from sqlalchemy import or_, select
+from sqlalchemy.orm import Session, aliased
 
 from mahara_data.db.models.employers import JobOffer, JobOfferSkill
 from mahara_data.db.models.matching import MatchResult as StoredMatchResult, SkillGap
-from mahara_data.db.models.taxonomy import Skill
-from mahara_data.enums import GapType, OfferStatus, RequirementLevel
+from mahara_data.db.models.taxonomy import Skill, SkillRelation
+from mahara_data.enums import GapType, OfferStatus, RequirementLevel, TaxonomyStatus
 from mahara_data.schemas.matching import RankedMatches, Roadmap
 
 from . import scoring as _scoring
@@ -70,6 +70,41 @@ def _published_offers(db: Session) -> list[dict[str, Any]]:
             }
         )
     return result
+
+
+def _related_candidate_skills(db: Session, profile: dict[str, Any], offers: list[dict[str, Any]]) -> dict[str, dict[str, float]]:
+    """Return curated candidate-skill -> required-skill relation credits."""
+    candidate_codes = {
+        skill["skill_code"] for skill in profile.get("skills", []) if skill.get("skill_code")
+    }
+    required_codes = {
+        skill["skill_code"]
+        for offer in offers
+        for skill in offer.get("skills", [])
+        if skill.get("skill_code")
+    }
+    if not candidate_codes or not required_codes:
+        return {}
+
+    source, target = aliased(Skill), aliased(Skill)
+    rows = db.execute(
+        select(source.code, target.code, SkillRelation.relation_type)
+        .join(SkillRelation, SkillRelation.source_skill_id == source.id)
+        .join(target, SkillRelation.target_skill_id == target.id)
+        .where(
+            source.code.in_(candidate_codes),
+            target.code.in_(required_codes),
+            source.status == TaxonomyStatus.VALIDATED,
+            target.status == TaxonomyStatus.VALIDATED,
+        )
+    ).all()
+    related: dict[str, dict[str, float]] = {}
+    for source_code, target_code, relation_type in rows:
+        relation = relation_type.value if hasattr(relation_type, "value") else str(relation_type)
+        credit = _scoring.RELATED_SKILL_CREDIT.get(relation)
+        if source_code and credit is not None:
+            related.setdefault(target_code, {})[source_code] = credit
+    return related
 
 
 def _persist_matches(db: Session, result: dict[str, Any]) -> None:
@@ -153,7 +188,9 @@ def create_matching_router(get_db: Any, get_current_user: Any, profile_reader: C
         user: Annotated[Any, Depends(get_current_user)],
     ):
         profile = candidate_profile(db, user)
-        result = _scoring.classer_offres(profile, _published_offers(db))
+        offers = _published_offers(db)
+        related_skills = _related_candidate_skills(db, profile, offers)
+        result = _scoring.classer_offres(profile, offers, related_skills=related_skills)
         _persist_matches(db, result)
         return RankedMatches.model_validate(result).model_dump(mode="json")
 
