@@ -69,6 +69,7 @@ llm_client = OpenAICompatibleClient(
     LLMSettings(
         base_url=settings.llm_base_url,
         model=settings.llm_model,
+        embedding_model=settings.llm_embedding_model,
         api_key=settings.llm_api_key,
         timeout_seconds=settings.llm_timeout_seconds,
         embedding_model=settings.llm_embedding_model,
