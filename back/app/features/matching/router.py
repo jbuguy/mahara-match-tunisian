@@ -1,8 +1,9 @@
 ﻿from datetime import datetime, timezone
-from typing import Annotated, Any, Callable
+from typing import Annotated, Any, Callable, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, Field
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
@@ -11,8 +12,20 @@ from mahara_data.db.models.matching import MatchResult as StoredMatchResult, Ski
 from mahara_data.db.models.taxonomy import Skill
 from mahara_data.enums import GapType, OfferStatus, RequirementLevel
 from mahara_data.schemas.matching import RankedMatches, Roadmap
+from shared_llm import OpenAICompatibleClient
 
 from . import scoring as _scoring
+from .rag import RAGUnavailable, answer_match_question
+
+
+class MatchAssistantMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=2000)
+
+
+class MatchAssistantIn(BaseModel):
+    question: str = Field(min_length=1, max_length=2000)
+    history: list[MatchAssistantMessage] = Field(default_factory=list, max_length=8)
 
 
 def _scoring_profile(candidate_id: UUID | str, profile: dict[str, Any]) -> dict[str, Any]:
@@ -137,7 +150,13 @@ def _persist_matches(db: Session, result: dict[str, Any]) -> None:
     db.commit()
 
 
-def create_matching_router(get_db: Any, get_current_user: Any, profile_reader: Callable[..., Any]) -> APIRouter:
+def create_matching_router(
+    get_db: Any,
+    get_current_user: Any,
+    profile_reader: Callable[..., Any],
+    *,
+    llm_client: OpenAICompatibleClient | None = None,
+) -> APIRouter:
     router = APIRouter(prefix="/api/v1/me/matches", tags=["wp3-matching"])
 
     def candidate_profile(db: Session, user: Any) -> dict[str, Any]:
@@ -156,6 +175,32 @@ def create_matching_router(get_db: Any, get_current_user: Any, profile_reader: C
         result = _scoring.classer_offres(profile, _published_offers(db))
         _persist_matches(db, result)
         return RankedMatches.model_validate(result).model_dump(mode="json")
+
+    @router.post("/{job_offer_id}/assistant")
+    async def ask_about_match(
+        job_offer_id: str,
+        body: MatchAssistantIn,
+        db: Annotated[Session, Depends(get_db)],
+        user: Annotated[Any, Depends(get_current_user)],
+    ) -> dict[str, Any]:
+        """Answer a candidate question from retrieved, public skill matching sources."""
+        if llm_client is None:
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="The matching assistant is not configured")
+        snapshot = profile_reader(db, user.id)
+        if snapshot is None:
+            raise HTTPException(status_code=404, detail="profile not found")
+        candidate_id, _profile = snapshot
+        try:
+            offer_uuid = UUID(job_offer_id)
+        except ValueError:
+            raise HTTPException(status_code=404, detail="Match or published offer not found") from None
+        history = [message.model_dump() for message in body.history]
+        try:
+            return await answer_match_question(db, llm_client, UUID(str(candidate_id)), offer_uuid, body.question.strip(), history)
+        except LookupError:
+            raise HTTPException(status_code=404, detail="Match or published offer not found") from None
+        except RAGUnavailable as exc:
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from None
 
     @router.get("/{job_offer_id}/roadmap")
     def get_roadmap(

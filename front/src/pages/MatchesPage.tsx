@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 
-import { applyToOffer, getMyApplications, getMyMatches, getMyRoadmap, type CandidateApplication, type MatchResult, type MatchRoadmap, type RankedMatches } from '../lib/api'
+import { applyToOffer, askAboutMatch, getMyApplications, getMyMatches, getMyRoadmap, type CandidateApplication, type MatchAssistantSource, type MatchResult, type MatchRoadmap, type RankedMatches } from '../lib/api'
+import { ChatPanel, type ChatMessage } from '../components/ChatPanel'
 
 function formatSkillCode(code: string) {
   return code.startsWith('UNMAPPED:') ? code.slice('UNMAPPED:'.length) : code
@@ -13,6 +14,12 @@ export function MatchesPage() {
   const [applying, setApplying] = useState('')
   const [roadmap, setRoadmap] = useState<{ offerId: string; result: MatchRoadmap } | null>(null)
   const [roadmapLoading, setRoadmapLoading] = useState('')
+  const [assistantOfferId, setAssistantOfferId] = useState('')
+  const [assistantMessages, setAssistantMessages] = useState<ChatMessage[]>([])
+  const [assistantSources, setAssistantSources] = useState<MatchAssistantSource[]>([])
+  const [assistantInput, setAssistantInput] = useState('')
+  const [assistantPending, setAssistantPending] = useState(false)
+  const [assistantError, setAssistantError] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(Boolean(localStorage.getItem('mahara_access_token')))
 
@@ -57,6 +64,34 @@ export function MatchesPage() {
       setError(cause instanceof Error ? cause.message : 'Could not submit this application.')
     } finally {
       setApplying('')
+    }
+  }
+
+  function toggleAssistant(offerId: string) {
+    setAssistantOfferId((current) => current === offerId ? '' : offerId)
+    setAssistantMessages([])
+    setAssistantSources([])
+    setAssistantInput('')
+    setAssistantError('')
+  }
+
+  async function askAssistant(event: FormEvent<HTMLFormElement>, offerId: string) {
+    event.preventDefault()
+    const question = assistantInput.trim()
+    if (!question || assistantPending) return
+    const history = assistantMessages
+    setAssistantMessages((current) => [...current, { role: 'user', content: question }])
+    setAssistantInput('')
+    setAssistantPending(true)
+    setAssistantError('')
+    try {
+      const response = await askAboutMatch(offerId, question, history)
+      setAssistantMessages((current) => [...current, { role: 'assistant', content: response.reply }])
+      setAssistantSources(response.sources)
+    } catch (cause) {
+      setAssistantError(cause instanceof Error ? cause.message : 'The matching assistant is unavailable.')
+    } finally {
+      setAssistantPending(false)
     }
   }
 
@@ -105,6 +140,31 @@ export function MatchesPage() {
           <button className="secondary-btn" type="button" onClick={() => void loadRoadmap(match)} disabled={roadmapLoading === match.job_offer_id}>
             {roadmapLoading === match.job_offer_id ? 'Loading roadmap…' : 'View learning roadmap'}
           </button>
+          <button className="secondary-btn" type="button" onClick={() => toggleAssistant(match.job_offer_id)} aria-expanded={assistantOfferId === match.job_offer_id}>
+            {assistantOfferId === match.job_offer_id ? 'Close match assistant' : 'Ask about this match'}
+          </button>
+          {assistantOfferId === match.job_offer_id && <ChatPanel
+            variant="compact"
+            className="match-assistant"
+            eyebrow="Grounded in matching data"
+            title="Questions about this match?"
+            messages={assistantMessages}
+            value={assistantInput}
+            onValueChange={setAssistantInput}
+            onSubmit={(event) => void askAssistant(event, match.job_offer_id)}
+            pending={assistantPending}
+            pendingLabel="Searching matching information…"
+            error={assistantError}
+            placeholder="Ask about this role or a skill gap…"
+            inputLabel="Question about this match"
+            emptyMessage="Ask why this role matches your skills or how to work on a listed gap."
+            submitLabel="Ask"
+          >
+            {assistantSources.length > 0 && <details className="match-assistant-sources">
+              <summary>Sources for the latest answer ({assistantSources.length})</summary>
+              <ul>{assistantSources.map((source) => <li key={`${source.type}-${source.id}`}><strong>[{source.citation}] {source.title}</strong><small>{source.type.replace('_', ' ')} · {source.excerpt}</small></li>)}</ul>
+            </details>}
+          </ChatPanel>}
           {(() => {
             const application = applications.find((item) => item.job_offer_id === match.job_offer_id)
             return application

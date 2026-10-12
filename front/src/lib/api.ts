@@ -51,6 +51,17 @@ export type Roadmap = {
 
 export type MatchRoadmap = Roadmap | { status: 'no_gap'; message: string }
 
+export type MatchAssistantMessage = { role: 'user' | 'assistant'; content: string }
+export type MatchAssistantSource = {
+  id: string
+  type: string
+  title: string
+  excerpt: string
+  citation: string
+  similarity: number
+}
+export type MatchAssistantResponse = { reply: string; sources: MatchAssistantSource[] }
+
 export type CandidateApplication = {
   application_id: string
   job_offer_id: string
@@ -95,6 +106,17 @@ export function getMyMatches(): Promise<RankedMatches> {
 
 export function getMyRoadmap(jobOfferId: string): Promise<MatchRoadmap> {
   return requestJson<MatchRoadmap>(`/api/v1/me/matches/${encodeURIComponent(jobOfferId)}/roadmap`)
+}
+
+export function askAboutMatch(
+  jobOfferId: string,
+  question: string,
+  history: MatchAssistantMessage[],
+): Promise<MatchAssistantResponse> {
+  return requestJson<MatchAssistantResponse>(`/api/v1/me/matches/${encodeURIComponent(jobOfferId)}/assistant`, {
+    method: 'POST',
+    body: JSON.stringify({ question, history }),
+  })
 }
 
 export function getMyApplications(): Promise<CandidateApplication[]> {
