@@ -40,7 +40,17 @@ export function SignInPage() {
   }
 
   return (
-    <div className="auth-card auth-card-polished">
+    <div className="auth-layout">
+      <aside className="auth-story" aria-label="About Mahara Match">
+        <span className="auth-story-kicker">Mahara Match · Tunisia</span>
+        <div>
+          <p className="auth-story-mark" aria-hidden="true">م</p>
+          <h1>Skills open doors.</h1>
+          <p>Connect your experience with meaningful work, local employers, and new opportunities.</p>
+        </div>
+        <span className="auth-story-foot">A civic platform for skills and employment</span>
+      </aside>
+      <div className="auth-card auth-card-polished">
       <div className="auth-intro">
         <p className="eyebrow">Welcome back</p>
         <h2>{role ? `Sign in to your ${role} workspace` : 'Sign in to your workspace'}</h2>
@@ -67,6 +77,7 @@ export function SignInPage() {
         </form>
       </>}
       <p className="auth-switch">New to Mahara? <Link to={role ? `/signup?role=${role}` : '/signup'}>Create an account</Link></p>
+      </div>
     </div>
   )
 }
