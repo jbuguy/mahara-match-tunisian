@@ -20,6 +20,8 @@ from .google_auth import router as google_auth_router
 from .features.onboarding.router import create_onboarding_router
 from .features.matching.router import create_matching_router
 from .features.employer.voice import create_employer_voice_router
+from .features.employee.models import CandidatePii
+from .email_auth import router as email_auth_router
 from .features.ministry.routers import analytics as ministry_analytics
 from .features.ministry.routers import ingestion as ministry_ingestion
 from .features.ministry.routers import market as ministry_market
@@ -123,6 +125,7 @@ app.include_router(
     )
 )
 app.include_router(google_auth_router)
+app.include_router(email_auth_router)
 # The existing OAuth client starts its flow under /api/v1; retain that route while
 # the platform's canonical callback remains /auth/google/callback.
 app.include_router(google_auth_router, prefix="/api/v1", include_in_schema=False)
@@ -350,6 +353,9 @@ def validate_onboarding_profile_contract(payload: dict[str, Any]) -> dict[str, o
 @app.post("/employers/signup", response_model=EmployerProfile, status_code=status.HTTP_201_CREATED)
 def signup(payload: EmployerSignup, db: Annotated[Session, Depends(get_db)]) -> Employer:
     email = payload.email.lower()
+    if db.query(User).filter(User.email == email).first() is not None:
+        detail = "An employer with this email already exists" if db.query(Employer).filter(Employer.email == email).first() else "An account with this email already exists"
+        raise HTTPException(status_code=409, detail=detail)
     user = get_or_create_user(db, email, roles=["employer"], email_verified=False)
     password_hash = hash_password(payload.password)
     AuthIdentity.link_user(
@@ -386,12 +392,17 @@ def login(payload: EmployerLogin, db: Annotated[Session, Depends(get_db)]) -> To
     employer = db.query(Employer).filter(Employer.email == payload.email.lower()).first()
     if employer is None or not verify_password(payload.password, employer.password_hash):
         raise HTTPException(status_code=401, detail="Invalid email or password")
+    user = db.query(User).filter(User.id == employer.user_id).first()
+    if user is None or not user.email_verified:
+        raise HTTPException(status_code=403, detail="Email not verified. Check your inbox or request a new verification link.")
     return Token(access_token=create_access_token(employer.id))
 
 
 @app.post("/candidates/signup", response_model=CandidateProfile, status_code=status.HTTP_201_CREATED)
 def candidate_signup(payload: CandidateSignup, db: Annotated[Session, Depends(get_db)]) -> Candidate:
     email = payload.email.lower()
+    if db.query(User).filter(User.email == email).first() is not None:
+        raise HTTPException(status_code=409, detail="An account with this email already exists")
     user = get_or_create_user(db, email, roles=["candidate"], email_verified=False)
     password_hash = hash_password(payload.password)
     AuthIdentity.link_user(
@@ -407,6 +418,12 @@ def candidate_signup(payload: CandidateSignup, db: Annotated[Session, Depends(ge
     candidate = get_or_create_candidate_for_user(db, user, onboarding_path=payload.onboarding_path or "cv_upload")
     user.preferred_language = (payload.preferred_language or "fr").strip() or "fr"
     candidate.governorate_code = payload.governorate_code.strip() if payload.governorate_code else None
+    identity = db.get(CandidatePii, candidate.id)
+    if identity is None:
+        identity = CandidatePii(candidate_id=candidate.id)
+        db.add(identity)
+    identity.full_name = payload.full_name.strip()
+    identity.email = email
     db.commit()
     db.refresh(candidate)
     return candidate
@@ -426,6 +443,8 @@ def candidate_login(payload: CandidateLogin, db: Annotated[Session, Depends(get_
     )
     if identity is None or identity.password_hash is None or not verify_password(payload.password, identity.password_hash):
         raise HTTPException(status_code=401, detail="Invalid email or password")
+    if not user.email_verified:
+        raise HTTPException(status_code=403, detail="Email not verified. Check your inbox or request a new verification link.")
 
     return Token(access_token=create_user_access_token(user))
 
