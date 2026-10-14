@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+
+<html class="h-full bg-background" dir="ltr" lang="fr"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Mahara Match | مهارة ماتش - Plateforme Nationale d'Intermédiation &amp; Compétences</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&amp;family=Noto+Serif:ital,wght@0,400;0,600;0,700;1,400&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols Outlined -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Configuration verbatim -->
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "error": "#ba1a1a",
+            "primary-fixed": "#d6e3ff",
+            "primary-fixed-dim": "#a9c7ff",
+            "outline-variant": "#c3c6d2",
+            "secondary-container": "#fa6c4c",
+            "on-tertiary": "#ffffff",
+            "error-container": "#ffdad6",
+            "tertiary-container": "#465418",
+            "on-primary-fixed-variant": "#144684",
+            "on-primary": "#ffffff",
+            "tertiary-fixed": "#d9ea9e",
+            "on-secondary-container": "#631000",
+            "secondary": "#ac3419",
+            "on-surface": "#221a14",
+            "surface-container-highest": "#f0dfd5",
+            "tertiary": "#303c02",
+            "tertiary-fixed-dim": "#bdce85",
+            "surface-variant": "#f0dfd5",
+            "on-tertiary-container": "#b7c87f",
+            "on-secondary-fixed-variant": "#8a1c02",
+            "on-tertiary-fixed": "#171e00",
+            "on-error-container": "#93000a",
+            "surface-tint": "#335f9d",
+            "primary-container": "#1f4e8c",
+            "surface": "#fff8f5",
+            "on-background": "#221a14",
+            "inverse-primary": "#a9c7ff",
+            "secondary-fixed-dim": "#ffb4a3",
+            "surface-dim": "#e8d7cd",
+            "secondary-fixed": "#ffdad2",
+            "outline": "#737781",
+            "on-secondary-fixed": "#3d0600",
+            "surface-bright": "#fff8f5",
+            "background": "#fff8f5",
+            "on-error": "#ffffff",
+            "on-primary-fixed": "#001b3d",
+            "surface-container-lowest": "#ffffff",
+            "surface-container-high": "#f6e5db",
+            "on-primary-container": "#9ec1ff",
+            "surface-container": "#fcebe1",
+            "primary": "#00376f",
+            "inverse-on-surface": "#ffede3",
+            "surface-container-low": "#fff1e9",
+            "inverse-surface": "#382e28",
+            "on-secondary": "#ffffff",
+            "on-tertiary-fixed-variant": "#3f4c10",
+            "on-surface-variant": "#434750"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "space-md": "1rem",
+            "space-xl": "2.5rem",
+            "gutter": "1.5rem",
+            "margin-mobile": "1rem",
+            "margin": "2.5rem",
+            "space-sm": "0.5rem",
+            "space-xs": "0.25rem",
+            "space-lg": "1.5rem",
+            "gutter-mobile": "1rem"
+          },
+          "fontFamily": {
+            "label-md": ["Plus Jakarta Sans"],
+            "body-sm": ["Plus Jakarta Sans"],
+            "headline-lg": ["Noto Serif"],
+            "label-sm": ["Plus Jakarta Sans"],
+            "body-lg": ["Plus Jakarta Sans"],
+            "title-md": ["Plus Jakarta Sans"],
+            "display-lg": ["Noto Serif"],
+            "display-lg-mobile": ["Noto Serif"],
+            "body-md": ["Plus Jakarta Sans"],
+            "headline-sm": ["Noto Serif"],
+            "headline-md-mobile": ["Noto Serif"],
+            "headline-md": ["Noto Serif"],
+            "headline-lg-mobile": ["Noto Serif"],
+            "title-lg": ["Plus Jakarta Sans"],
+            "arabic": ["Cairo", "sans-serif"]
+          },
+          "fontSize": {
+            "label-md": ["13px", { "lineHeight": "18px", "letterSpacing": "0.03em", "fontWeight": "600" }],
+            "body-sm": ["13px", { "lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "400" }],
+            "headline-lg": ["36px", { "lineHeight": "44px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+            "label-sm": ["11px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600" }],
+            "body-lg": ["18px", { "lineHeight": "28px", "letterSpacing": "0em", "fontWeight": "400" }],
+            "title-md": ["16px", { "lineHeight": "24px", "letterSpacing": "0.01em", "fontWeight": "600" }],
+            "display-lg": ["48px", { "lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+            "display-lg-mobile": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+            "body-md": ["15px", { "lineHeight": "24px", "letterSpacing": "0em", "fontWeight": "400" }],
+            "headline-sm": ["20px", { "lineHeight": "28px", "letterSpacing": "0em", "fontWeight": "600" }],
+            "headline-md-mobile": ["22px", { "lineHeight": "30px", "letterSpacing": "0em", "fontWeight": "600" }],
+            "headline-md": ["28px", { "lineHeight": "36px", "letterSpacing": "0em", "fontWeight": "600" }],
+            "headline-lg-mobile": ["26px", { "lineHeight": "34px", "letterSpacing": "0em", "fontWeight": "600" }],
+            "title-lg": ["18px", { "lineHeight": "26px", "letterSpacing": "0.01em", "fontWeight": "600" }]
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      display: inline-block;
+      vertical-align: middle;
+      line-height: 1;
+    }
+    .material-symbols-outlined.fill-icon {
+      font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    }
+
+    /* Architectural studs & Medina stone textures */
+    .medina-stud {
+      box-shadow: inset 0 1px 1px rgba(255,255,255,0.7), 0 1px 2px rgba(42,33,27,0.18);
+    }
+    .zellige-border-b {
+      background-image: radial-gradient(#1f4e8c 0.8px, transparent 0.8px);
+      background-size: 8px 8px;
+    }
+    .arch-portal {
+      border-radius: 1.5rem 1.5rem 0.5rem 0.5rem;
+    }
+
+    /* Custom scrollbar to match warm limestone */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f6e5db;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #c3c6d2;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #737781;
+    }
+
+    /* RTL specific overrides for Arabic typography feel */
+    [dir="rtl"] {
+      font-family: 'Cairo', 'Noto Serif', sans-serif;
+    }
+  </style>
+<style id="mobile-adaptive">
+@media(max-width:760px){body{overflow-x:hidden}.main-container,.workspace-main,.main-content{width:100%;max-width:100%;padding-left:1rem!important;padding-right:1rem!important}.sidebar{z-index:40}.topbar{gap:.5rem;padding-inline:.75rem}.topbar .search-container{display:none}#role-stats-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}.hero-section,.hero-card{align-items:flex-start!important;flex-direction:column!important}.workspace-content{min-width:0}.overflow-x-auto{max-width:100%;overflow-x:auto}button,a{min-height:40px}}
+@media(max-width:480px){#role-stats-grid{grid-template-columns:1fr!important}.sidebar{position:fixed;inset-block:0;max-height:100dvh;overflow-y:auto}.topbar{min-height:56px}h1{font-size:clamp(1.45rem,7vw,2rem)!important}.rounded-2xl{border-radius:1rem!important}}
+</style></head>
+<body class="h-full antialiased text-on-surface bg-background flex flex-col overflow-hidden select-none">
+<!-- Interactive Simulation Bar (Dev & Role Harness) -->
+<aside aria-label="Simulateur d'Environnement" class="bg-primary text-on-primary px-space-md py-1.5 flex flex-wrap items-center justify-between text-xs z-50 shadow-md border-b border-primary-container">
+<div class="flex items-center gap-space-sm">
+<span class="inline-flex items-center justify-center w-2 h-2 rounded-full bg-secondary-container animate-pulse"></span>
+<span class="font-bold tracking-wider text-label-sm uppercase">Simulateur d'Environnement Mahara Match</span>
+<span class="hidden md:inline-block text-outline-variant">|</span>
+<span class="text-primary-fixed hidden md:inline text-label-sm">Basculez de rôle ou d'orientation pour vérifier les états de navigation :</span>
+</div>
+<div class="flex items-center gap-space-sm">
+<!-- Quick Role Toggle Buttons -->
+<div class="inline-flex rounded-lg bg-primary-container p-0.5 border border-outline/30">
+<button class="px-2.5 py-1 rounded text-label-sm font-semibold transition-all bg-surface-container-lowest text-primary shadow-sm" id="btn-role-candidate" onclick="setRole('candidate')">
+          Candidat
+        </button>
+<button class="px-2.5 py-1 rounded text-label-sm font-semibold transition-all text-primary-fixed hover:text-white" id="btn-role-employer" onclick="setRole('employer')">
+          Employeur
+        </button>
+<button class="px-2.5 py-1 rounded text-label-sm font-semibold transition-all text-primary-fixed hover:text-white" id="btn-role-ministry" onclick="setRole('ministry')">
+          Ministère
+        </button>
+<button class="px-2.5 py-1 rounded text-label-sm font-semibold transition-all text-primary-fixed hover:text-white flex items-center gap-1" id="btn-role-training" onclick="setRole('training')">
+<span>Centre</span>
+<span class="text-[9px] bg-secondary px-1 rounded text-white font-mono">PLANNED</span>
+</button>
+<button class="px-2.5 py-1 rounded text-label-sm font-semibold transition-all text-primary-fixed hover:text-white flex items-center gap-1" id="btn-role-staff" onclick="setRole('staff')">
+<span>Staff</span>
+<span class="text-[9px] bg-secondary px-1 rounded text-white font-mono">PLANNED</span>
+</button>
+</div>
+<!-- Quick Direction Toggle -->
+<button class="inline-flex items-center gap-1 bg-surface-container-high text-on-surface px-2.5 py-1 rounded-lg text-label-sm font-bold border border-outline-variant hover:bg-surface-container-highest transition-colors" onclick="toggleDirection()">
+<span class="material-symbols-outlined text-[16px]">sync_alt</span>
+<span id="dir-toggle-text">FR (LTR) ↔ AR (RTL)</span>
+</button>
+</div>
+</aside>
+<!-- Main Desktop App Shell Container -->
+<div class="flex-1 flex overflow-hidden relative">
+<!-- COLLAPSIBLE DESKTOP SIDEBAR -->
+<!-- Follows Shared Components JSON 'SideNavBar' specs & Brand Anchors -->
+<aside class="w-72 bg-surface-container-low border-e border-outline-variant flex flex-col justify-between shrink-0 transition-all duration-300 z-30 shadow-sm relative group/sidebar" id="main-sidebar">
+<!-- Top Section: Header & Role Context -->
+<div class="flex flex-col">
+<!-- Sidebar Header with Tunisian Emblem Motif -->
+<div class="p-space-md border-b border-outline-variant/60 flex items-center justify-between">
+<div class="flex items-center gap-space-sm overflow-hidden sidebar-text-item">
+<!-- Tunisian Architectural Crest / Medina Star Nailhead -->
+<div class="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shrink-0 shadow-sm relative border border-primary-container">
+<span class="material-symbols-outlined text-white text-[22px]">account_balance</span>
+<span class="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-secondary border-2 border-surface-container-low"></span>
+</div>
+<div class="flex flex-col truncate">
+<div class="flex items-center gap-1.5">
+<span class="font-headline-sm text-headline-sm font-bold text-primary tracking-wide">Mahara Match</span>
+</div>
+<span class="text-label-sm text-on-surface-variant font-medium truncate">مهارة ماتش • الجمهورية التونسية</span>
+</div>
+</div>
+<!-- Collapse / Expand Toggle Button -->
+<button class="p-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-primary transition-colors flex items-center justify-center" id="collapse-btn" onclick="toggleSidebarCollapse()" title="Réduire le panneau latéral">
+<span class="material-symbols-outlined text-[20px]" id="collapse-icon">menu_open</span>
+</button>
+</div>
+<!-- Interactive Role Switcher Pill & Dropdown -->
+<div class="p-space-sm border-b border-outline-variant/40">
+<div class="relative">
+<button class="w-full flex items-center justify-between p-2 rounded-xl bg-surface-container-lowest border border-outline-variant hover:border-primary transition-all shadow-sm group" id="role-selector-button" onclick="toggleRoleDropdown()">
+<div class="flex items-center gap-2 truncate">
+<div class="w-7 h-7 rounded-lg bg-primary-fixed flex items-center justify-center text-primary shrink-0" id="role-pill-icon-container">
+<span class="material-symbols-outlined text-[18px]" id="current-role-icon">person</span>
+</div>
+<div class="flex flex-col text-start truncate sidebar-text-item">
+<span class="text-[10px] text-outline uppercase font-bold tracking-wider" id="current-role-subtitle">Rôle actif</span>
+<span class="text-label-md font-bold text-primary truncate" id="current-role-title">Candidat (مترشح)</span>
+</div>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-transform text-[18px] sidebar-text-item" id="role-chevron">expand_more</span>
+</button>
+<!-- Role Selector Floating Dropdown Menu -->
+<div class="hidden absolute top-full start-0 mt-1.5 w-full bg-surface-container-lowest border border-outline-variant rounded-xl shadow-lg p-1.5 z-50 flex-col gap-1" id="role-dropdown-menu">
+<div class="text-[10px] font-bold text-outline px-2 py-1 uppercase tracking-wider">Sélectionner un profil</div>
+<!-- 1. Candidate -->
+<button class="w-full flex items-center justify-between p-2 rounded-lg hover:bg-surface-container text-start transition-colors" onclick="setRole('candidate')">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[18px]">person</span>
+<div>
+<p class="text-label-md font-bold text-on-surface">Candidat</p>
+<p class="text-label-sm text-on-surface-variant font-arabic">مترشح للعمل</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-primary text-[18px] role-check candidate-check">check</span>
+</button>
+<!-- 2. Employer -->
+<button class="w-full flex items-center justify-between p-2 rounded-lg hover:bg-surface-container text-start transition-colors" onclick="setRole('employer')">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[18px]">domain</span>
+<div>
+<p class="text-label-md font-bold text-on-surface">Employeur</p>
+<p class="text-label-sm text-on-surface-variant font-arabic">مؤجر / مؤسسة</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-primary text-[18px] role-check employer-check hidden">check</span>
+</button>
+<!-- 3. Ministry -->
+<button class="w-full flex items-center justify-between p-2 rounded-lg hover:bg-surface-container text-start transition-colors" onclick="setRole('ministry')">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[18px]">account_balance</span>
+<div>
+<p class="text-label-md font-bold text-on-surface">Ministère de l'Emploi</p>
+<p class="text-label-sm text-on-surface-variant font-arabic">وزارة التشغيل والتكوين</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-primary text-[18px] role-check ministry-check hidden">check</span>
+</button>
+<!-- 4. Training Center (Concept) -->
+<button class="w-full flex items-center justify-between p-2 rounded-lg hover:bg-surface-container text-start transition-colors group/item" onclick="setRole('training')">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-outline text-[18px]">school</span>
+<div>
+<div class="flex items-center gap-1.5">
+<p class="text-label-md font-bold text-on-surface">Centre de formation</p>
+</div>
+<p class="text-label-sm text-on-surface-variant font-arabic">مركز تكوين مهني</p>
+</div>
+</div>
+<span class="text-[10px] bg-secondary-fixed text-on-secondary-fixed-variant px-1.5 py-0.5 rounded font-mono font-bold border border-secondary/30">PLANNED</span>
+</button>
+<!-- 5. Platform Staff (Concept) -->
+<button class="w-full flex items-center justify-between p-2 rounded-lg hover:bg-surface-container text-start transition-colors group/item" onclick="setRole('staff')">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-outline text-[18px]">admin_panel_settings</span>
+<div>
+<div class="flex items-center gap-1.5">
+<p class="text-label-md font-bold text-on-surface">Staff Plateforme</p>
+</div>
+<p class="text-label-sm text-on-surface-variant font-arabic">فريق الإشراف الفني</p>
+</div>
+</div>
+<span class="text-[10px] bg-secondary-fixed text-on-secondary-fixed-variant px-1.5 py-0.5 rounded font-mono font-bold border border-secondary/30">PLANNED</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Dynamic Role Navigation List -->
+<nav aria-label="Menu principal" class="p-space-sm space-y-1 overflow-y-auto max-h-[calc(100vh-280px)]" id="sidebar-nav-items">
+<!-- Injected dynamically via JavaScript according to active role -->
+</nav>
+</div>
+<!-- Footer Section: Institutional Accord & Settings -->
+<div class="p-space-sm border-t border-outline-variant/60 bg-surface-container space-y-1">
+<a class="flex items-center gap-3 px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-primary transition-colors text-label-md font-medium group" href="#settings">
+<span class="material-symbols-outlined text-[20px] text-on-surface-variant group-hover:text-primary">settings</span>
+<span class="sidebar-text-item">Paramètres</span>
+</a>
+<a class="flex items-center gap-3 px-space-sm py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-primary transition-colors text-label-md font-medium group" href="#help">
+<span class="material-symbols-outlined text-[20px] text-on-surface-variant group-hover:text-primary">help</span>
+<span class="sidebar-text-item">Assistance &amp; Guide</span>
+</a>
+<!-- Republic of Tunisia Badge Motif -->
+<div class="mt-2 pt-2 border-t border-outline-variant/30 px-2 flex items-center gap-2 sidebar-text-item">
+<div class="w-2 h-2 rounded-full bg-secondary"></div>
+<span class="text-[11px] text-outline font-semibold">Service Public Numérique Tunisien</span>
+</div>
+</div>
+</aside>
+<!-- MAIN APPLICATION VIEWPORT -->
+<div class="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
+<!-- TOP APPLICATION BAR -->
+<!-- Matches Shared Components JSON 'TopNavBar' specs -->
+<header class="bg-surface border-b border-outline-variant px-space-md md:px-margin h-16 flex items-center justify-between shrink-0 sticky top-0 z-20 shadow-sm">
+<!-- Search Bar Area (Left on LTR, Right on RTL) -->
+<div class="flex items-center gap-space-md flex-1 max-w-xl">
+<div class="relative w-full">
+<span class="material-symbols-outlined absolute start-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[20px]">search</span>
+<input class="w-full ps-10 pe-4 py-2 bg-surface-container-lowest border border-outline-variant rounded-xl text-body-sm text-on-surface placeholder:text-outline focus:outline-none focus:border-primary-container focus:ring-2 focus:ring-primary-container/20 transition-all shadow-sm" id="top-search-input" placeholder="Rechercher une compétence, offre, métier (ex: Soudure TIG, Java, Industrie 4.0)..." type="text"/>
+<div class="absolute end-2 top-1/2 -translate-y-1/2 hidden md:flex items-center gap-1">
+<kbd class="px-1.5 py-0.5 text-[10px] font-mono text-outline bg-surface-container rounded border border-outline-variant">⌘K</kbd>
+</div>
+</div>
+</div>
+<!-- Trailing Actions Cluster -->
+<div class="flex items-center gap-space-sm md:gap-space-md ms-4">
+<!-- Language Selector Dropdown -->
+<div class="relative">
+<button class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-outline-variant bg-surface-container-lowest text-primary hover:bg-surface-container font-label-md text-label-md transition-colors shadow-sm" id="lang-btn" onclick="toggleLangDropdown()">
+<span class="material-symbols-outlined text-[18px]">translate</span>
+<span class="font-bold" id="current-lang-text">Français (FR)</span>
+<span class="material-symbols-outlined text-[16px] text-outline">expand_more</span>
+</button>
+<!-- Language Menu Dropdown -->
+<div class="hidden absolute end-0 mt-1.5 w-48 bg-surface-container-lowest border border-outline-variant rounded-xl shadow-lg p-1.5 z-50 flex-col gap-1" id="lang-dropdown-menu">
+<button class="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-surface-container text-start transition-colors" onclick="changeLanguage('fr')">
+<span class="text-label-md font-semibold text-primary">Français (FR - LTR)</span>
+<span class="material-symbols-outlined text-primary text-[18px] lang-check" id="check-fr">check</span>
+</button>
+<button class="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-surface-container text-start transition-colors" onclick="changeLanguage('ar')">
+<div class="text-start">
+<span class="text-label-md font-semibold font-arabic text-on-surface">العربية (الفصحى - RTL)</span>
+</div>
+<span class="material-symbols-outlined text-primary text-[18px] lang-check hidden" id="check-ar">check</span>
+</button>
+<button class="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-surface-container text-start transition-colors" onclick="changeLanguage('tn')">
+<div class="text-start">
+<span class="text-label-md font-semibold font-arabic text-on-surface">Tounsi (دارجة تونسية)</span>
+</div>
+<span class="material-symbols-outlined text-primary text-[18px] lang-check hidden" id="check-tn">check</span>
+</button>
+</div>
+</div>
+<!-- Notification Bell with Popover & Empty State toggle -->
+<div class="relative">
+<button aria-label="Notifications" class="relative p-2 rounded-xl text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors" id="notif-btn" onclick="toggleNotificationPopover()">
+<span class="material-symbols-outlined text-[22px]">notifications</span>
+<span class="absolute top-1.5 end-1.5 w-4 h-4 bg-secondary text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-surface" id="notif-badge">2</span>
+</button>
+<!-- Notification Dropdown Panel -->
+<div class="hidden absolute end-0 mt-2 w-80 md:w-96 bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-xl z-50 overflow-hidden" id="notification-popover">
+<div class="p-3 border-b border-outline-variant bg-surface-container-low flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="font-headline-sm text-title-md font-bold text-primary">Notifications</span>
+<span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-primary-fixed text-on-primary-fixed-variant" id="notif-count-tag">2 nouvelles</span>
+</div>
+<!-- Demo Toggle: Filled vs Empty -->
+<button class="text-label-sm text-secondary hover:underline font-semibold flex items-center gap-1" onclick="toggleNotificationState()">
+<span class="material-symbols-outlined text-[14px]">swap_horiz</span>
+<span id="notif-toggle-label">Voir état vide</span>
+</button>
+</div>
+<!-- Notifications Active List -->
+<div class="max-h-80 overflow-y-auto divide-y divide-outline-variant/40" id="notifications-filled-container">
+<div class="p-3 hover:bg-surface-container-low transition-colors flex gap-3 items-start">
+<div class="w-8 h-8 rounded-lg bg-primary-fixed flex items-center justify-center text-primary shrink-0">
+<span class="material-symbols-outlined text-[18px]">verified</span>
+</div>
+<div class="flex-1">
+<p class="text-label-md font-bold text-on-surface">Compétence certifiée par le CENAFFIF</p>
+<p class="text-body-sm text-on-surface-variant mt-0.5">Votre badge "Technicien en Automatisme Industriel" est validé sur votre passeport de compétences.</p>
+<span class="text-label-sm text-outline mt-1 block">Il y a 25 minutes</span>
+</div>
+</div>
+<div class="p-3 hover:bg-surface-container-low transition-colors flex gap-3 items-start">
+<div class="w-8 h-8 rounded-lg bg-secondary-fixed flex items-center justify-center text-secondary shrink-0">
+<span class="material-symbols-outlined text-[18px]">work</span>
+</div>
+<div class="flex-1">
+<p class="text-label-md font-bold text-on-surface">Nouveau match d'opportunité (94%)</p>
+<p class="text-body-sm text-on-surface-variant mt-0.5">Société Tunisienne d'Automobile recherche un profil correspondant exactement à votre passeport Mahara.</p>
+<span class="text-label-sm text-outline mt-1 block">Il y a 2 heures</span>
+</div>
+</div>
+</div>
+<!-- Notifications Empty State (Shown via Toggle) -->
+<div class="hidden p-8 flex-col items-center justify-center text-center" id="notifications-empty-container">
+<div class="w-14 h-14 rounded-full bg-surface-container flex items-center justify-center text-outline mb-3 border border-outline-variant">
+<span class="material-symbols-outlined text-[28px]">notifications_off</span>
+</div>
+<h4 class="font-headline-sm text-title-md font-bold text-on-surface">Aucune notification récente</h4>
+<p class="text-body-sm text-on-surface-variant max-w-xs mt-1">Vous êtes à jour. Les alertes de compétences et d'offres apparaîtront ici.</p>
+<span class="mt-4 text-label-sm text-outline font-arabic">لا توجد إشعارات جديدة حالياً</span>
+</div>
+<!-- Notification Footer -->
+<div class="p-2.5 bg-surface-container-low border-t border-outline-variant text-center">
+<a class="text-label-md text-primary font-bold hover:underline" href="#all-notifs">Afficher tout l'historique</a>
+</div>
+</div>
+</div>
+<div class="h-6 w-px bg-outline-variant"></div>
+<!-- User Profile & Verified Citizen Dropdown -->
+<div class="relative">
+<button class="flex items-center gap-2 p-1.5 rounded-xl hover:bg-surface-container transition-colors group" id="user-menu-btn" onclick="toggleUserDropdown()">
+<div class="relative">
+<img class="w-9 h-9 rounded-full object-cover border-2 border-primary-container" data-alt="Photographie portrait professionnelle en buste d'un citoyen tunisien souriant vêtu d'une chemise élégante, éclairé par la douce lumière naturelle méditerranéenne mettant en valeur un teint chaleureux sur fond de mur de pierre ocre clair style sidi bou said." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA79MtY0ZBZ2n29wBOARxg8MaRowSDDL0_OJKcq6w16q7nKih3yV1vhivVnHwurETEBP4hYoxXNdpFaTFMHI0yNBffPovooQvzkQzW-mu7z2KoSPxz9EbzQYQ_GdVl2N1uvtDmIR93UXyJxzZEd2oiaYilOcc-jU26wgeNsp4MjFyTCiPjY7Utd74La72Iml4agNnp5b8lH37l63rbdBM3SZElkt_RFGPDdcch71y9Sfm3aVp9EwTSCfw"/>
+<span class="absolute -bottom-0.5 -end-0.5 w-3.5 h-3.5 bg-tertiary-container rounded-full border-2 border-surface flex items-center justify-center text-[8px] text-white" title="Identité Citoyenne Vérifiée (TunTrust / Mobile ID)">
+                  ✓
+                </span>
+</div>
+<div class="hidden lg:flex flex-col text-start">
+<div class="flex items-center gap-1">
+<span class="text-label-md font-bold text-on-surface truncate" id="top-user-name"></span>
+<span class="material-symbols-outlined text-tertiary text-[16px] fill-icon" title="Profil Homologué">verified</span>
+</div>
+<span class="text-[11px] text-on-surface-variant truncate font-arabic" id="top-user-role-label">مترشح موثّق • Tunis</span>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary text-[18px]">expand_more</span>
+</button>
+<!-- User Dropdown Menu -->
+<div class="hidden absolute end-0 mt-2 w-64 bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-xl p-2 z-50 flex-col gap-1" id="user-dropdown-menu">
+<div class="p-2 border-b border-outline-variant/60">
+<p class="text-label-md font-bold text-on-surface truncate">Mohamed Yassine Ben Salah</p>
+<p class="text-body-sm text-outline text-xs truncate">yassine.bensalah@aneti.nat.tn</p>
+<div class="mt-2 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-surface-container text-primary text-[11px] font-semibold border border-outline-variant">
+<span class="w-1.5 h-1.5 rounded-full bg-tertiary-container"></span>
+<span>Compte Citoyen Validé</span>
+</div>
+</div>
+<div class="py-1">
+<a class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-body-sm hover:bg-surface-container text-on-surface transition-colors" href="#profile">
+<span class="material-symbols-outlined text-[20px] text-primary">badge</span>
+<span>Mon Profil / <span class="font-arabic">ملفي الشخصي</span></span>
+</a>
+<a class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-body-sm hover:bg-surface-container text-on-surface transition-colors" href="#settings">
+<span class="material-symbols-outlined text-[20px] text-primary">tune</span>
+<span>Paramètres du compte / <span class="font-arabic">الإعدادات</span></span>
+</a>
+<a class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-body-sm hover:bg-surface-container text-on-surface transition-colors" href="#privacy">
+<span class="material-symbols-outlined text-[20px] text-primary">security</span>
+<span>Confidentialité &amp; Données</span>
+</a>
+</div>
+<div class="pt-1 border-t border-outline-variant/60">
+<button class="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-body-sm text-secondary hover:bg-secondary-fixed/30 transition-colors font-bold text-start">
+<span class="material-symbols-outlined text-[20px] text-secondary">logout</span>
+<span>Se déconnecter / <span class="font-arabic">تسجيل الخروج</span></span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</header>
+<!-- WORKSPACE PREVIEW & CONTENT CANVAS -->
+<!-- Medina Atelier Warm Environment -->
+<main class="flex-1 overflow-y-auto p-space-md md:p-margin bg-background relative">
+<!-- Architectural subtle top decorative border (Zellige hint) -->
+<div class="h-1 w-full zellige-border-b opacity-25 mb-6"></div>
+<!-- Role Breadcrumb & Welcome Banner Container -->
+<div class="max-w-7xl mx-auto space-y-6">
+<!-- Breadcrumb & Status Row -->
+<div class="flex flex-wrap items-center justify-between gap-4">
+<nav aria-label="Fil d'Ariane" class="flex items-center gap-2 text-label-md text-on-surface-variant">
+<span class="hover:text-primary flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">home</span>
+<span>Accueil</span>
+</span>
+<span class="material-symbols-outlined text-[14px] text-outline">chevron_right</span>
+<span class="text-primary font-bold" id="workspace-breadcrumb-role">Candidat</span>
+<span class="material-symbols-outlined text-[14px] text-outline">chevron_right</span>
+<span class="text-outline" id="workspace-breadcrumb-page">Vue d'ensemble</span>
+</nav>
+<div class="flex items-center gap-2">
+<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-container text-primary font-label-md border border-outline-variant">
+<span class="w-2 h-2 rounded-full bg-tertiary-container animate-pulse"></span>
+<span id="role-sync-label">Synchronisation Référentiel National (REM) Active</span>
+</span>
+</div>
+</div>
+<!-- Hero Role Overview Card (Portico Arch Structure) -->
+<div class="arch-portal bg-surface-container-lowest border border-outline-variant p-6 md:p-8 shadow-sm relative overflow-hidden">
+<!-- Medina Architectural Sunlit Ambient corner motif -->
+<div class="absolute top-0 end-0 w-64 h-64 bg-surface-container-high/40 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20"></div>
+<div class="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+<div class="space-y-2">
+<div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-primary-fixed text-primary font-label-sm uppercase font-bold tracking-wider" id="hero-role-pill">
+                  Espace Candidat Certifié
+                </div>
+<h1 class="font-headline-lg text-headline-lg font-bold text-primary tracking-tight" id="hero-headline">
+                  Bienvenue, Mohamed Yassine
+                </h1>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-2xl" id="hero-subline">
+                  Votre passeport de compétences est à jour selon la taxonomie nationale des métiers (CNFP). Deux recruteurs industriels ont consulté vos validations d'acquis cette semaine.
+                </p>
+</div>
+<!-- Quick Action Button (Harissa Red Accent) -->
+<div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+<button class="px-5 py-3 rounded-lg bg-secondary text-white font-label-md font-bold shadow-md hover:bg-secondary-container transition-all flex items-center justify-center gap-2 active:translate-y-px">
+<span class="material-symbols-outlined text-[20px]" id="hero-primary-action-icon">auto_awesome</span>
+<span id="hero-primary-action-text">Explorer les 14 offres compatibles</span>
+</button>
+<button class="px-4 py-3 rounded-lg border border-outline-variant bg-surface-container hover:bg-surface-container-high text-primary font-label-md font-semibold transition-colors flex items-center justify-center gap-1.5">
+<span class="material-symbols-outlined text-[18px]">download</span>
+<span>Exporter Passeport PDF</span>
+</button>
+</div>
+</div>
+<!-- Mediterranean Ceramic separator rule -->
+<div class="my-6 border-b border-outline-variant/60"></div>
+<!-- Bento Quick Stats Grid: Adapts per Role -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" id="role-stats-grid">
+<!-- Dynamically populated stats -->
+</div>
+</div>
+<!-- Secondary Grid Section: Architectural Medina Cards -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+<!-- Left 2 Cols: Main Operational Feed -->
+<div class="lg:col-span-2 space-y-6">
+<!-- Active Workflow Card -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 shadow-sm">
+<div class="flex items-center justify-between pb-4 border-b border-outline-variant">
+<div class="flex items-center gap-2.5">
+<div class="w-8 h-8 rounded-lg bg-primary-container text-white flex items-center justify-center">
+<span class="material-symbols-outlined text-[18px]" id="workflow-box-icon">timeline</span>
+</div>
+<div>
+<h3 class="font-title-lg text-title-lg font-bold text-primary" id="workflow-box-title">Parcours de Qualification &amp; Matchs</h3>
+<p class="text-body-sm text-on-surface-variant" id="workflow-box-subtitle">Validation des compétences et alignement avec les besoins régionaux de Ben Arous</p>
+</div>
+</div>
+<span class="text-label-sm font-bold text-tertiary-container bg-surface-container px-2.5 py-1 rounded border border-outline-variant">Homologué CNFP</span>
+</div>
+<!-- Process Steps with Mediterranean brass studs -->
+<div class="py-6 space-y-6">
+<div class="flex items-start gap-4">
+<div class="relative flex flex-col items-center">
+<div class="w-7 h-7 rounded-full bg-primary flex items-center justify-center text-white medina-stud">
+<span class="material-symbols-outlined text-[16px]">check</span>
+</div>
+<div class="w-0.5 h-12 bg-outline-variant mt-1"></div>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<span class="text-label-md font-bold text-primary">Évaluation Initiale des Savoir-Faire</span>
+<span class="text-[10px] bg-surface-container-highest px-1.5 py-0.5 rounded text-outline font-mono">100% Validé</span>
+</div>
+<p class="text-body-sm text-on-surface-variant mt-0.5">Test technique standardisé ANETI &amp; simulation atelier validés au Centre Sectoriel de Borj Cédria.</p>
+</div>
+</div>
+<div class="flex items-start gap-4">
+<div class="relative flex flex-col items-center">
+<div class="w-7 h-7 rounded-full bg-secondary flex items-center justify-center text-white medina-stud animate-pulse">
+<span class="material-symbols-outlined text-[16px]">hourglass_top</span>
+</div>
+<div class="w-0.5 h-12 bg-outline-variant mt-1"></div>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<span class="text-label-md font-bold text-on-surface">Mise en correspondance avec 3 entreprises locales</span>
+<span class="text-[10px] bg-secondary-fixed text-on-secondary-fixed px-1.5 py-0.5 rounded font-bold font-mono">EN COURS</span>
+</div>
+<p class="text-body-sm text-on-surface-variant mt-0.5">Transmission sécurisée des fiches de compétences anonymisées aux recruteurs certifiés.</p>
+</div>
+</div>
+<div class="flex items-start gap-4">
+<div class="w-7 h-7 rounded-full bg-surface-container border border-outline flex items-center justify-center text-outline medina-stud">
+<span class="material-symbols-outlined text-[16px]">verified_user</span>
+</div>
+<div>
+<span class="text-label-md font-bold text-outline">Signature de la Convention d'Emploi ou Contrat d'Insertion</span>
+<p class="text-body-sm text-outline mt-0.5">Cadre légal garanti par l'inspection du travail et la convention collective sectorielle.</p>
+</div>
+</div>
+</div>
+<!-- Footer Callout -->
+<div class="p-4 rounded-xl bg-surface-container-low border border-outline-variant flex items-center justify-between">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary text-[24px]">verified</span>
+<span class="text-body-sm font-medium text-on-surface">Vous avez accumulé 4 micro-certifications vérifiables sur la blockchain publique.</span>
+</div>
+<a class="text-label-md font-bold text-primary hover:underline whitespace-nowrap" href="#credentials">Consulter</a>
+</div>
+</div>
+</div>
+<!-- Right Col: Regional Observatory & Contextual Widget -->
+<div class="space-y-6">
+<!-- Regional Insights Card (Tunisian Medina Focus) -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 shadow-sm space-y-4">
+<div class="flex items-center justify-between">
+<h4 class="font-title-md text-title-md font-bold text-primary">Observatoire Régional</h4>
+<span class="text-label-sm text-outline font-arabic">مرصد التشغيل</span>
+</div>
+<div class="p-3 bg-surface-container rounded-lg border border-outline-variant/60 flex items-center gap-3">
+<span class="material-symbols-outlined text-secondary text-[22px]">trending_up</span>
+<div>
+<p class="text-label-md font-bold text-on-surface">Gouvernorat de Tunis &amp; Grand Tunis</p>
+<p class="text-[12px] text-on-surface-variant">+18% de tension sur les métiers de la mécatronique</p>
+</div>
+</div>
+<!-- Sectors Bar Chart mockup -->
+<div class="space-y-2.5 pt-2">
+<div class="space-y-1">
+<div class="flex justify-between text-label-sm">
+<span class="font-medium text-on-surface">Technologies &amp; Numérique</span>
+<span class="font-bold text-primary">88% Recrutements</span>
+</div>
+<div class="w-full h-2 rounded-full bg-surface-container overflow-hidden">
+<div class="h-full bg-primary-container rounded-full" style="width: 88%"></div>
+</div>
+</div>
+<div class="space-y-1">
+<div class="flex justify-between text-label-sm">
+<span class="font-medium text-on-surface">Industries Aéronautiques (Mghira)</span>
+<span class="font-bold text-primary">72%</span>
+</div>
+<div class="w-full h-2 rounded-full bg-surface-container overflow-hidden">
+<div class="h-full bg-secondary rounded-full" style="width: 72%"></div>
+</div>
+</div>
+<div class="space-y-1">
+<div class="flex justify-between text-label-sm">
+<span class="font-medium text-on-surface">Artisanat Moderne &amp; Agroalimentaire</span>
+<span class="font-bold text-primary">54%</span>
+</div>
+<div class="w-full h-2 rounded-full bg-surface-container overflow-hidden">
+<div class="h-full bg-tertiary-container rounded-full" style="width: 54%"></div>
+</div>
+</div>
+</div>
+<!-- Support Anchor -->
+<div class="pt-3 border-t border-outline-variant flex items-center justify-between text-label-sm">
+<span class="text-outline">Données ANETI &amp; INS 2025</span>
+<a class="text-primary font-bold hover:underline" href="#stats">Rapport complet</a>
+</div>
+</div>
+<!-- Public Notice Card -->
+<div class="bg-surface-container-high border border-outline-variant rounded-xl p-5 space-y-3">
+<div class="flex items-center gap-2 text-primary font-bold text-label-md">
+<span class="material-symbols-outlined text-[18px]">info</span>
+<span>Permanence Conseillers</span>
+</div>
+<p class="text-body-sm text-on-surface-variant">
+                  Les conseillers ANETI organisent une permanence en ligne chaque jeudi pour accompagner les transitions professionnelles et les équivalences de diplômes étrangers.
+                </p>
+<button class="w-full py-2 bg-surface-container-lowest text-primary rounded-lg border border-outline-variant font-label-md font-bold hover:bg-surface transition-colors shadow-sm">
+                  Prendre rendez-vous en ligne
+                </button>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</div>
+<!-- JavaScript for Shell Interactions & Context Switching -->
+<script>
+    // State storage
+    const AppState = {
+      role: 'candidate', // 'candidate' | 'employer' | 'ministry' | 'training' | 'staff'
+      direction: 'ltr',   // 'ltr' | 'rtl'
+      language: 'fr',    // 'fr' | 'ar' | 'tn'
+      sidebarCollapsed: false,
+      notificationsFilled: true
+    };
+
+    // Role definitions according to requirements
+    const ROLES = {
+      candidate: {id:'candidate',fr:'Candidat',ar:'????',icon:'person',subtitleFr:'Profil citoyen & comp?tences',userName:'',userRoleLabel:'',heroHeadline:'Votre espace candidat',heroSubline:'Consultez vos informations et services disponibles.',actionText:'Voir mes opportunit?s',actionIcon:'work',nav:[{label:"Vue d'ensemble",icon:'dashboard',active:true},{label:'Mon profil',icon:'account_circle'},{label:'Opportunit?s & Matchs',icon:'handshake'},{label:'Candidatures',icon:'assignment_ind'},{label:"Simulation d'entretien",icon:'psychology',planned:true},{label:'Formations certifiantes',icon:'school',planned:true}],stats:[]},
+      employer: {id:'employer',fr:'Employeur',ar:'????',icon:'domain',subtitleFr:'Entreprise & recrutement',userName:'',userRoleLabel:'',heroHeadline:'Espace employeur',heroSubline:'G?rez vos offres et les candidatures re?ues.',actionText:'Publier une nouvelle offre',actionIcon:'add_circle',nav:[{label:'Tableau de bord',icon:'dashboard',active:true},{label:'Offres publi?es',icon:'work'},{label:'Vivier de candidats',icon:'groups'}],stats:[]},
+      ministry: {id:'ministry',fr:'Minist?re',ar:'????? ???????',icon:'account_balance',subtitleFr:'Minist?re de l?emploi',userName:'',userRoleLabel:'',heroHeadline:'Espace minist?re',heroSubline:'Les indicateurs seront affich?s selon vos autorisations.',actionText:'Ouvrir les indicateurs',actionIcon:'analytics',nav:[{label:'R?f?rentiels',icon:'menu_book',active:true},{label:'Observatoire de l?emploi',icon:'analytics'}],stats:[]},
+      training: {id:'training',fr:'Centre de formation',ar:'???? ?????',icon:'school',subtitleFr:'Op?rateur de formation',userName:'',userRoleLabel:'',heroHeadline:'Espace formation',heroSubline:'Les informations disponibles d?pendront de votre compte.',actionText:'Voir les formations',actionIcon:'school',nav:[{label:'Tableau de bord',icon:'dashboard',active:true},{label:'Parcours & formations',icon:'auto_stories'}],stats:[]},
+      staff: {id:'staff',fr:'Staff plateforme',ar:'???? ??????',icon:'admin_panel_settings',subtitleFr:'Administration plateforme',userName:'',userRoleLabel:'',heroHeadline:'Espace administration',heroSubline:'Les outils sont accessibles selon vos autorisations.',actionText:'Ouvrir la supervision',actionIcon:'security',nav:[{label:'Supervision',icon:'verified_user',active:true}],stats:[]}
+    };
+
+    // Render Navigation dynamically
+    function renderNavigation() {
+      const navContainer = document.getElementById('sidebar-nav-items');
+      const roleData = ROLES[AppState.role];
+      const isArabic = AppState.direction === 'rtl';
+
+      navContainer.innerHTML = '';
+
+      roleData.nav.forEach((item, index) => {
+        const itemBtn = document.createElement('a');
+        itemBtn.href = `#${item.label.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
+
+        // Exact styling classes from Shared Components JSON
+        const baseClass = "flex items-center justify-between w-full px-space-sm py-2 rounded-lg text-body-sm transition-all group relative";
+        const activeClass = item.active
+          ? "bg-surface-container-high text-primary font-bold shadow-xs border-s-4 border-primary"
+          : "text-on-surface-variant hover:bg-surface-container hover:text-primary font-medium";
+
+        itemBtn.className = `${baseClass} ${activeClass}`;
+
+        const labelText = isArabic && item.ar ? item.ar : item.label;
+
+        itemBtn.innerHTML = `
+          <div class="flex items-center gap-3 min-w-0">
+            <span class="material-symbols-outlined text-[20px] shrink-0 ${item.active ? 'text-primary' : 'text-on-surface-variant group-hover:text-primary'}">
+              ${item.icon}
+            </span>
+            <span class="truncate sidebar-text-item ${isArabic ? 'font-arabic' : ''}">${labelText}</span>
+          </div>
+          ${item.planned ? `
+            <span class="sidebar-text-item text-[10px] bg-secondary-fixed text-on-secondary-fixed-variant px-1.5 py-0.5 rounded font-mono font-bold border border-secondary/40 shrink-0">
+              PLANNED
+            </span>
+          ` : ''}
+        `;
+
+        navContainer.appendChild(itemBtn);
+      });
+    }
+
+    // Render Stats and Content preview
+    function renderWorkspace() {
+      const roleData = ROLES[AppState.role];
+      const isArabic = AppState.direction === 'rtl';
+
+      // Update Breadcrumbs & Hero
+      document.getElementById('workspace-breadcrumb-role').textContent = isArabic ? roleData.ar : roleData.fr;
+      document.getElementById('hero-role-pill').textContent = isArabic ? `فضاء ${roleData.ar}` : `Espace ${roleData.fr}`;
+      document.getElementById('hero-headline').textContent = roleData.heroHeadline;
+      document.getElementById('hero-subline').textContent = roleData.heroSubline;
+      document.getElementById('hero-primary-action-text').textContent = roleData.actionText;
+      document.getElementById('hero-primary-action-icon').textContent = roleData.actionIcon;
+
+      // Update Sidebar Role Button text
+      document.getElementById('current-role-title').textContent = `${roleData.fr} (${roleData.ar})`;
+      document.getElementById('current-role-icon').textContent = roleData.icon;
+
+      // Update Topbar User Mock
+      document.getElementById('top-user-name').textContent = roleData.userName;
+      document.getElementById('top-user-role-label').textContent = roleData.userRoleLabel;
+
+      // Render Bento Stats
+      const statsGrid = document.getElementById('role-stats-grid');
+      statsGrid.innerHTML = '';
+
+      roleData.stats.forEach(stat => {
+        const card = document.createElement('div');
+        card.className = "p-4 rounded-xl bg-surface-container-low border border-outline-variant hover:border-primary/40 transition-colors flex flex-col justify-between";
+        card.innerHTML = `
+          <div class="flex items-center justify-between text-on-surface-variant">
+            <span class="text-label-sm font-semibold truncate">${stat.label}</span>
+            <span class="material-symbols-outlined text-[18px] text-primary">${stat.icon}</span>
+          </div>
+          <div class="mt-2">
+            <div class="text-headline-md font-headline-md font-bold text-primary">${stat.value}</div>
+            <span class="text-label-sm text-tertiary font-semibold flex items-center gap-1 mt-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-tertiary"></span>
+              ${stat.trend}
+            </span>
+          </div>
+        `;
+        statsGrid.appendChild(card);
+      });
+    }
+
+    // Role switching handler
+    function setRole(roleId) {
+      if (!ROLES[roleId]) return;
+      AppState.role = roleId;
+
+      // Update simulator buttons visual state
+      ['candidate', 'employer', 'ministry', 'training', 'staff'].forEach(id => {
+        const btn = document.getElementById(`btn-role-${id}`);
+        if (id === roleId) {
+          btn.className = "px-2.5 py-1 rounded text-label-sm font-semibold transition-all bg-surface-container-lowest text-primary shadow-sm";
+        } else {
+          btn.className = "px-2.5 py-1 rounded text-label-sm font-semibold transition-all text-primary-fixed hover:text-white";
+        }
+      });
+
+      // Update role checkmarks inside dropdown
+      document.querySelectorAll('.role-check').forEach(el => el.classList.add('hidden'));
+      const activeCheck = document.querySelector(`.${roleId}-check`);
+      if (activeCheck) activeCheck.classList.remove('hidden');
+
+      // Close dropdown if open
+      document.getElementById('role-dropdown-menu').classList.add('hidden');
+      document.getElementById('role-chevron').classList.remove('rotate-180');
+
+      renderNavigation();
+      renderWorkspace();
+    }
+
+    // Direction (LTR / RTL) toggle
+    function toggleDirection() {
+      const newDir = AppState.direction === 'ltr' ? 'rtl' : 'ltr';
+      setDirection(newDir);
+    }
+
+    function setDirection(dir) {
+      AppState.direction = dir;
+      document.documentElement.setAttribute('dir', dir);
+
+      const toggleLabel = document.getElementById('dir-toggle-text');
+      if (dir === 'rtl') {
+        toggleLabel.textContent = 'AR (RTL) ↔ FR (LTR)';
+        document.documentElement.lang = 'ar';
+      } else {
+        toggleLabel.textContent = 'FR (LTR) ↔ AR (RTL)';
+        document.documentElement.lang = 'fr';
+      }
+
+      renderNavigation();
+      renderWorkspace();
+    }
+
+    // Language selector
+    function changeLanguage(lang) {
+      AppState.language = lang;
+      const langText = document.getElementById('current-lang-text');
+      const checkFr = document.getElementById('check-fr');
+      const checkAr = document.getElementById('check-ar');
+      const checkTn = document.getElementById('check-tn');
+
+      checkFr.classList.add('hidden');
+      checkAr.classList.add('hidden');
+      checkTn.classList.add('hidden');
+
+      if (lang === 'fr') {
+        langText.textContent = 'Français (FR)';
+        checkFr.classList.remove('hidden');
+        setDirection('ltr');
+      } else if (lang === 'ar') {
+        langText.textContent = 'العربية (AR)';
+        checkAr.classList.remove('hidden');
+        setDirection('rtl');
+      } else if (lang === 'tn') {
+        langText.textContent = 'تونسي (Tounsi)';
+        checkTn.classList.remove('hidden');
+        setDirection('rtl');
+      }
+
+      document.getElementById('lang-dropdown-menu').classList.add('hidden');
+    }
+
+    // Collapsible Sidebar handling
+    function toggleSidebarCollapse() {
+      const sidebar = document.getElementById('main-sidebar');
+      const collapseIcon = document.getElementById('collapse-icon');
+      const collapseBtn = document.getElementById('collapse-btn');
+      const textItems = document.querySelectorAll('.sidebar-text-item');
+
+      AppState.sidebarCollapsed = !AppState.sidebarCollapsed;
+
+      if (AppState.sidebarCollapsed) {
+        sidebar.classList.remove('w-72');
+        sidebar.classList.add('w-20');
+        collapseIcon.textContent = 'menu';
+        collapseBtn.title = "Agrandir le panneau latéral";
+        textItems.forEach(el => el.classList.add('hidden'));
+      } else {
+        sidebar.classList.remove('w-20');
+        sidebar.classList.add('w-72');
+        collapseIcon.textContent = 'menu_open';
+        collapseBtn.title = "Réduire le panneau latéral";
+        textItems.forEach(el => el.classList.remove('hidden'));
+      }
+    }
+
+    // Dropdown toggles
+    function toggleRoleDropdown() {
+      const menu = document.getElementById('role-dropdown-menu');
+      const chevron = document.getElementById('role-chevron');
+      menu.classList.toggle('hidden');
+      chevron.classList.toggle('rotate-180');
+    }
+
+    function toggleLangDropdown() {
+      const menu = document.getElementById('lang-dropdown-menu');
+      menu.classList.toggle('hidden');
+    }
+
+    function toggleNotificationPopover() {
+      const popover = document.getElementById('notification-popover');
+      popover.classList.toggle('hidden');
+    }
+
+    function toggleUserDropdown() {
+      const menu = document.getElementById('user-dropdown-menu');
+      menu.classList.toggle('hidden');
+    }
+
+    // Notification State Toggle (Demonstrates Populated vs Accessible Empty State)
+    function toggleNotificationState() {
+      const filledContainer = document.getElementById('notifications-filled-container');
+      const emptyContainer = document.getElementById('notifications-empty-container');
+      const countTag = document.getElementById('notif-count-tag');
+      const badge = document.getElementById('notif-badge');
+      const toggleLabel = document.getElementById('notif-toggle-label');
+
+      AppState.notificationsFilled = !AppState.notificationsFilled;
+
+      if (AppState.notificationsFilled) {
+        filledContainer.classList.remove('hidden');
+        emptyContainer.classList.add('hidden');
+        countTag.textContent = '2 nouvelles';
+        countTag.classList.remove('bg-surface-container', 'text-outline');
+        countTag.classList.add('bg-primary-fixed', 'text-on-primary-fixed-variant');
+        badge.classList.remove('hidden');
+        toggleLabel.textContent = 'Voir état vide';
+      } else {
+        filledContainer.classList.add('hidden');
+        emptyContainer.classList.remove('hidden');
+        emptyContainer.classList.add('flex');
+        countTag.textContent = '0 nouvelle';
+        countTag.classList.remove('bg-primary-fixed', 'text-on-primary-fixed-variant');
+        countTag.classList.add('bg-surface-container', 'text-outline');
+        badge.classList.add('hidden');
+        toggleLabel.textContent = 'Voir avec données';
+      }
+    }
+
+    // Close floating overlays when clicking outside
+    document.addEventListener('click', (e) => {
+      // Role dropdown
+      if (!e.target.closest('#role-selector-button') && !e.target.closest('#role-dropdown-menu')) {
+        document.getElementById('role-dropdown-menu').classList.add('hidden');
+        document.getElementById('role-chevron').classList.remove('rotate-180');
+      }
+      // Lang dropdown
+      if (!e.target.closest('#lang-btn') && !e.target.closest('#lang-dropdown-menu')) {
+        document.getElementById('lang-dropdown-menu').classList.add('hidden');
+      }
+      // Notification dropdown
+      if (!e.target.closest('#notif-btn') && !e.target.closest('#notification-popover')) {
+        document.getElementById('notification-popover').classList.add('hidden');
+      }
+      // User menu
+      if (!e.target.closest('#user-menu-btn') && !e.target.closest('#user-dropdown-menu')) {
+        document.getElementById('user-dropdown-menu').classList.add('hidden');
+      }
+    });
+
+    // Initialize on load
+    window.addEventListener('DOMContentLoaded', () => {
+      renderNavigation();
+      renderWorkspace();
+    });
+  </script>
+<script>
+(async function loadAccountData(){const token=localStorage.getItem('mahara_access_token');if(!token){location.replace('/signin');return;}try{const response=await fetch('/api/v1/me',{headers:{Authorization:'Bearer '+token}});if(!response.ok)throw new Error();const account=await response.json();const name=account.name||account.email;document.getElementById('top-user-name').textContent=name;document.getElementById('hero-headline').textContent='Bienvenue, '+name;document.getElementById('role-stats-grid').replaceChildren();document.getElementById('current-role-title').textContent='Votre espace Mahara Match';document.getElementById('top-user-name').textContent=name;document.getElementById('hero-primary-action').onclick=()=>location.assign('/employer');}catch(e){document.getElementById('hero-subline').textContent='Les informations de votre espace ne sont pas disponibles pour le moment.';}})();
+</script></body></html>
