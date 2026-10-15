@@ -67,16 +67,22 @@ def _resolve_record(
 
 def ingest(
     db: Session, submission: MarketDatasetSubmission, actor_user_id: uuid.UUID | None = None,
+    existing_job: IngestionJob | None = None, *, commit: bool = True,
 ) -> tuple[MarketDataset, IngestionJob, list[dict]]:
     """Record the deposit, keep every row that resolves, report the rest."""
-    job = IngestionJob(
+    job = existing_job or IngestionJob(
         source=IngestionSource.MINISTRY_MARKET,
         status=ProcessingStatus.PROCESSING,
         pipeline_version=PIPELINE_VERSION,
         records_total=len(submission.records),
         started_at=datetime.now(timezone.utc),
     )
-    db.add(job)
+    job.status = ProcessingStatus.PROCESSING
+    job.pipeline_version = PIPELINE_VERSION
+    job.records_total = len(submission.records)
+    job.started_at = job.started_at or datetime.now(timezone.utc)
+    if existing_job is None:
+        db.add(job)
     db.flush()  # the dataset needs the job's id
 
     dataset = MarketDataset(
@@ -137,9 +143,12 @@ def ingest(
         },
         actor_user_id=actor_user_id,
     )
-    db.commit()
-    db.refresh(dataset)
-    db.refresh(job)
+    if commit:
+        db.commit()
+        db.refresh(dataset)
+        db.refresh(job)
+    else:
+        db.flush()
     return dataset, job, rejections
 
 

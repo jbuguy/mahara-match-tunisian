@@ -46,6 +46,25 @@ class MarketIndicatorRecord(Contract):
             raise ValueError("percent values must be between 0 and 100")
         if self.indicator_type is MarketIndicatorType.SKILL_DEMAND and not self.skill_code:
             raise ValueError("skill_demand indicators need a skill_code")
+        if self.indicator_type is MarketIndicatorType.MEDIAN_SALARY:
+            if self.unit != "tnd":
+                raise ValueError("median_salary indicators must use the tnd unit")
+            sample_size = self.extra.get("sample_size")
+            if sample_size is not None and (isinstance(sample_size, bool) or not isinstance(sample_size, int) or sample_size < 0):
+                raise ValueError("salary sample_size must be a non-negative integer")
+            region = self.extra.get("region")
+            if region is not None and region not in {"national", "grand_tunis"}:
+                raise ValueError("salary region must be national or grand_tunis")
+            if region is not None and self.governorate_code is not None:
+                raise ValueError("region-level salary aggregates cannot also name one governorate")
+            p25 = self.extra.get("p25_tnd")
+            p75 = self.extra.get("p75_tnd")
+            if (p25 is not None and float(p25) < 0) or (p75 is not None and float(p75) < 0):
+                raise ValueError("salary percentiles must be non-negative")
+            if p25 is not None and p75 is not None and float(p25) > float(p75):
+                raise ValueError("p25_tnd must be less than or equal to p75_tnd")
+            if (p25 is not None and float(p25) > float(self.value)) or (p75 is not None and float(p75) < float(self.value)):
+                raise ValueError("median salary must lie between the supplied percentiles")
         return self
 
 

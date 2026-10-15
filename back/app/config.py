@@ -24,6 +24,21 @@ class Settings(BaseSettings):
     llm_timeout_seconds: float = 60.0
     groq_api_key: str | None = None
     groq_model: str = "openai/gpt-oss-120b"
+    ministry_market_feed_url: str | None = None
+    ministry_market_feed_token: str | None = None
+    ministry_market_worker_poll_seconds: float = 3.0
+    ministry_market_feed_timeout_seconds: float = 30.0
+    s3_endpoint_url: str | None = None
+    s3_region: str = "eu-central-1"
+    s3_bucket: str | None = None
+    s3_access_key_id: str | None = None
+    s3_secret_access_key: str | None = None
+    smtp_host: str | None = None
+    smtp_port: int = 587
+    smtp_username: str | None = None
+    smtp_password: str | None = None
+    smtp_from_email: str | None = None
+    smtp_use_starttls: bool = True
 
     @property
     def cors_origin_list(self) -> list[str]:

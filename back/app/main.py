@@ -1,5 +1,7 @@
 import importlib
 import importlib.util
+import asyncio
+import contextlib
 import time
 from contextlib import asynccontextmanager
 from typing import Any, Annotated
@@ -20,6 +22,9 @@ from .google_auth import router as google_auth_router
 from .features.onboarding.router import create_onboarding_router
 from .features.matching.router import create_matching_router
 from .features.employer.voice import create_employer_voice_router
+from .features.employer.market import router as employer_market_router
+from .features.mock_interviews import create_mock_interview_router
+from .features.mock_interview_retention import run_retention_loop
 from .features.ministry.routers import analytics as ministry_analytics
 from .features.ministry.routers import ingestion as ministry_ingestion
 from .features.ministry.routers import market as ministry_market
@@ -78,7 +83,13 @@ llm_client = OpenAICompatibleClient(
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    yield
+    retention_task = asyncio.create_task(run_retention_loop())
+    try:
+        yield
+    finally:
+        retention_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await retention_task
     await llm_client.close()
 
 
@@ -127,6 +138,8 @@ app.include_router(google_auth_router)
 # the platform's canonical callback remains /auth/google/callback.
 app.include_router(google_auth_router, prefix="/api/v1", include_in_schema=False)
 app.include_router(create_application_router(get_db, get_current_user, get_current_employer))
+app.include_router(create_mock_interview_router(get_db, require_roles("candidate"), llm_client))
+app.include_router(employer_market_router)
 app.include_router(create_offer_router(get_db, get_current_user))
 app.include_router(create_onboarding_router(get_db, get_current_user))
 read_candidate_profile = register_employee_routes(app, settings, get_db)

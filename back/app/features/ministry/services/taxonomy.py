@@ -34,7 +34,9 @@ def get_by_code(db: Session, code: str) -> Skill | None:
     return repository.get_skill_by_code(db, code)
 
 
-def create_skill(db: Session, payload: SkillCreate) -> Skill:
+def create_skill(
+    db: Session, payload: SkillCreate, actor_user_id: uuid.UUID | None = None
+) -> Skill:
     """A new entry always starts as a draft: creating and validating are two separate acts."""
     skill = Skill(
         code=payload.code,
@@ -47,6 +49,7 @@ def create_skill(db: Session, payload: SkillCreate) -> Skill:
         status=TaxonomyStatus.DRAFT,
     )
     repository.add_skill(db, skill)
+    audit.record(db, "skill.created", "skill", skill.code, {"status": skill.status.value}, actor_user_id=actor_user_id)
     db.commit()
     db.refresh(skill)
     return skill
@@ -66,7 +69,12 @@ def list_skills(
     )
 
 
-def update_skill(db: Session, skill: Skill, payload: SkillUpdate) -> Skill:
+def update_skill(
+    db: Session,
+    skill: Skill,
+    payload: SkillUpdate,
+    actor_user_id: uuid.UUID | None = None,
+) -> Skill:
     """Apply editorial changes and bump the version: a shared referential tracks its edits."""
     changes = payload.model_dump(exclude_unset=True)
     if not changes:
@@ -75,7 +83,7 @@ def update_skill(db: Session, skill: Skill, payload: SkillUpdate) -> Skill:
     for field, value in changes.items():
         setattr(skill, field, value)
     skill.version += 1
-
+    audit.record(db, "skill.updated", "skill", skill.code, {"version": skill.version, "fields": sorted(changes)}, actor_user_id=actor_user_id)
     db.commit()
     db.refresh(skill)
     return skill

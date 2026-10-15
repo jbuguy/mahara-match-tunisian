@@ -9,11 +9,12 @@ from .candidates import (
     CandidatePII,
     CandidateSkill,
     ConversationSession,
+    MockInterviewSession,
 )
 from .employers import Application, Employer, HiringFeedback, JobOffer, JobOfferSkill
 from .market import MarketDataset, MarketIndicator
 from .matching import MatchResult, Roadmap, RoadmapItem, SkillGap
-from .platform import AuditLog, Document, Embedding, IngestionJob
+from .platform import AuditLog, Document, Embedding, IngestionJob, MarketUploadPreview, NotificationOutbox
 from .reference import Governorate, Sector
 from .taxonomy import Occupation, OccupationSkill, Skill, SkillCategory, SkillRelation, SkillSuggestion
 from .training import CandidateCertification, TrainingCourse, TrainingCourseSkill, TrainingProvider
@@ -40,8 +41,11 @@ __all__ = [
     "JobOfferSkill",
     "MarketDataset",
     "MarketIndicator",
+    "MarketUploadPreview",
     "MatchResult",
+    "MockInterviewSession",
     "Occupation",
+    "NotificationOutbox",
     "OccupationSkill",
     "Roadmap",
     "RoadmapItem",

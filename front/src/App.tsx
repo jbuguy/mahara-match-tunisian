@@ -9,6 +9,7 @@ import { OnboardingPage } from './pages/OnboardingPage'
 import { CandidatePage } from './pages/CandidatePage'
 import { CandidateStartPage } from './pages/CandidateStartPage'
 import { MatchesPage } from './pages/MatchesPage'
+import { MockInterviewPage } from './pages/MockInterviewPage'
 import { SignInPage } from './pages/SignInPage'
 import { SignUpPage } from './pages/SignUpPage'
 import { MinistryPage } from './pages/MinistryPage'
@@ -103,6 +104,7 @@ function PlatformShell({
               {!account.hasProfile && <NavLink to="/candidate/start" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>Set up my profile</NavLink>}
               <NavLink to="/candidate" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>My profile</NavLink>
               <NavLink to="/matches" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>Job matches</NavLink>
+              <NavLink to="/mock-interview" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>Interview practice</NavLink>
             </>}
             {!accountLoading && account?.kind === 'employer' && <>
               <NavLink to="/dashboard" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>Overview</NavLink>
@@ -131,6 +133,7 @@ function PlatformShell({
             <Route path="/candidate/start" element={<CandidateStartPage />} />
             <Route path="/candidate" element={<CandidatePage />} />
             <Route path="/matches" element={<MatchesPage />} />
+            <Route path="/mock-interview" element={<MockInterviewPage />} />
             <Route path="/employer" element={<EmployerPage />} />
             <Route path="/ministry" element={<MinistryPage />} />
           </Routes>

@@ -68,6 +68,7 @@ export type CandidateApplication = {
   title: string
   status: string
   applied_at: string
+  employer_contact_consent?: boolean
 }
 
 export type EmployerApplication = CandidateApplication & {
@@ -77,6 +78,7 @@ export type EmployerApplication = CandidateApplication & {
   candidate_phone: string | null
   match_id: string | null
   score_global: number | null
+  employer_contact_consent: boolean
 }
 
 export type EmployerOffer = {
@@ -91,6 +93,74 @@ export type EmployerOffer = {
   hired_count: number
   rejected_count: number
   top_match_score: number | null
+  archived_at?: string | null
+}
+
+export type MockInterviewQuestion = { theme: string; prompt: string; follow_up: string; tip: string }
+export type MockInterviewFeedback = {
+  overall_summary: string
+  topics: { title: string; status: string; evidence: string; next_step: string }[]
+  answers: { question_index: number; strength: string; improvement: string; example: string }[]
+}
+export type MockInterview = {
+  session_id: string; target_title: string; occupation_code: string | null; target_offer_id: string | null; language: 'fr' | 'ar' | 'derja'
+  question_count: number; questions: MockInterviewQuestion[]; answers: { question_index: number; answer: string }[]
+  current_index: number; draft_answer: string | null; status: 'in_progress' | 'completed'; saved: boolean; feedback: MockInterviewFeedback | null
+}
+
+export function getMockInterviews(): Promise<{ items: MockInterview[] }> {
+  return requestJson('/api/v1/me/mock-interviews')
+}
+
+export function startMockInterview(input: { target_title: string; occupation_code: string | null; target_offer_id: string | null; language: 'fr' | 'ar' | 'derja'; question_count: number; consent: boolean }): Promise<MockInterview> {
+  return requestJson('/api/v1/me/mock-interviews', { method: 'POST', body: JSON.stringify(input) })
+}
+
+export function getMockInterview(id: string): Promise<MockInterview> {
+  return requestJson(`/api/v1/me/mock-interviews/${encodeURIComponent(id)}`)
+}
+
+export function submitMockInterviewAnswer(id: string, question_index: number, answer: string): Promise<MockInterview & { next_question: MockInterviewQuestion | null }> {
+  return requestJson(`/api/v1/me/mock-interviews/${encodeURIComponent(id)}/answers`, { method: 'POST', body: JSON.stringify({ question_index, answer }) })
+}
+
+export function saveMockInterviewDraftAnswer(id: string, answer: string): Promise<MockInterview> {
+  return requestJson(`/api/v1/me/mock-interviews/${encodeURIComponent(id)}/draft-answer`, { method: 'PATCH', body: JSON.stringify({ answer }) })
+}
+
+export function reviewMockInterview(id: string): Promise<MockInterview> {
+  return requestJson(`/api/v1/me/mock-interviews/${encodeURIComponent(id)}/review`, { method: 'POST' })
+}
+
+export function saveMockInterview(id: string, saved: boolean): Promise<MockInterview> {
+  return requestJson(`/api/v1/me/mock-interviews/${encodeURIComponent(id)}/saved`, { method: 'PATCH', body: JSON.stringify({ saved }) })
+}
+
+export function deleteMockInterview(id: string): Promise<void> {
+  return requestJson(`/api/v1/me/mock-interviews/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+export async function downloadMockInterviewReport(id: string): Promise<Blob> {
+  const token = localStorage.getItem('mahara_access_token')
+  const response = await fetch(`${API_BASE_URL}/api/v1/me/mock-interviews/${encodeURIComponent(id)}/report.pdf`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
+  if (!response.ok) {
+    const body = await response.json().catch(() => null)
+    throw new Error(body?.detail || `Request failed with status ${response.status}`)
+  }
+  return response.blob()
+}
+
+export type EmployerOfferEditor = {
+  offer_id: string; employer_id: string; title: string; description: string
+  occupation_code: string | null; sector_code: string | null; contract_type: string; work_mode: string
+  location: { governorate_code: string; delegation: string | null }; positions_count: number
+  min_years_experience: number; education_level_min: string | null
+  salary: { min_tnd: number | null; max_tnd: number | null; period: 'hour' | 'day' | 'month' } | null
+  skills: { skill_code: string; requirement: string; min_level: number }[]
+  languages_required: { code: string; level: number }[]; status: string; source: string
+  published_at: string | null; expires_at: string | null
 }
 
 export type EmployerApplicationDetail = {
@@ -171,10 +241,10 @@ export function getMyApplications(): Promise<CandidateApplication[]> {
   return requestJson<CandidateApplication[]>('/api/v1/me/applications')
 }
 
-export function applyToOffer(jobOfferId: string): Promise<CandidateApplication> {
+export function applyToOffer(jobOfferId: string, employerContactConsent: boolean): Promise<CandidateApplication> {
   return requestJson<CandidateApplication>('/api/v1/me/applications', {
     method: 'POST',
-    body: JSON.stringify({ job_offer_id: jobOfferId }),
+    body: JSON.stringify({ job_offer_id: jobOfferId, employer_contact_consent: employerContactConsent }),
   })
 }
 
@@ -198,4 +268,40 @@ export function decideApplication(
     method: 'PATCH',
     body: JSON.stringify({ decision }),
   })
+}
+
+export function updateApplicationContactConsent(applicationId: string, allowContact: boolean): Promise<{ application_id: string; employer_contact_consent: boolean }> {
+  return requestJson(`/api/v1/me/applications/${encodeURIComponent(applicationId)}/contact-consent`, {
+    method: 'PATCH', body: JSON.stringify({ allow_contact: allowContact }),
+  })
+}
+
+export function getEmployerOfferEditor(offerId: string): Promise<EmployerOfferEditor> {
+  return requestJson<EmployerOfferEditor>(`/api/v1/employer/offers/${encodeURIComponent(offerId)}/edit`)
+}
+
+export function updateEmployerOffer(offerId: string, offer: EmployerOfferEditor): Promise<EmployerOfferEditor> {
+  return requestJson<EmployerOfferEditor>(`/api/v1/employer/offers/${encodeURIComponent(offerId)}`, {
+    method: 'PUT', body: JSON.stringify(offer),
+  })
+}
+
+export function archiveEmployerOffer(offerId: string): Promise<{ status: string }> {
+  return requestJson<{ status: string }>(`/api/v1/employer/offers/${encodeURIComponent(offerId)}/archive`, { method: 'POST' })
+}
+
+export function setEmployerOfferStatus(offerId: string, status: 'published' | 'closed', expiresAt?: string | null): Promise<{ job_offer_id: string; status: string }> {
+  return requestJson(`/api/v1/employer/offers/${encodeURIComponent(offerId)}/status`, {
+    method: 'PATCH', body: JSON.stringify({ status, ...(expiresAt !== undefined ? { expires_at: expiresAt } : {}) }),
+  })
+}
+
+export function inviteCandidateToInterview(applicationId: string, invitation: { meeting_at_local: string; timezone: string; note?: string }): Promise<{ notification_id: string; status: string }> {
+  return requestJson<{ notification_id: string; status: string }>(`/api/v1/employer/applications/${encodeURIComponent(applicationId)}/interviews`, {
+    method: 'POST', body: JSON.stringify(invitation),
+  })
+}
+
+export function getInterviewInvitations(applicationId: string): Promise<{ notification_id: string; status: string; meeting_at: string; meeting_timezone: string; attempts: number; sent_at: string | null }[]> {
+  return requestJson(`/api/v1/employer/applications/${encodeURIComponent(applicationId)}/interviews`)
 }

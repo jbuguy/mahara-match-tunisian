@@ -30,10 +30,14 @@ def _get_or_404(db: Session, code: str) -> Skill:
 
 
 @router.post("/skills", response_model=SkillRead, status_code=status.HTTP_201_CREATED)
-def create_skill(payload: SkillCreate, db: Annotated[Session, Depends(get_db)]) -> SkillRead:
+def create_skill(
+    payload: SkillCreate,
+    db: Annotated[Session, Depends(get_db)],
+    admin: Annotated[User, Depends(require_roles("ministry_admin"))],
+) -> SkillRead:
     if service.get_by_code(db, payload.code) is not None:
         raise HTTPException(status_code=409, detail=f"Skill code {payload.code} already exists")
-    return service.to_read(service.create_skill(db, payload))
+    return service.to_read(service.create_skill(db, payload, admin.id))
 
 
 @router.get("/skills", response_model=Page[SkillRead])
@@ -68,10 +72,13 @@ def read_skill(code: str, db: Annotated[Session, Depends(get_db)]) -> SkillRead:
 
 @router.patch("/skills/{code}", response_model=SkillRead)
 def edit_skill(
-    code: str, payload: SkillUpdate, db: Annotated[Session, Depends(get_db)]
+    code: str,
+    payload: SkillUpdate,
+    db: Annotated[Session, Depends(get_db)],
+    admin: Annotated[User, Depends(require_roles("ministry_admin"))],
 ) -> SkillRead:
     """Editorial corrections. Cannot change the status: see the dedicated routes."""
-    return service.to_read(service.update_skill(db, _get_or_404(db, code), payload))
+    return service.to_read(service.update_skill(db, _get_or_404(db, code), payload, admin.id))
 
 
 @router.post("/skills/{code}/validate", response_model=SkillRead)

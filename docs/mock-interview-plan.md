@@ -1,4 +1,18 @@
-# AI Mock Interview Feature Plan
+# AI Mock Interview: implementation and deployment plan
+
+## Current demo implementation
+
+The candidate mock interview is implemented at `/mock-interview` with private setup consent, occupation/custom/applied-offer targets, 3/5/8 questions, French/Arabic/Tunisian Derja selection, typed answers, optional microphone recording and editable transcription, question playback, saved drafts, delete controls, non-scored coaching feedback, and PDF export. The former prototype state switcher is not part of the app. Video remains a future concept and is not offered as working functionality.
+
+Sessions are owned by a candidate account. Unsaved records expire after 24 hours; explicit saves expire after 30 days. A server retention task removes expired records hourly. Raw audio is processed in memory by the configured transcription service and is not stored. Mock interview answers are not returned by employer, matching, or ministry APIs.
+
+Question and feedback generation uses the shared OpenAI-compatible client configured by `LLM_BASE_URL`, `LLM_MODEL`, and `LLM_API_KEY`. This makes a local inference server compatible with the same API shape a deployment change rather than a feature rewrite. The demo must identify the currently configured provider in its disclosure. When an applied offer is selected, its description and listed skill requirements are sent to that configured model; the user must explicitly consent to that data transfer before starting. Voice transcription currently uses the existing Groq Whisper adapter (`GROQ_API_KEY`), so switching only the LLM endpoint will not make voice fully local. A local transcription adapter is a separate production follow-up.
+
+### To request local inference resources
+
+Before production, choose models that support the required French, Arabic, and Tunisian Derja quality, then benchmark the actual prompt and response sizes and transcription audio. Resource sizing should use concurrent sessions, time-to-first-token, tokens per second, model context size, transcription latency, and memory/GPU utilization from representative loads. No specific GPU or instance size is assumed by this prototype. A local LLM service must expose the OpenAI-compatible chat-completions endpoint; a local transcription service must provide an equivalent in-memory transcription API. Both must keep prompts, audio, and logs inside the approved environment and have an operational owner for monitoring, upgrades, and capacity.
+
+The demo still needs provider credentials/configuration, deployment of migration `20261017000000_mock_interview_sessions.sql`, and an operational check that the hourly cleanup task is running. Before production, add per-candidate rate limits and concurrency caps for question generation and final reviews. French advice sheets download as a server-generated PDF. Arabic and Derja use the browser's print dialog so the installed Arabic font and text shaping can produce a readable PDF; test this on the demo browsers before presenting it as production-ready.
 
 ## Goal
 
@@ -13,13 +27,13 @@ Add a candidate practice experience that runs a realistic, role-focused mock int
 - `back/shared_llm/client.py` supplies the configured OpenAI-compatible chat completion client.
 - Candidate profile, skills, occupations, and job matches can provide context for personalized questions.
 
-## Proposed first release
+## First-release behavior
 
-1. Add a candidate-only **Mock interview** page, reachable from candidate navigation. Let the candidate choose a target occupation or a job match, interview length, language, and response mode (typed or audio).
-2. Start a session with a short explanation of data handling and a reminder that confidence feedback is approximate and for practice only.
-3. Ask one question at a time. Use the selected occupation/job requirements and candidate profile to tailor questions, with a mix of behavioral and role-specific prompts. Allow a follow-up question when an answer needs clarification.
-4. Accept typed answers or record audio in the browser. For audio, reuse the established in-memory transcription approach and show the transcript for correction before evaluation. Do not retain raw audio by default.
-5. End the session with actionable feedback and examples of how to strengthen answers. Provide a per-answer review and an overall summary; do not present a pass/fail score.
+1. Candidate-only **Mock interview** page, reachable from candidate navigation. The candidate chooses an occupation, custom title, or applied offer, plus length and language.
+2. The candidate reviews a data-use disclosure and explicitly consents before sending any selected title, applied offer context, and answers for question generation and coaching.
+3. The app asks one question at a time, with an optional contextual follow-up and a structuring tip.
+4. Typed responses and in-memory browser audio transcription are supported. Candidates can inspect and edit the transcript before submitting it.
+5. The final review gives evidence-based encouragement, concrete next steps, and example phrasing per answer, with no score or verdict.
 
 ## Feedback model
 

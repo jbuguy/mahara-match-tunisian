@@ -134,6 +134,29 @@ class CandidateDesiredOccupation(Base):
     priority: Mapped[int] = mapped_column(SmallInteger, default=1, nullable=False)
 
 
+class MockInterviewSession(UUIDPrimaryKeyMixin, Base):
+    """Private candidate coaching session with bounded retention."""
+
+    __tablename__ = "mock_interview_sessions"
+
+    candidate_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("candidates.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    target_title: Mapped[str] = mapped_column(String(200), nullable=False)
+    occupation_code: Mapped[str | None] = mapped_column(String(32), ForeignKey("occupations.code"))
+    target_offer_id: Mapped[uuid.UUID | None] = mapped_column(Uuid(as_uuid=True), ForeignKey("job_offers.id", ondelete="SET NULL"))
+    language: Mapped[str] = mapped_column(String(16), nullable=False)
+    question_count: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    questions: Mapped[list[dict]] = mapped_column(JSONType, default=list, nullable=False)
+    answers: Mapped[list[dict]] = mapped_column(JSONType, default=list, nullable=False)
+    draft_answer: Mapped[str | None] = mapped_column(Text)
+    feedback: Mapped[dict | None] = mapped_column(JSONType)
+    status: Mapped[str] = mapped_column(String(16), default="in_progress", nullable=False)
+    saved: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    consented_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+
+
 class ConversationSession(UUIDPrimaryKeyMixin, Base):
     """A WP2 onboarding dialogue; its output is the "vecteur d'appétence"."""
 

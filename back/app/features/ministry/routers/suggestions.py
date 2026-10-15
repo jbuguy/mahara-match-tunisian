@@ -12,7 +12,7 @@ from mahara_data.schemas.taxonomy import SkillRead, SkillSuggestionRead
 from ....database import get_db
 from ....models import User
 from ....security import require_roles
-from ..schemas import SuggestionApprove, SuggestionMerge
+from ..schemas import SuggestionApprove, SuggestionMerge, SuggestionReject
 from ..services import suggestions as service
 from ..services import taxonomy as taxonomy_service
 
@@ -105,9 +105,10 @@ def merge_suggestion(
 @router.post("/{suggestion_id}/reject", response_model=SkillSuggestionRead)
 def reject_suggestion(
     suggestion_id: uuid.UUID,
+    payload: SuggestionReject,
     db: Annotated[Session, Depends(get_db)],
     admin: Annotated[User, Depends(require_roles("ministry_admin"))],
 ) -> SkillSuggestionRead:
     """Noise, typo, or not a skill. The refusal is recorded, never erased."""
     suggestion = _pending_or_error(db, suggestion_id)
-    return service.to_read(db, service.reject(db, suggestion, admin.id))
+    return service.to_read(db, service.reject(db, suggestion, admin.id, payload.reason))

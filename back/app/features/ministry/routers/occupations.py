@@ -45,13 +45,15 @@ def _sector_id_or_404(db: Session, code: str | None):
 
 @router.post("", response_model=OccupationRead, status_code=status.HTTP_201_CREATED)
 def create_occupation(
-    payload: OccupationCreate, db: Annotated[Session, Depends(get_db)]
+    payload: OccupationCreate,
+    db: Annotated[Session, Depends(get_db)],
+    admin: Annotated[User, Depends(require_roles("ministry_admin"))],
 ) -> OccupationRead:
     if service.get_by_code(db, payload.code) is not None:
         raise HTTPException(status_code=409, detail=f"Occupation code {payload.code} already exists")
 
     sector_id = _sector_id_or_404(db, payload.sector_code)
-    return service.to_read(db, service.create_occupation(db, payload, sector_id))
+    return service.to_read(db, service.create_occupation(db, payload, sector_id, admin.id))
 
 
 @router.get("", response_model=Page[OccupationRead])
@@ -80,7 +82,10 @@ def read_occupation(code: str, db: Annotated[Session, Depends(get_db)]) -> Occup
 
 @router.patch("/{code}", response_model=OccupationRead)
 def edit_occupation(
-    code: str, payload: OccupationUpdate, db: Annotated[Session, Depends(get_db)]
+    code: str,
+    payload: OccupationUpdate,
+    db: Annotated[Session, Depends(get_db)],
+    admin: Annotated[User, Depends(require_roles("ministry_admin"))],
 ) -> OccupationRead:
     """Editorial corrections. Cannot change the status: see the dedicated routes."""
     occupation = _get_or_404(db, code)
@@ -89,7 +94,7 @@ def edit_occupation(
     if "sector_code" in changes:
         changes["sector_id"] = _sector_id_or_404(db, changes.pop("sector_code"))
 
-    return service.to_read(db, service.update_occupation(db, occupation, changes))
+    return service.to_read(db, service.update_occupation(db, occupation, changes, admin.id))
 
 
 @router.post("/{code}/validate", response_model=OccupationRead)

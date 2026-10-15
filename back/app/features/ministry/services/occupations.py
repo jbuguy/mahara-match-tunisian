@@ -57,7 +57,10 @@ def skill_id_for(db: Session, code: str) -> uuid.UUID | None:
 
 
 def create_occupation(
-    db: Session, payload: OccupationCreate, sector_id: uuid.UUID | None
+    db: Session,
+    payload: OccupationCreate,
+    sector_id: uuid.UUID | None,
+    actor_user_id: uuid.UUID | None = None,
 ) -> Occupation:
     """A new occupation always starts as a draft, like any entry of the referential."""
     occupation = Occupation(
@@ -71,6 +74,7 @@ def create_occupation(
         status=TaxonomyStatus.DRAFT,
     )
     db.add(occupation)
+    audit.record(db, "occupation.created", "occupation", occupation.code, {"status": occupation.status.value}, actor_user_id=actor_user_id)
     db.commit()
     db.refresh(occupation)
     return occupation
@@ -99,14 +103,19 @@ def list_occupations(
     return list(rows), total
 
 
-def update_occupation(db: Session, occupation: Occupation, changes: dict) -> Occupation:
+def update_occupation(
+    db: Session,
+    occupation: Occupation,
+    changes: dict,
+    actor_user_id: uuid.UUID | None = None,
+) -> Occupation:
     """Changes arrive already translated: the router turned codes into ids."""
     if not changes:
         return occupation
 
     for field, value in changes.items():
         setattr(occupation, field, value)
-
+    audit.record(db, "occupation.updated", "occupation", occupation.code, {"fields": sorted(changes)}, actor_user_id=actor_user_id)
     db.commit()
     db.refresh(occupation)
     return occupation

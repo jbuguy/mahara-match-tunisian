@@ -2,6 +2,7 @@
 
 from uuid import UUID
 
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -9,6 +10,7 @@ from mahara_data.db.models.candidates import Candidate, CandidatePII
 from mahara_data.db.models.employers import Application, HiringFeedback, JobOffer
 from mahara_data.db.models.matching import MatchResult
 from mahara_data.db.models.platform import AuditLog
+from mahara_data.enums import ApplicationStatus
 
 from .accounts import get_candidate_for_user
 
@@ -35,6 +37,40 @@ def list_employer_applications(db: Session, employer_id: UUID):
         .order_by(MatchResult.score_global.desc().nullslast(), Application.applied_at.desc())
         .all()
     )
+
+
+def list_employer_applications_page(
+    db: Session,
+    employer_id: UUID,
+    *,
+    page: int,
+    page_size: int,
+    status: ApplicationStatus | None = None,
+    job_offer_id: UUID | None = None,
+    min_score: float | None = None,
+):
+    query = (
+        db.query(Application, JobOffer, Candidate, CandidatePII, MatchResult)
+        .join(JobOffer, JobOffer.id == Application.job_offer_id)
+        .join(Candidate, Candidate.id == Application.candidate_id)
+        .outerjoin(CandidatePII, CandidatePII.candidate_id == Candidate.id)
+        .outerjoin(MatchResult, MatchResult.id == Application.match_result_id)
+        .filter(JobOffer.employer_id == employer_id, Candidate.deleted_at.is_(None))
+    )
+    if status is not None:
+        query = query.filter(Application.status == status)
+    if job_offer_id is not None:
+        query = query.filter(Application.job_offer_id == job_offer_id)
+    if min_score is not None:
+        query = query.filter(MatchResult.score_global >= min_score)
+    total = query.with_entities(func.count(Application.id)).scalar() or 0
+    rows = (
+        query.order_by(MatchResult.score_global.desc().nullslast(), Application.applied_at.desc())
+        .limit(page_size)
+        .offset((page - 1) * page_size)
+        .all()
+    )
+    return rows, total
 
 
 def get_offer(db: Session, offer_id: UUID) -> JobOffer | None:

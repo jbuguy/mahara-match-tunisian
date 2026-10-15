@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 
-import { applyToOffer, askAboutMatch, getMyApplications, getMyMatches, getMyRoadmap, type CandidateApplication, type MatchAssistantSource, type MatchResult, type MatchRoadmap, type RankedMatches } from '../lib/api'
+import { applyToOffer, askAboutMatch, getMyApplications, getMyMatches, getMyRoadmap, updateApplicationContactConsent, type CandidateApplication, type MatchAssistantSource, type MatchResult, type MatchRoadmap, type RankedMatches } from '../lib/api'
 import { ChatPanel, type ChatMessage } from '../components/ChatPanel'
 
 function formatSkillCode(code: string) {
@@ -12,6 +12,7 @@ export function MatchesPage() {
   const [matches, setMatches] = useState<RankedMatches | null>(null)
   const [applications, setApplications] = useState<CandidateApplication[]>([])
   const [applying, setApplying] = useState('')
+  const [employerContactConsent, setEmployerContactConsent] = useState(false)
   const [roadmap, setRoadmap] = useState<{ offerId: string; result: MatchRoadmap } | null>(null)
   const [roadmapLoading, setRoadmapLoading] = useState('')
   const [assistantOfferId, setAssistantOfferId] = useState('')
@@ -58,7 +59,7 @@ export function MatchesPage() {
     setApplying(match.job_offer_id)
     setError('')
     try {
-      const application = await applyToOffer(match.job_offer_id)
+      const application = await applyToOffer(match.job_offer_id, employerContactConsent)
       setApplications((current) => [...current, application])
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not submit this application.')
@@ -119,6 +120,9 @@ export function MatchesPage() {
       {matches && matches.items.length === 0 && <section className="detail-panel"><h3>No offers to match yet</h3><p>New offers will appear here when they are available.</p></section>}
 
       {matches && matches.items.length > 0 && <section className="detail-panel match-results" aria-label="Ranked job matches">
+        <label className="consent-checkbox"><input type="checkbox" checked={employerContactConsent} onChange={(event) => setEmployerContactConsent(event.target.checked)} />
+          I consent to employers contacting me about applications I submit. This is required to apply through the platform.
+        </label>
         {matches.items.map((match, index) => <article className="match-item" key={match.job_offer_id}>
           <div className="match-heading">
             <div><p className="eyebrow">Rank {index + 1}</p><h3>Offer {match.job_offer_id.slice(0, 8)}</h3><small className="match-id">{match.job_offer_id}</small></div>
@@ -168,8 +172,8 @@ export function MatchesPage() {
           {(() => {
             const application = applications.find((item) => item.job_offer_id === match.job_offer_id)
             return application
-              ? <p className="form-notice" role="status">Application {application.status}</p>
-              : <button className="primary-btn" type="button" onClick={() => void apply(match)} disabled={applying === match.job_offer_id}>
+              ? <div><p className="form-notice" role="status">Application {application.status}</p><label className="consent-checkbox"><input type="checkbox" checked={Boolean(application.employer_contact_consent)} onChange={async (event) => { const allow = event.target.checked; try { await updateApplicationContactConsent(application.application_id, allow); setApplications((current) => current.map((item) => item.application_id === application.application_id ? { ...item, employer_contact_consent: allow } : item)) } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not update contact consent.') } }} />Allow employers to contact me about this application</label></div>
+              : <button className="primary-btn" type="button" onClick={() => void apply(match)} disabled={!employerContactConsent || applying === match.job_offer_id}>
                 {applying === match.job_offer_id ? 'Applying…' : 'Apply to this offer'}
               </button>
           })()}

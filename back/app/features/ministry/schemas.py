@@ -1,5 +1,5 @@
 import uuid
-from pydantic import Field
+from pydantic import Field, model_validator
 from datetime import date, datetime
 from mahara_data.enums import (
     IngestionSource,
@@ -56,6 +56,10 @@ class SuggestionMerge(Contract):
     """Attach the proposed label as a synonym of a skill that already exists."""
 
     code: TaxonomyCode
+
+
+class SuggestionReject(Contract):
+    reason: str = Field(min_length=3, max_length=1000)
 
 class OccupationCreate(Contract):
     """Payload to add an occupation to the national referential. Owned by WP5."""
@@ -118,6 +122,34 @@ class IngestionReport(Contract):
     rejections: list[RecordRejection] = Field(default_factory=list)
 
 
+class MarketRefreshRequest(Contract):
+    """Optional incremental cursor sent to the configured official feed."""
+
+    since: datetime | None = None
+
+    @model_validator(mode="after")
+    def _cursor_timezone(self) -> "MarketRefreshRequest":
+        if self.since is not None and self.since.tzinfo is None:
+            raise ValueError("since must include a timezone")
+        return self
+
+
+class MarketUploadPreviewOut(Contract):
+    preview_id: uuid.UUID
+    expires_at: datetime
+    size_bytes: int
+    sha256: str
+    records_total: int
+    records_valid: int
+    records_invalid: int
+    sample: list[dict] = Field(default_factory=list)
+    rejections: list[RecordRejection] = Field(default_factory=list)
+
+
+class MarketUploadConfirm(Contract):
+    accept_valid_rows: bool = False
+
+
 class MarketDatasetOut(Contract):
     """A deposited dataset, seen from the admin side."""
 
@@ -154,3 +186,35 @@ class SkillGapMap(Contract):
     k_anonymity: int
     cells_suppressed: int
     cells: list[SkillGapAggregate] = Field(default_factory=list)
+
+
+class GovernorateDemandCell(Contract):
+    governorate_code: str
+    governorate_name: str
+    demand_positions: int = Field(ge=0)
+    published_offers: int = Field(ge=0)
+
+
+class OccupationTensionCell(Contract):
+    occupation_code: str
+    occupation_title: str
+    governorate_code: str | None = None
+    governorate_name: str
+    demand_positions: int = Field(ge=0)
+    published_offers: int = Field(ge=0)
+    candidate_supply: int = Field(ge=0)
+    demand_supply_ratio: float = Field(ge=0)
+    previous_demand_positions: int = Field(ge=0)
+    demand_change_percent: float | None = None
+
+
+class LabourMarketOverview(Contract):
+    period_start: date
+    period_end: date
+    comparison_period_start: date
+    comparison_period_end: date
+    definition_version: str
+    k_anonymity: int
+    cells_suppressed: int = Field(ge=0)
+    demand_by_governorate: list[GovernorateDemandCell]
+    occupations_under_tension: list[OccupationTensionCell]

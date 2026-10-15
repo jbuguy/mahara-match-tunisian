@@ -116,7 +116,12 @@ def merge(db: Session, suggestion: SkillSuggestion, skill: Skill, actor_user_id:
     return skill
 
 
-def reject(db: Session, suggestion: SkillSuggestion, actor_user_id: uuid.UUID | None = None) -> SkillSuggestion:
+def reject(
+    db: Session,
+    suggestion: SkillSuggestion,
+    actor_user_id: uuid.UUID | None = None,
+    reason: str | None = None,
+) -> SkillSuggestion:
     """Noise. Traced, never deleted: a refusal is part of the governance history."""
     _close(suggestion, SuggestionStatus.REJECTED, actor_user_id=actor_user_id)
     audit.record(
@@ -124,7 +129,7 @@ def reject(db: Session, suggestion: SkillSuggestion, actor_user_id: uuid.UUID | 
         "suggestion.rejected",
         "skill_suggestion",
         str(suggestion.id),
-        {"proposed_label": suggestion.proposed_label},
+        {"proposed_label": suggestion.proposed_label, "reason": reason},
         actor_user_id=actor_user_id,
     )
     db.commit()

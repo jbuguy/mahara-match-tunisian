@@ -87,6 +87,7 @@ class JobOffer(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     guardrail_flags: Mapped[list[dict]] = mapped_column(JSONType, default=list, nullable=False)
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class JobOfferSkill(Base):
@@ -117,6 +118,7 @@ class Application(UUIDPrimaryKeyMixin, Base):
         t.application_status, default=e.ApplicationStatus.SUBMITTED, nullable=False
     )
     cover_note: Mapped[str | None] = mapped_column(Text)
+    employer_contact_consent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     applied_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False

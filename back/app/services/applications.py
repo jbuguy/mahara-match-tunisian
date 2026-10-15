@@ -1,6 +1,7 @@
 """Business rules and WP1 contract mapping for candidate applications."""
 
 import uuid
+from datetime import datetime, timezone
 
 from mahara_data.db.models.candidates import (
     Candidate,
@@ -54,7 +55,11 @@ def _application_payload(application: Application, offer: JobOffer, match: Match
         applied_at=application.applied_at,
         updated_at=application.updated_at,
     )
-    return {"title": offer.title, **contract.model_dump(mode="json")}
+    return {
+        "title": offer.title,
+        "employer_contact_consent": application.employer_contact_consent_at is not None,
+        **contract.model_dump(mode="json"),
+    }
 
 
 def list_candidate_applications(db: Session, *, user_id: uuid.UUID) -> list[dict]:
@@ -73,11 +78,14 @@ def create_candidate_application(
     user_id: uuid.UUID,
     job_offer_id: uuid.UUID,
     cover_note: str | None = None,
+    employer_contact_consent: bool = False,
 ) -> dict:
     """Apply using the authenticated candidate and their current match snapshot."""
     candidate = repository.get_candidate_for_user(db, user_id)
     if candidate is None:
         raise ApplicationWorkflowError(404, "Candidate profile not found")
+    if not employer_contact_consent:
+        raise ApplicationWorkflowError(422, "Consent to employer contact is required before applying")
 
     offer = repository.get_offer(db, job_offer_id)
     if offer is None or offer.status is not OfferStatus.PUBLISHED:
@@ -93,6 +101,7 @@ def create_candidate_application(
         job_offer_id=offer.id,
         match_result_id=match.id,
         cover_note=request.cover_note,
+        employer_contact_consent_at=datetime.now(timezone.utc),
     )
     try:
         repository.insert_application(db, application)
@@ -110,22 +119,48 @@ def list_employer_applications(db: Session, *, employer: Employer) -> list[dict]
         employer_id=employer.id,
         applications=rows,
     )
-    return [
-        {
-            "application_id": str(application.id),
-            "candidate_id": str(candidate.id),
-            "candidate_name": pii.full_name if pii is not None else None,
-            "candidate_email": pii.email if pii is not None else None,
-            "candidate_phone": pii.phone if pii is not None else None,
-            "match_id": str(application.match_result_id) if application.match_result_id else None,
-            "score_global": float(match.score_global) if match is not None else None,
-            "job_offer_id": str(offer.id),
-            "title": offer.title,
-            "status": application.status.value,
-            "applied_at": application.applied_at.isoformat(),
-        }
-        for application, offer, candidate, pii, match in rows
-    ]
+    return [_employer_application_payload(row) for row in rows]
+
+
+def list_employer_applications_page(
+    db: Session,
+    *,
+    employer: Employer,
+    page: int,
+    page_size: int,
+    status: ApplicationStatus | None = None,
+    job_offer_id: uuid.UUID | None = None,
+    min_score: float | None = None,
+) -> tuple[list[dict], int]:
+    rows, total = repository.list_employer_applications_page(
+        db, employer.id, page=page, page_size=page_size, status=status,
+        job_offer_id=job_offer_id, min_score=min_score,
+    )
+    repository.audit_candidate_identity_reads(
+        db,
+        actor_user_id=getattr(employer, "user_id", None),
+        employer_id=employer.id,
+        applications=rows,
+    )
+    return [_employer_application_payload(row) for row in rows], total
+
+
+def _employer_application_payload(row) -> dict:
+    application, offer, candidate, pii, match = row
+    return {
+        "application_id": str(application.id),
+        "candidate_id": str(candidate.id),
+        "candidate_name": pii.full_name if pii is not None else None,
+        "candidate_email": pii.email if pii is not None else None,
+        "candidate_phone": pii.phone if pii is not None else None,
+        "employer_contact_consent": application.employer_contact_consent_at is not None,
+        "match_id": str(application.match_result_id) if application.match_result_id else None,
+        "score_global": float(match.score_global) if match is not None else None,
+        "job_offer_id": str(offer.id),
+        "title": offer.title,
+        "status": application.status.value,
+        "applied_at": application.applied_at.isoformat(),
+    }
 
 
 def get_employer_application_detail(db: Session, *, employer: Employer, application_id: uuid.UUID) -> dict:
