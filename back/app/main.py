@@ -19,6 +19,7 @@ from .database import get_db
 from .google_auth import router as google_auth_router
 from .features.onboarding.router import create_onboarding_router
 from .features.matching.router import create_matching_router
+from .features.training.router import create_training_provider_router
 from .features.employer.voice import create_employer_voice_router
 from .features.employee.models import CandidatePii
 from .email_auth import router as email_auth_router
@@ -135,6 +136,7 @@ app.include_router(create_onboarding_router(get_db, get_current_user))
 read_candidate_profile = register_employee_routes(app, settings, get_db)
 app.include_router(create_employer_voice_router())
 app.include_router(create_matching_router(get_db, get_current_user, read_candidate_profile, llm_client=llm_client))
+app.include_router(create_training_provider_router(get_db, get_current_user))
 for ministry_router in (
     ministry_taxonomy.router,
     ministry_suggestions.router,
@@ -170,7 +172,7 @@ def build_contract_catalog() -> dict[str, object]:
 
 
 def detect_module_status(module_code: str) -> str:
-    return "registered" if module_code in {"data", "onboarding", "matching", "employer", "employee", "ministry"} else "not_configured"
+    return "registered" if module_code in {"data", "onboarding", "matching", "employer", "employee", "ministry", "training"} else "not_configured"
 
 
 def build_module_registry() -> list[dict[str, object]]:
@@ -446,6 +448,25 @@ def candidate_login(payload: CandidateLogin, db: Annotated[Session, Depends(get_
     if not user.email_verified:
         raise HTTPException(status_code=403, detail="Email not verified. Check your inbox or request a new verification link.")
 
+    return Token(access_token=create_user_access_token(user))
+
+
+@app.post("/training-providers/login", response_model=Token)
+def training_provider_login(payload: CandidateLogin, db: Annotated[Session, Depends(get_db)]) -> Token:
+    """Sign in an invited training-provider account; centers are provisioned by MFPE."""
+    email = payload.email.lower()
+    user = db.query(User).filter(User.email == email).first()
+    if user is None:
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    identity = db.query(AuthIdentity).filter(
+        AuthIdentity.user_id == user.id, AuthIdentity.provider == AuthProvider.PASSWORD
+    ).first()
+    if identity is None or identity.password_hash is None or not verify_password(payload.password, identity.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    if "training_provider" not in {str(role).strip().lower() for role in (user.roles or [])}:
+        raise HTTPException(status_code=403, detail="This account is not enabled for a training center")
+    if not user.email_verified:
+        raise HTTPException(status_code=403, detail="Email not verified. Check your inbox or request a new verification link.")
     return Token(access_token=create_user_access_token(user))
 
 
