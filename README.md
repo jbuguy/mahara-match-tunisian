@@ -12,7 +12,7 @@ Mahara Match is one React frontend and one FastAPI backend for candidate onboard
 
 ## Local setup
 
-Requirements: Python 3.11+, Node.js 18+, and PostgreSQL. Configure `back/.env` from `back/.env.example`; set `DATABASE_URL` and a strong `JWT_SECRET`. Optional Google OAuth, Groq, and OpenAI-compatible LLM settings are documented in that file.
+Requirements: Python 3.11+, Node.js 18+, and PostgreSQL. Configure `back/.env` from `back/.env.example`; set `DATABASE_URL` and a strong `JWT_SECRET`. Optional Google OAuth, Groq, and OpenAI-compatible LLM settings are documented in that file. Email verification and password reset require SMTP settings (`SMTP_HOST`, `SMTP_FROM_EMAIL`, and, when required, SMTP credentials) before the API can deliver links.
 
 Apply ordered SQL migrations and start the API in one terminal:
 

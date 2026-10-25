@@ -3,7 +3,7 @@ import uuid
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, Enum, ForeignKey, Numeric, String, Uuid, UniqueConstraint, func
+from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, Enum, ForeignKey, Index, Numeric, String, Uuid, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from mahara_data.db.base import JSONType, pg_enum
 from mahara_data.enums import EducationLevel, LiteracyLevel, OnboardingPath, UserRole
@@ -119,6 +119,24 @@ class AuthIdentity(Base):
         db.add(identity)
         db.flush()
         return identity
+
+
+class AccountActionToken(Base):
+    """Single-use email verification and password reset tokens (only their hashes are stored)."""
+
+    __tablename__ = "account_action_tokens"
+    __table_args__ = (
+        CheckConstraint("purpose in ('email_verification', 'password_reset')", name="account_action_tokens_purpose_check"),
+        Index("ix_account_action_tokens_user_purpose_created", "user_id", "purpose", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    purpose: Mapped[str] = mapped_column(String(32), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
 class Candidate(Base):

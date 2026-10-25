@@ -25,6 +25,8 @@ from .features.employer.voice import create_employer_voice_router
 from .features.employer.market import router as employer_market_router
 from .features.mock_interviews import create_mock_interview_router
 from .features.mock_interview_retention import run_retention_loop
+from .email_auth import router as email_auth_router
+from .features.training.router import create_training_provider_router
 from .features.ministry.routers import analytics as ministry_analytics
 from .features.ministry.routers import ingestion as ministry_ingestion
 from .features.ministry.routers import market as ministry_market
@@ -137,6 +139,8 @@ app.include_router(google_auth_router)
 # The existing OAuth client starts its flow under /api/v1; retain that route while
 # the platform's canonical callback remains /auth/google/callback.
 app.include_router(google_auth_router, prefix="/api/v1", include_in_schema=False)
+app.include_router(email_auth_router)
+app.include_router(create_training_provider_router(get_db, get_current_user))
 app.include_router(create_application_router(get_db, get_current_user, get_current_employer))
 app.include_router(create_mock_interview_router(get_db, require_roles("candidate"), llm_client))
 app.include_router(employer_market_router)

@@ -38,6 +38,9 @@ class Settings(BaseSettings):
     smtp_username: str | None = None
     smtp_password: str | None = None
     smtp_from_email: str | None = None
+    smtp_from_name: str = "Mahara Match"
+    smtp_starttls: bool = True
+    smtp_use_ssl: bool = False
     smtp_use_starttls: bool = True
 
     @property

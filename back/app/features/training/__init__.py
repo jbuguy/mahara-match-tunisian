@@ -1,0 +1,1 @@
+"""Training-provider catalog feature."""

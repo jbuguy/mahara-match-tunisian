@@ -1,10 +1,27 @@
 # Feature Plan and Current Status
 
-**Checked against the repository on 12 October 2026.**
+**Checked against the repository on 15 October 2026.** This plan tracks the candidate mock interview and the training-center actor, and records the recent conversion of the main product screens to React. A checked item means code exists; it does not imply the feature is production-verified or complete end to end.
 
-This checklist tracks the two proposed features: an AI mock interview for candidates and a training-center actor. Checked boxes mean the capability already exists in the codebase; they do not mean the complete feature is done.
+## 1. React application screens
 
-## 1. AI mock interview
+### Implemented
+
+- [x] Candidate portal is a React route with profile, opportunities, applications, profile editing, offer details, and matching-roadmap views (`front/src/App.tsx`).
+- [x] Candidate portal uses the existing profile, offer, application, matching, and roadmap APIs; candidate sign-in and onboarding lead to this route.
+- [x] Employer workspace is a React route with employer offers, applications, hiring decisions, and the conversational offer-generation/review/publish flow.
+- [x] Signup is routed to the React signup form. Candidate, employer, and invited training-provider sign-in routes use React.
+- [x] `/dashboard` redirects to the candidate portal instead of showing the old role-state demo page.
+- [x] Removed the standalone dashboard, employer, and signup HTML pages and their iframe route component.
+- [x] Added responsive styling for candidate, employer, and training-center workspaces in `front/src/styles.css`.
+
+### Still needed
+
+- [ ] Install frontend dependencies and run the production TypeScript/Vite build; this has not yet been verified because `tsc` is unavailable in the current workspace.
+- [ ] Manually verify candidate, employer, signup, and training-provider flows against a running backend and representative accounts.
+- [ ] Add frontend/backend integration coverage for offer creation and publishing, application decisions, and profile updates.
+- [ ] Review keyboard navigation, screen-reader labels, responsive layouts, and localized text for every new React route.
+
+## 2. AI mock interview
 
 ### Existing building blocks
 
@@ -26,39 +43,41 @@ This checklist tracks the two proposed features: an AI mock interview for candid
 - [ ] Validate model output, provider failure behavior, language quality, accessibility, and privacy behavior.
 - [ ] Consider candidate-controlled video playback only after the text/audio experience is validated; no face-based confidence analysis.
 
-**Current status:** The app has reusable LLM and transcription infrastructure, but no candidate mock interview feature, route, session API, or review UI was found.
+**Current status:** Reusable LLM and transcription infrastructure exists, but no mock-interview feature, interview-session API, or review UI has been implemented.
 
-## 2. Training-center actor
+## 3. Training-center actor
 
-### Existing building blocks
+### Existing foundations
 
-- [x] Shared `training_provider` user role exists (`back/mahara_data/enums.py`; database enum in `migrations/20260921000000_wp1_shared_schema.sql`).
-- [x] Training provider, course, course-skill, and candidate-certification models exist (`back/mahara_data/db/models/training.py`).
-- [x] Training course and certification schemas exist (`back/mahara_data/schemas/training.py`).
-- [x] Training catalog data is used by matching knowledge/roadmap features (`back/app/features/matching/rag.py`).
+- [x] Shared `training_provider` user role, provider/course/course-skill/certification models, and training schemas exist.
+- [x] Training-course records are used by matching knowledge and roadmap features.
+- [x] Added training-provider password sign-in at `/training-providers/login`; provider accounts must be provisioned and linked by MFPE.
+- [x] Added authenticated, provider-owned APIs for reading the linked center, listing its courses, creating courses, and toggling course availability (`back/app/features/training/router.py`).
+- [x] Provider APIs enforce the `training_provider` role and scope course operations to the linked provider; course skills must come from the validated taxonomy.
+- [x] Added a React training-center workspace with dashboard, accreditation reference display, course catalog, course creation, availability controls, statistics, settings, support, and guide views (`front/src/App.tsx`).
+- [x] Added a training-center sign-in choice and Vite development proxy route.
 
-### Feature work still needed
+### Still needed
 
-- [ ] Add training-center registration/sign-in and link a provider account securely to one organization.
-- [ ] Define provider verification lifecycle (pending, approved, rejected, suspended) and authorized reviewer actions.
-- [ ] Add provider ownership and staff membership rules; enforce authorization and ownership on every provider API.
-- [ ] Add a training-center workspace for provider profile, verification status, and course catalog.
-- [ ] Add course create/edit/preview/publish/archive actions scoped to the owning center.
-- [ ] Restrict candidate discovery, matching context, and roadmaps to active courses from approved providers.
-- [ ] Refresh/remove search and embedding content when course publication or provider status changes.
-- [ ] Add candidate-facing course details and clear provider verification status.
-- [ ] Decide whether certification verification and multi-staff accounts are in the first release; add audit trails and strict document access if included.
-- [ ] Define migration and visibility behavior for existing provider/course records.
-- [ ] Add authorization, lifecycle, catalog freshness, privacy, and UI coverage.
+- [ ] Add a controlled provider onboarding/linking workflow; current provider login works only for a verified user with a `TrainingProvider.user_id` association already provisioned.
+- [ ] Add provider verification lifecycle fields and reviewer workflows. The current accreditation reference is informational and must not be shown as verified status.
+- [ ] Add edit, draft, preview, publish, archive, and restore workflows for courses; the current API creates active courses and toggles availability.
+- [ ] Enforce that only approved-provider courses enter candidate discovery, matching context, roadmaps, and embeddings. The current training model/API has no provider approval state.
+- [ ] Add candidate-facing course details and application/enrollment only after the required course availability and contact data are defined.
+- [ ] Add audit events for provider/course administration and authorization tests for cross-provider access.
+- [ ] Define migrations and a visibility policy for existing provider/course records.
+- [ ] Add backend and frontend coverage for provider login, unlinked providers, course validation, ownership, and availability changes.
 
-**Current status:** The role, database structures, and schemas exist, but no training-center registration, workspace, provider management API, verification workflow, or provider-facing course CRUD was found. Existing course catalog integration does not provide a self-service center experience.
+**Current status:** The center workspace and limited provider-scoped catalog API are implemented. Account provisioning/linking, accreditation approval, full course lifecycle, audit coverage, and approved-course candidate discovery remain outstanding.
 
-## Suggested sequence
+## Recommended next steps
 
-1. [ ] Resolve product choices: launch languages and audio scope for mock interviews; provider verification authority, account model, and course publishing requirements for centers.
-2. [ ] Build the mock-interview typed prototype and the training-provider identity/authorization foundation.
-3. [ ] Add mock-interview audio and the provider course-management workspace.
-4. [ ] Connect approved published courses to candidate discovery and roadmap surfaces.
-5. [ ] Evaluate both features for quality, privacy, accessibility, authorization boundaries, and provider/model failure handling.
+1. [ ] Install the frontend dependencies and run the TypeScript/Vite production build; fix compile errors before adding more UI.
+2. [ ] Start the backend and frontend and manually exercise the candidate and employer flows with test accounts, including offer creation/publishing and application status changes.
+3. [ ] Decide and implement the MFPE-controlled training-provider provisioning and approval lifecycle; until then, create/link one authorized provider account in the development database for UI verification.
+4. [ ] Add training-provider API tests for role checks, provider ownership, course creation, taxonomy validation, and availability changes.
+5. [ ] Implement provider course draft/review/publish lifecycle and prevent unapproved courses from candidate-facing discovery and RAG.
+6. [ ] Revisit candidate discovery to surface real training courses and clearly distinguish verified provider status.
+7. [ ] Build the candidate mock interview as a separate feature after agreeing on languages, question design, feedback boundaries, and audio retention.
 
 See the detailed proposals in [mock-interview-plan.md](./mock-interview-plan.md) and [training-center-actor-plan.md](./training-center-actor-plan.md).
