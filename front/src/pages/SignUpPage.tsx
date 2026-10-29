@@ -1,107 +1,25 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-
-import { API_BASE_URL, requestJson } from '../lib/api'
+import { requestJson } from '../lib/api'
+import { useI18n } from '../lib/i18n'
 
 type Role = 'candidate' | 'employer'
+const profiles = [
+  { role: 'candidate' as const, eyebrow: 'ESPACE CITOYEN', title: 'Je cherche un emploi', description: 'Pour tout citoyen tunisien ou résident en quête d’insertion, de reconversion ou d’évolution de carrière.', points: [['Matching intelligent ANETI', 'Recommandations basées sur votre bassin de vie.'], ['Passeport compétences civique', 'Attestation des savoir-faire et certifications.'], ['100% Gratuit & Souverain', 'Aucune commission, protection des données INPDP.']], badge: 'DISPONIBLE (ACTIF)', button: 'Choisir le profil Citoyen' },
+  { role: 'employer' as const, eyebrow: 'ESPACE ENTREPRISE', title: 'Je recrute des talents', description: 'Pour entreprises tunisiennes, artisans labellisés, start-ups et institutions publiques recruteuses.', points: [['Publicité ciblée', 'Diffusion vers les réseaux territoriaux et sectoriels.'], ['Vivier vérifié', 'Candidatures vérifiées et conformité réglementaire.'], ['Matricule fiscal requis', 'Lutte contre les offres fictives et la fraude.']], badge: 'DISPONIBLE (ACTIF)', button: 'Choisir le profil Entreprise' },
+]
 
 export function SignUpPage() {
-  const navigate = useNavigate()
-  const [searchParams, setSearchParams] = useSearchParams()
-  const selectedRole = searchParams.get('role') as Role | null
-  const role = selectedRole === 'candidate' || selectedRole === 'employer' ? selectedRole : null
-  const [fullName, setFullName] = useState('')
-  const [companyName, setCompanyName] = useState('')
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [sector, setSector] = useState('')
-  const [companySize, setCompanySize] = useState('1-10')
-  const [error, setError] = useState('')
-  const [isSubmitting, setIsSubmitting] = useState(false)
-
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    if (!role) return
-    setError('')
-    setIsSubmitting(true)
-    try {
-      if (role === 'candidate') {
-        await requestJson('/candidates/signup', {
-          method: 'POST',
-          body: JSON.stringify({ full_name: fullName.trim(), email, password, onboarding_path: 'cv_upload' }),
-        })
-      } else {
-        await requestJson('/employers/signup', {
-          method: 'POST',
-          body: JSON.stringify({ company_name: companyName.trim(), email, password, sector: sector.trim(), company_size: companySize }),
-        })
-      }
-      const token = await requestJson<{ access_token: string }>(role === 'candidate' ? '/candidates/login' : '/employers/login', {
-        method: 'POST', body: JSON.stringify({ email, password }),
-      })
-      localStorage.setItem('mahara_access_token', token.access_token)
-      window.dispatchEvent(new Event('mahara-auth-changed'))
-      navigate(role === 'candidate' ? '/candidate/start' : '/dashboard', { replace: true })
-    } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : 'Unable to create your account. Please try again.')
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
-  return (
-    <div className="auth-layout signup-layout">
-      <aside className="auth-story" aria-label="About Mahara Match">
-        <span className="auth-story-kicker">Mahara Match · Tunisia</span>
-        <div>
-          <p className="auth-story-mark" aria-hidden="true">م</p>
-          <h1>Your next chapter starts here.</h1>
-          <p>Build a skills profile, find work that fits, or connect your team with local talent.</p>
-        </div>
-        <span className="auth-story-foot">Made for people and businesses across Tunisia</span>
-      </aside>
-      <div className="auth-card auth-card-polished">
-      <div className="auth-intro">
-        <p className="eyebrow">Create your account</p>
-        <h2>{role === 'candidate' ? 'Find work that fits you' : role === 'employer' ? 'Build your hiring workspace' : 'Choose your Mahara workspace'}</h2>
-        <p>{role ? 'Create your account to get started. You can update your details later.' : 'Start with a workspace tailored to what you need.'}</p>
-      </div>
-
-      {!role && <div className="signup-role-grid">
-        <button className="signup-choice" type="button" onClick={() => setSearchParams({ role: 'candidate' })}>
-          <span className="auth-choice-icon" aria-hidden="true">↗</span><h3>I'm looking for work</h3>
-          <p>Build a profile, explore suitable jobs, and plan your next steps.</p><span>Candidate workspace →</span>
-        </button>
-        <button className="signup-choice" type="button" onClick={() => setSearchParams({ role: 'employer' })}>
-          <span className="auth-choice-icon" aria-hidden="true">＋</span><h3>I'm hiring</h3>
-          <p>Publish clear job offers and find people with the right skills.</p><span>Employer workspace →</span>
-        </button>
-      </div>}
-
-      {role && <>
-        <button className="text-button" type="button" onClick={() => { setSearchParams({}); setError('') }}>← Choose another workspace</button>
-        {role === 'candidate' && <div className="auth-method-card signup-role-form">
-          <p className="auth-method-title">Continue with Google</p>
-          <p className="auth-method-copy">Use your Google account to get started quickly.</p>
-          <button className="secondary-btn full-width google-btn" type="button" onClick={() => { window.location.href = `${API_BASE_URL}/auth/google` }}>
-            <span className="google-g" aria-hidden="true">G</span> Continue with Google
-          </button>
-        </div>}
-        <div className="auth-divider"><span>or sign up with email</span></div>
-        <form className="auth-form signup-role-form" onSubmit={handleSubmit}>
-          {role === 'candidate' ? <label><span>Full name</span><input autoComplete="name" required maxLength={160} value={fullName} onChange={(event) => setFullName(event.target.value)} /></label> : <>
-            <label><span>Company name</span><input autoComplete="organization" required maxLength={160} value={companyName} onChange={(event) => setCompanyName(event.target.value)} /></label>
-            <label><span>Sector</span><input required maxLength={120} value={sector} onChange={(event) => setSector(event.target.value)} /></label>
-            <label><span>Company size</span><select value={companySize} onChange={(event) => setCompanySize(event.target.value)}><option value="1-10">1–10</option><option value="11-50">11–50</option><option value="51-200">51–200</option><option value="200+">200+</option></select></label>
-          </>}
-          <label><span>Email address</span><input autoComplete="email" required type="email" value={email} onChange={(event) => setEmail(event.target.value)} /></label>
-          <label><span>Password</span><input autoComplete="new-password" required type="password" minLength={8} maxLength={128} value={password} onChange={(event) => setPassword(event.target.value)} aria-describedby="password-hint" /><small id="password-hint" className="field-hint">At least 8 characters, including uppercase, lowercase, and a number.</small></label>
-          {error && <p className="form-error" role="alert">{error}</p>}
-          <button type="submit" className="primary-btn full-width" disabled={isSubmitting}>{isSubmitting ? 'Creating your account…' : 'Create account'}</button>
-        </form>
-      </>}
-      <p className="auth-switch">Already have an account? <Link to={role ? `/signin?role=${role}` : '/signin'}>Sign in</Link></p>
-      </div>
-    </div>
-  )
+  const navigate = useNavigate(); const [searchParams, setSearchParams] = useSearchParams()
+  const { language, setLanguage, t } = useI18n()
+  const selectedRole = searchParams.get('role') as Role | null; const role = selectedRole === 'candidate' || selectedRole === 'employer' ? selectedRole : null
+  const [fullName, setFullName] = useState(''); const [companyName, setCompanyName] = useState(''); const [email, setEmail] = useState(''); const [password, setPassword] = useState(''); const [sector, setSector] = useState(''); const [companySize, setCompanySize] = useState('1-10'); const [error, setError] = useState(''); const [isSubmitting, setIsSubmitting] = useState(false)
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); if (!role) return; setError(''); setIsSubmitting(true); try { if (role === 'candidate') await requestJson('/candidates/signup', { method: 'POST', body: JSON.stringify({ full_name: fullName.trim(), email, password, onboarding_path: 'cv_upload' }) }); else await requestJson('/employers/signup', { method: 'POST', body: JSON.stringify({ company_name: companyName.trim(), email, password, sector: sector.trim(), company_size: companySize }) }); const token = await requestJson<{ access_token: string }>(role === 'candidate' ? '/candidates/login' : '/employers/login', { method: 'POST', body: JSON.stringify({ email, password }) }); localStorage.setItem('mahara_access_token', token.access_token); window.dispatchEvent(new Event('mahara-auth-changed')); navigate(role === 'candidate' ? '/candidate/start' : '/dashboard', { replace: true }) } catch (requestError) { setError(requestError instanceof Error ? requestError.message : 'Impossible de créer votre compte. Veuillez réessayer.') } finally { setIsSubmitting(false) } }
+  return <div className="signup-page">
+    <header className="signup-header"><Link to="/signup" className="signup-brand"><span className="signup-brand-mark" aria-hidden="true">••<br />••</span><span><strong>Mahara Match</strong> <b>مهارة ماتش</b><small>{t('brand.platform')}</small></span></Link><nav className="signup-actions" aria-label="signup navigation"><button type="button" className={language === 'fr' ? 'selected' : ''} onClick={() => setLanguage('fr')}>Français</button><button type="button" className={language === 'en' ? 'selected' : ''} onClick={() => setLanguage('en')}>English</button><button type="button" className={language === 'ar' ? 'selected' : ''} onClick={() => setLanguage('ar')}>العربية</button><button type="button" onClick={() => setLanguage(language === 'ar' ? 'fr' : 'ar')}>⇄ {t('nav.changeLanguage')}</button><span>{language === 'en' ? 'Already have an account?' : language === 'ar' ? 'لديك حساب؟' : 'Vous avez déjà un compte ?'}</span><Link to="/signin">{t('nav.signIn')} ↪</Link></nav></header>
+    <section className="signup-hero"><div className="signup-welcome">☼ مرحبا بك · Ahla w Sahla fi Mahara Match ☼</div><h1>Rejoignez l’écosystème républicain des talents</h1><p>La plateforme publique unifiée associant demandeurs d’emploi, entreprises civiques et<br /> centres de formation agréés sous l’égide des institutions nationales.</p><div className="signup-steps" aria-label="Progression de l’inscription"><div className="signup-step active"><strong>1</strong><span>ÉTAPE ACTIVE<em>1. Choix du profil</em></span></div><div className="signup-step"><strong>2</strong><span>EN ATTENTE<em>2. Création du compte</em></span></div><div className="signup-step"><strong>3</strong><span>CONFIRMATION<em>3. Vérification e-mail</em></span></div></div></section>
+    {!role ? <main className="signup-content"><div className="signup-section-heading"><div><h2>Sélectionnez la nature de votre engagement</h2><p>Votre profil adaptera automatiquement les outils réglementaires et les services de mise en relation.</p></div><span>3 profils institutionnels</span></div><div className="signup-profile-list">{profiles.map((profile) => <article key={profile.role} className={`signup-profile ${profile.role}`}><div className="profile-icon" aria-hidden="true">{profile.role === 'candidate' ? '♙' : '▦'}</div><div className="profile-intro"><small>{profile.eyebrow}</small><h3>{profile.title}</h3><p>{profile.description}</p></div><div className="profile-points">{profile.points.map(([label, copy]) => <p key={label}><b>◉</b><span><strong>{label}:</strong> {copy}</span></p>)}</div><div className="profile-cta"><span>● {profile.badge}</span><button type="button" onClick={() => setSearchParams({ role: profile.role })}>{profile.button}<b>→</b></button></div></article>)}
+      <article className="signup-profile ministry"><div className="profile-icon">♜</div><div className="profile-intro"><small>INSTITUTIONS</small><h3>Administration & pilotage</h3><p>Comptes d’administration ministérielle et accès institutionnels.</p></div><div className="profile-points"><p><b>◉</b><span>Les accès sont délivrés sur invitation nominative et suivent un protocole 2FA.</span></p></div><div className="profile-cta"><span>EN INVITATION</span><button type="button" disabled>Accès institutionnel ↗</button></div></article>
+      <article className="signup-profile training"><div className="profile-icon">⌂</div><div className="profile-intro"><small>FORMATION & REQUALIFICATION</small><h3>Je dirige un centre</h3><p>Centres publics (ATFP) et organismes privés homologués pour la formation professionnelle.</p></div><div className="profile-points"><p><b>◉</b><span><strong>Catalogue BTP / BTS:</strong> Indexation automatique des cursus certifiants.</span></p><p><b>◉</b><span><strong>Requalification rapide:</strong> Alignement direct avec les besoins exprimés.</span></p></div><div className="profile-cta"><span>BIENTÔT DISPONIBLE</span><button type="button" disabled>Être informé de l’ouverture</button><small>Lancement de la phase pilote prévu pour le T3.</small></div></article></div></main> : <main className="signup-content signup-form-content"><button className="signup-back" type="button" onClick={() => { setSearchParams({}); setError('') }}>← Choisir un autre profil</button><h2>{role === 'candidate' ? 'Créer votre profil citoyen' : 'Créer votre espace entreprise'}</h2><p>Complétez vos informations pour rejoindre Mahara Match.</p><form className="auth-form signup-role-form" onSubmit={handleSubmit}>{role === 'candidate' ? <label><span>Nom complet</span><input required value={fullName} onChange={(event) => setFullName(event.target.value)} /></label> : <><label><span>Nom de l’entreprise</span><input required value={companyName} onChange={(event) => setCompanyName(event.target.value)} /></label><label><span>Secteur</span><input required value={sector} onChange={(event) => setSector(event.target.value)} /></label><label><span>Taille de l’entreprise</span><select value={companySize} onChange={(event) => setCompanySize(event.target.value)}><option>1-10</option><option>11-50</option><option>51-200</option><option>200+</option></select></label></>}<label><span>Adresse e-mail</span><input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} /></label><label><span>Mot de passe</span><input required type="password" minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} /></label>{error && <p className="form-error">{error}</p>}<button className="primary-btn full-width" disabled={isSubmitting}>{isSubmitting ? 'Création…' : 'Créer mon compte'}</button></form></main>}
+  </div>
 }

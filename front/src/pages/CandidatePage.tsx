@@ -94,6 +94,7 @@ export function CandidatePage() {
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
+  const [reloadKey, setReloadKey] = useState(0)
   const [saving, setSaving] = useState(false)
   const [importingCv, setImportingCv] = useState(false)
   const [assistantMessages, setAssistantMessages] = useState<ChatMessage[]>([])
@@ -193,7 +194,7 @@ export function CandidatePage() {
     }
     void loadProfile()
     return () => { active = false }
-  }, [])
+  }, [reloadKey])
 
   useEffect(() => {
     if (loading || !location.hash) return
@@ -340,9 +341,10 @@ export function CandidatePage() {
   }
 
   if (!localStorage.getItem('mahara_access_token')) {
-    return <div className="stacked-view"><h2>Candidate profile</h2><p>Sign in with Google to manage your candidate profile.</p><Link className="primary-btn" to="/signin">Sign in</Link></div>
+    return <div className="stacked-view"><h2>Candidate profile</h2><p>Sign in to manage your candidate profile.</p><Link className="primary-btn" to="/signin">Sign in</Link></div>
   }
   if (loading) return <div className="stacked-view"><p>Loading candidate profile…</p></div>
+  if (error && !identity) return <div className="stacked-view"><h2>We couldn’t load your profile</h2><p className="form-error" role="alert">{error}</p><button className="primary-btn" type="button" onClick={() => { setError(''); setLoading(true); setReloadKey((current) => current + 1) }}>Try again</button></div>
 
   return (
     <div className="stacked-view">

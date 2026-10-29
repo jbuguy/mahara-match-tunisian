@@ -132,8 +132,8 @@ def application_client():
 def test_candidate_applies_once_to_currently_matched_offer(application_client):
     client, sessions, _user, _employer, candidate_id, _employer_id, _other_id, offer_id = application_client
 
-    created = client.post("/api/v1/me/applications", json={"job_offer_id": str(offer_id), "cover_note": "Bonjour"})
-    duplicate = client.post("/api/v1/me/applications", json={"job_offer_id": str(offer_id)})
+    created = client.post("/api/v1/me/applications", json={"job_offer_id": str(offer_id), "cover_note": "Bonjour", "employer_contact_consent": True})
+    duplicate = client.post("/api/v1/me/applications", json={"job_offer_id": str(offer_id), "employer_contact_consent": True})
 
     assert created.status_code == 201
     assert created.json()["status"] == ApplicationStatus.SUBMITTED.value
@@ -146,7 +146,7 @@ def test_candidate_applies_once_to_currently_matched_offer(application_client):
 
 def test_applicant_list_is_employer_scoped_and_excludes_pii(application_client):
     client, _sessions, _user, active_employer, _candidate_id, _employer_id, other_employer_id, offer_id = application_client
-    client.post("/api/v1/me/applications", json={"job_offer_id": str(offer_id)})
+    client.post("/api/v1/me/applications", json={"job_offer_id": str(offer_id), "employer_contact_consent": True})
 
     own = client.get("/api/v1/employer/applications")
     active_employer["value"] = type("EmployerRef", (), {"id": other_employer_id})()
@@ -161,7 +161,7 @@ def test_applicant_list_is_employer_scoped_and_excludes_pii(application_client):
 
 def test_employer_decision_persists_feedback_and_rejects_other_owner(application_client):
     client, sessions, _user, active_employer, _candidate_id, employer_id, other_employer_id, offer_id = application_client
-    created = client.post("/api/v1/me/applications", json={"job_offer_id": str(offer_id)}).json()
+    created = client.post("/api/v1/me/applications", json={"job_offer_id": str(offer_id), "employer_contact_consent": True}).json()
 
     active_employer["value"] = type("EmployerRef", (), {"id": other_employer_id})()
     denied = client.patch(
@@ -183,7 +183,7 @@ def test_employer_decision_persists_feedback_and_rejects_other_owner(application
 
 def test_candidate_application_list_is_scoped_to_own_profile(application_client):
     client, _sessions, active_user, _employer, _candidate_id, _employer_id, _other_id, offer_id = application_client
-    client.post("/api/v1/me/applications", json={"job_offer_id": str(offer_id)})
+    client.post("/api/v1/me/applications", json={"job_offer_id": str(offer_id), "employer_contact_consent": True})
     active_user["value"] = type("UserRef", (), {"id": uuid.uuid4()})()
 
     assert client.get("/api/v1/me/applications").status_code == 404

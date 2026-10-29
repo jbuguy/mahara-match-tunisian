@@ -1,0 +1,390 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage[a4paper,margin=2.3cm,headheight=14pt]{geometry}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{longtable}
+\usepackage{tabularx}
+\usepackage[table]{xcolor}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+
+\definecolor{maharaBlue}{HTML}{174A70}
+\definecolor{maharaPale}{HTML}{EAF2F8}
+\definecolor{statusGreen}{HTML}{E6F4EA}
+\definecolor{statusAmber}{HTML}{FFF3CD}
+\definecolor{statusGray}{HTML}{ECEFF1}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=maharaBlue,
+  urlcolor=maharaBlue,
+  pdftitle={Cahier des charges MVP - Mahara Match},
+  pdfauthor={Projet Mahara Match}
+}
+
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{\textcolor{maharaBlue}{Mahara Match}}
+\rhead{Cahier des charges consolidé}
+\cfoot{\thepage}
+
+\setlist[itemize]{leftmargin=*,itemsep=2pt,topsep=4pt}
+\setlist[enumerate]{leftmargin=*,itemsep=2pt,topsep=4pt}
+\renewcommand{\arraystretch}{1.2}
+\newcommand{\status}[1]{\textsf{\small #1}}
+\newcommand{\code}[1]{\texttt{#1}}
+
+\begin{document}
+
+\begin{titlepage}
+  \centering
+  \vspace*{2.2cm}
+  {\Large\textcolor{maharaBlue}{PROJET UNIVERSITAIRE -- CYCLE INGÉNIEUR}\par}
+  \vspace{1.1cm}
+  {\Huge\bfseries Cahier des charges\par}
+  \vspace{0.25cm}
+  {\LARGE\bfseries Mahara Match\par}
+  \vspace{0.7cm}
+  {\large Plateforme d'IA pour la mise en visibilité des compétences et la mise en relation avec l'emploi en Tunisie\par}
+  \vspace{1.4cm}
+  \colorbox{maharaPale}{\parbox{0.82\textwidth}{\centering
+    \textbf{Version consolidée du MVP}\\
+    Le périmètre initial est conservé et complété par les services déjà présents dans le projet.\\
+    Les fonctions complémentaires restent visibles dans la cible, sans être présentées comme toutes déployées.
+  }}
+  \vfill
+  \begin{tabular}{rl}
+    \textbf{Version :} & 1.0 -- document de travail\\
+    \textbf{Date :} & Octobre 2026\\
+    \textbf{Statut :} & Consolidation du cahier initial et du dépôt logiciel\\
+    \textbf{Pays cible :} & Tunisie\\
+  \end{tabular}
+  \vspace*{1.3cm}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+\section{Synthèse}
+
+Mahara Match aide les personnes en recherche d'emploi à rendre leurs compétences visibles, y compris lorsqu'elles n'ont ni diplôme formel ni CV. La plateforme structure un profil à partir d'un échange guidé, peut exploiter un CV fourni volontairement, puis rapproche le profil des offres publiées à l'aide d'un score explicable.
+
+Elle accompagne également les employeurs dans la rédaction et la gestion des offres, et fournit des outils de gouvernance des référentiels et des données du marché du travail. Des services complémentaires présents dans le projet -- candidatures, entraînement aux entretiens, parcours de compétences, assistant et catalogue de formation -- sont conservés dans la cible consolidée.
+
+\begin{quote}
+\textbf{Promesse produit.} Réduire la friction entre les personnes et les opportunités existantes, et rendre visibles des compétences qui ne le sont pas dans les parcours classiques. La plateforme ne prétend pas résoudre le chômage et ne décide jamais seule d'une embauche ou d'un rejet.
+\end{quote}
+
+\subsection{Conventions de lecture}
+
+Ce document réunit le cahier MVP préliminaire et les capacités documentées ou repérables dans le dépôt courant. Il distingue le besoin produit de son état logiciel :
+\begin{itemize}
+  \item \colorbox{statusGreen}{\status{Présent dans le dépôt}} : un parcours, une route ou un service correspondant existe dans le code. Cela ne certifie pas sa mise en production.
+  \item \colorbox{statusAmber}{\status{Partiel / dépendant}} : une partie existe, ou l'usage dépend de données, de configuration ou d'un service externe.
+  \item \colorbox{statusGray}{\status{À réaliser / à valider}} : exigence de la cible qui n'a pas été confirmée comme opérationnelle dans le code.
+\end{itemize}
+
+\section{Contexte, objectifs et périmètre}
+
+\subsection{Problème à résoudre}
+
+Une part des compétences acquises par l'expérience -- artisanat, commerce, services ou travail informel -- n'est pas décrite dans un CV standard ni reliée aux référentiels utilisés par les employeurs. Il en résulte une difficulté à présenter ces compétences et à les rapprocher d'offres pertinentes. Les petites structures peuvent aussi manquer de temps ou de méthode pour rédiger une offre complète et inclusive.
+
+\subsection{Objectifs}
+\begin{enumerate}
+  \item Permettre à un candidat de créer et corriger son profil sans devoir commencer par un CV.
+  \item Rattacher les compétences et métiers à des référentiels partagés et gouvernés.
+  \item Présenter des offres pertinentes avec les facteurs du score et les écarts de compétences.
+  \item Aider les employeurs à formaliser, relire, publier et gérer leurs offres.
+  \item Faciliter le suivi des candidatures et l'accès à des ressources de développement professionnel.
+  \item Fournir au ministère des indicateurs agrégés et des outils de gouvernance, sans exposer de données individuelles non nécessaires.
+  \item Maintenir une séparation nette entre assistance automatisée et décision humaine.
+\end{enumerate}
+
+\subsection{Périmètre consolidé}
+
+Les trois fonctions du document initial restent le noyau du MVP :
+\begin{itemize}
+  \item \textbf{F1 -- Profil candidat sans CV :} entretien guidé, saisie assistée et rattachement des compétences au référentiel.
+  \item \textbf{F2 -- Matching explicable :} classement déterministe des offres et présentation des raisons de la correspondance.
+  \item \textbf{F3 -- Offre assistée :} rédaction structurée, revue par l'employeur et garde-fou de non-discrimination.
+\end{itemize}
+
+À la demande du porteur de projet, les autres idées du dépôt et des documents de travail sont conservées dans la cible fonctionnelle : authentification, import de CV, candidatures, gestion des dossiers côté employeur, assistant, entraînement aux entretiens, parcours de compétences, formation et espace ministère. Elles sont décrites ci-dessous et pourront être livrées progressivement. Leur présence dans le périmètre cible ne signifie pas qu'elles sont toutes achevées ni qu'elles doivent bloquer une première démonstration du noyau MVP.
+
+\subsection{Hors périmètre explicite}
+\begin{itemize}
+  \item Scraping automatisé de sites d'emploi tiers ; les offres proviennent de la plateforme, d'une saisie autorisée ou d'une source officiellement autorisée.
+  \item Décision automatique d'embauche, de rejet, d'éligibilité ou de sanction d'un candidat.
+  \item Promesse de placement, de salaire ou de résultat d'emploi.
+  \item Déploiement de Kubernetes ou découpage obligatoire en microservices pour le MVP.
+  \item Fine-tuning de modèle présenté comme nécessaire au fonctionnement initial.
+\end{itemize}
+
+\section{Acteurs et droits}
+
+\begin{longtable}{>{\raggedright\arraybackslash}p{0.19\textwidth} >{\raggedright\arraybackslash}p{0.35\textwidth} >{\raggedright\arraybackslash}p{0.36\textwidth}}
+\toprule
+\textbf{Acteur} & \textbf{Besoins} & \textbf{Droits / limites}\\
+\midrule
+\endhead
+Candidat / demandeur d'emploi & Créer son profil, explorer les offres, postuler, consulter son parcours et s'entraîner. & Gérer ses informations et consentements ; accéder uniquement à ses propres données et candidatures.\\
+Employeur (PME, artisan, recruteur) & Créer des offres, les publier, trouver des profils pertinents et suivre les candidatures. & Gérer les offres de son organisation ; consulter les informations candidat selon le statut de la candidature et les autorisations accordées.\\
+Ministère / administrateur habilité & Gouverner les référentiels, traiter les suggestions, importer des jeux de données et consulter des indicateurs. & Actions contrôlées par rôle, journalisées et limitées aux agrégats lorsque les données individuelles ne sont pas nécessaires.\\
+Organisme de formation & Publier et actualiser des cours reliés à des compétences. & Gérer le catalogue rattaché à son compte ; ne pas modifier le profil ou le parcours du candidat.\\
+Opérateur de la plateforme & Configurer les services, surveiller leur disponibilité et traiter les incidents. & Accès technique contrôlé ; les secrets et données de production ne sont pas exposés dans le navigateur.\\
+\bottomrule
+\end{longtable}
+
+\section{Exigences fonctionnelles}
+
+\subsection{F1 -- Onboarding et profil candidat}
+
+\begin{longtable}{>{\raggedright\arraybackslash}p{0.12\textwidth} >{\raggedright\arraybackslash}p{0.60\textwidth} >{\raggedright\arraybackslash}p{0.18\textwidth}}
+\toprule
+\textbf{ID} & \textbf{Exigence} & \textbf{État repéré}\\
+\midrule
+\endhead
+F1.1 & Le candidat peut créer un compte et ouvrir une session ; le profil est rattaché à l'identité authentifiée. & \status{Présent / à valider}\\
+F1.2 & Le candidat peut construire ou corriger son profil par formulaire et conversation, sans CV obligatoire. L'assistant demande des informations manquantes, conserve la langue de l'utilisateur lorsque possible et ne valide pas le profil à sa place. & \status{Présent, dépend du LLM}\\
+F1.3 & Les compétences, niveaux, expériences, langues, formation, lieu et métiers souhaités peuvent être structurés et reliés aux codes connus. Les valeurs non reconnues sont signalées ou proposées à validation, et ne sont pas silencieusement inventées. & \status{Partiel}\\
+F1.4 & Un parcours vocal guidé est proposé aux personnes préférant l'audio ou ayant une faible aisance numérique. L'audio est transcrit avant revue et validation par le candidat. & \status{Présent, dépend de STT}\\
+F1.5 & L'import d'un CV PDF ou DOCX peut préremplir un brouillon. Le candidat vérifie et confirme les informations avant enregistrement. Un fichier illisible conduit à une saisie manuelle, et non à un profil fabriqué. & \status{Présent, formats limités}\\
+F1.6 & Le consentement à l'utilisation du profil est explicite ; la personne peut demander la rectification ou la suppression de ses données selon la politique de conservation. & \status{À vérifier de bout en bout}\\
+\bottomrule
+\end{longtable}
+
+\subsection{F2 -- Offres, matching et explications}
+
+\begin{itemize}
+  \item Seules les offres publiées et non expirées sont proposées au matching candidat.
+  \item Le classement est produit par une formule déterministe, versionnée et testable ; un LLM ne choisit pas le score final.
+  \item Les critères du score sont les compétences techniques, l'expérience, les compétences comportementales et la localisation.
+  \item Le résultat présente les éléments correspondants, les exigences manquantes ou de niveau insuffisant et, lorsque disponible, le détail du score par composante.
+  \item Les relations entre compétences ne donnent du crédit que lorsqu'elles sont définies dans le référentiel partagé.
+  \item Le candidat peut consulter une offre, l'enregistrer ou déposer une candidature selon les règles de l'offre et son statut.
+\end{itemize}
+
+\begin{center}
+\rowcolors{2}{maharaPale}{white}
+\begin{tabularx}{0.78\textwidth}{Xr}
+\toprule
+\textbf{Composante} & \textbf{Pondération actuelle}\\
+\midrule
+Compétences techniques & 50\,\%\\
+Expérience & 20\,\%\\
+Compétences comportementales & 15\,\%\\
+Localisation & 15\,\%\\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+Ces pondérations sont celles de l'implémentation de scoring repérée dans le dépôt ; toute modification doit être documentée, versionnée et accompagnée de tests. L'absence d'une information ne doit pas être présentée comme une certitude. Les critères liés à l'âge, au genre et à l'origine sont exclus du score.
+
+\subsection{F3 -- Création et gestion des offres employeur}
+
+\begin{enumerate}
+  \item L'employeur crée une offre au moyen d'un formulaire structuré ou d'un échange guidé.
+  \item L'assistant peut structurer les réponses en français ou en derja tunisienne ; les champs ignorés restent inconnus et ne sont pas inventés.
+  \item L'offre contient au minimum un intitulé, une description des missions, une localisation, un type de contrat et des compétences obligatoires.
+  \item Les compétences proposées sont associées aux entrées validées du référentiel ; l'employeur peut les corriger.
+  \item L'employeur relit et modifie le brouillon avant toute publication. Les statuts brouillon, publiée, clôturée et archivée sont gérés selon les règles métier.
+  \item L'employeur peut consulter les candidatures associées à ses offres et appliquer les transitions de statut autorisées.
+\end{enumerate}
+
+\subsubsection{Garde-fou de non-discrimination}
+
+Le contrôle doit être fondé sur des règles explicites et auditables, et non sur une décision opaque du LLM. Il doit :
+\begin{itemize}
+  \item repérer des formulations potentiellement discriminatoires ou inutilement genrées dans le texte de l'offre ;
+  \item présenter à l'employeur le passage concerné, la raison de l'alerte et, lorsqu'une règle fiable existe, une proposition de formulation neutre ;
+  \item laisser l'employeur examiner et modifier l'offre ; le contrôle ne publie, ne rejette et ne bloque pas une offre à lui seul ;
+  \item enregistrer les alertes liées à l'offre dans le champ de données prévu \code{guardrail\_flags}, avec une trace suffisante pour l'audit ;
+  \item ne jamais introduire le genre, l'âge ou l'origine dans le calcul du matching.
+\end{itemize}
+
+\textbf{État :} le modèle de données du work package data layer prévoit \code{guardrail\_flags} et l'architecture prévoit un contrôle de non-discrimination. Le dépôt ne confirme pas encore un moteur de règles opérationnel ni un catalogue de règles. Les catégories de termes, les langues couvertes, le niveau de gravité et la politique de reformulation doivent donc être validés avant de présenter cette fonction comme active.
+
+\subsection{Services candidat complémentaires}
+
+\begin{longtable}{>{\raggedright\arraybackslash}p{0.25\textwidth} >{\raggedright\arraybackslash}p{0.51\textwidth} >{\raggedright\arraybackslash}p{0.16\textwidth}}
+\toprule
+\textbf{Service} & \textbf{Exigence consolidée} & \textbf{État repéré}\\
+\midrule
+\endhead
+Candidatures & Déposer une candidature sur une offre active, consulter l'historique et l'état, éviter les doublons et conserver le contexte du matching au moment du dépôt. & \status{Présent / à valider}\\
+Assistant Mahara & Aider à compléter le profil et répondre aux questions sur les offres, compétences et cours disponibles. Les réponses liées aux offres reposent sur des sources publiées/validées ; l'assistant signale lorsqu'il ne sait pas. & \status{Présent, dépend de LLM}\\
+Parcours de compétences & Montrer les écarts par rapport à un métier ou une offre et ordonner des étapes de progression à partir des compétences manquantes. & \status{Partiel}\\
+Formation & Permettre de consulter des cours associés aux compétences utiles, avec modalités, durée, coût éventuel, langue et localisation lorsqu'ils sont renseignés. & \status{Présent / dépend du catalogue}\\
+Entretien blanc & Proposer un entraînement privé et non évaluatif, avec questions, réponses et retours de coaching. Les réponses ne servent pas à noter une candidature ni ne sont communiquées à un employeur. & \status{Présent, dépend de LLM}\\
+\bottomrule
+\end{longtable}
+
+\subsection{Services employeur complémentaires}
+\begin{itemize}
+  \item Consulter et filtrer les offres et candidatures appartenant à l'employeur authentifié.
+  \item Suivre les décisions de présélection, refus ou recrutement conformément au cycle métier ; une décision reste prise par une personne.
+  \item Consulter un indicateur salarial uniquement si sa source, sa période et sa couverture sont suffisamment fiables. Les données trop rares sont supprimées ou présentées comme indisponibles.
+  \item Envoyer des notifications uniquement si le candidat a donné le consentement requis et si le canal de livraison est configuré. L'état d'envoi doit être explicite.
+\end{itemize}
+
+\subsection{Espace ministère et gouvernance}
+\begin{itemize}
+  \item Créer, modifier, valider et déprécier des compétences et métiers ; conserver les versions et les relations entre compétences.
+  \item Examiner les suggestions issues des libellés inconnus, puis les approuver, fusionner ou rejeter avec une trace d'audit.
+  \item Importer des jeux de données marché par formats autorisés, prévisualiser les erreurs et confirmer l'import ; suivre les volumes et erreurs du traitement.
+  \item Présenter les écarts agrégés entre compétences demandées dans les offres et compétences présentes dans les profils, ainsi que des indicateurs de marché selon les périodes disponibles.
+  \item Appliquer des seuils de confidentialité aux petites cohortes ; ne pas exposer des dossiers individuels dans un tableau de bord agrégé.
+  \item Produire des exports contrôlés et journalisés lorsque l'autorisation le permet.
+\end{itemize}
+
+\subsection{Espace organismes de formation}
+\begin{itemize}
+  \item Permettre à un organisme authentifié de gérer son catalogue de cours.
+  \item Associer chaque cours à une ou plusieurs compétences validées et à un niveau cible.
+  \item Décrire les informations connues : modalité, durée, coût en TND, gouvernorat, langue, certification et disponibilité.
+  \item Rendre les cours visibles aux candidats uniquement selon les critères de publication et d'activité définis par la plateforme.
+\end{itemize}
+
+\section{Parcours principaux}
+
+\subsection{Candidat}
+\begin{enumerate}
+  \item Création de compte et choix d'une méthode de connexion.
+  \item Création du profil par échange guidé, formulaire ou import de CV ; les données proposées restent modifiables.
+  \item Revue par le candidat, choix de ses consentements et enregistrement du profil.
+  \item Calcul des correspondances sur les offres éligibles et consultation des explications.
+  \item Dépôt éventuel d'une candidature ; consultation ultérieure de son statut.
+  \item Consultation facultative d'un assistant, d'un parcours de compétences, de cours ou d'un entretien blanc.
+\end{enumerate}
+
+\subsection{Employeur}
+\begin{enumerate}
+  \item Création de compte et accès aux offres appartenant à son organisation.
+  \item Création d'un brouillon par formulaire ou conversation, avec possibilité de passer une question.
+  \item Revue, correction, vérification des alertes de non-discrimination et publication volontaire.
+  \item Consultation des profils correspondants et des candidatures autorisées.
+  \item Décision humaine et mise à jour du statut ; notification éventuelle selon consentement et configuration.
+\end{enumerate}
+
+\subsection{Ministère et organisme de formation}
+
+Le ministère gouverne les référentiels et exploite des agrégats protégés. L'organisme de formation gère ses propres cours. Ces rôles et leurs données restent séparés : un fournisseur de formation ne reçoit pas les candidatures, et un analyste ne reçoit pas les identifiants individuels au travers d'un agrégat.
+
+\section{Données et référentiels}
+
+\subsection{Données principales}
+\begin{itemize}
+  \item Profil candidat : compétences et niveaux, expériences, formations, langues, gouvernorat, mobilité et métiers souhaités.
+  \item Identité et coordonnées : nom, courriel, téléphone et autres données strictement nécessaires.
+  \item Offre : employeur, métier, localisation, description, contrat, exigences et statut.
+  \item Matching : score global, détail par composante, version de la formule et écarts de compétences.
+  \item Parcours : étapes de progression, cours associés et certifications, selon les services activés.
+  \item Marché : jeux de données, sources, périodes, indicateurs, erreurs d'ingestion et traces d'audit.
+\end{itemize}
+
+\subsection{Principes de qualité}
+\begin{itemize}
+  \item Utiliser des codes stables pour les compétences, métiers et gouvernorats ; les libellés libres sont conservés comme valeurs sources ou suggestions.
+  \item Distinguer les compétences obligatoires des compétences souhaitées et conserver le niveau minimal lorsqu'il est connu.
+  \item Traiter explicitement les données absentes, incertaines ou non vérifiées.
+  \item Conserver la provenance, la date et la version des données de marché ; ne pas présenter une source illustrative comme une statistique officielle.
+  \item Ne pas importer de données personnelles provenant de sources non autorisées.
+\end{itemize}
+
+\section{Exigences non fonctionnelles}
+
+\begin{longtable}{>{\raggedright\arraybackslash}p{0.20\textwidth} >{\raggedright\arraybackslash}p{0.70\textwidth}}
+\toprule
+\textbf{Domaine} & \textbf{Exigence}\\
+\midrule
+\endhead
+Confidentialité & Collecter le minimum nécessaire ; isoler les données d'identité des attributs utilisés par le matching ; limiter et journaliser les accès aux coordonnées.\\
+Consentement & Expliquer l'usage des données, recueillir un consentement explicite lorsque requis et prévoir un mécanisme de retrait et de suppression conforme aux règles applicables.\\
+Sécurité & Contrôler chaque route selon l'identité, le rôle et la propriété de la ressource ; protéger les secrets côté serveur ; utiliser HTTPS en déploiement ; valider et borner les fichiers entrants.\\
+Équité & Exclure l'âge, le genre et l'origine du score ; suivre les alertes d'offre ; conserver la capacité d'expliquer et d'auditer les traitements.\\
+Transparence & Présenter les facteurs du score, les limites des données et l'origine des indicateurs ; ne pas faire passer une sortie de LLM pour une vérité vérifiée.\\
+Accessibilité & Concevoir des parcours simples, utilisables sur téléphone, avec étapes courtes, langage clair, saisie manuelle de secours et parcours vocal lorsque disponible.\\
+Internationalisation & Le produit vise prioritairement le français, avec prise en compte du derja tunisien et de l'arabe dans les parcours concernés. Le niveau réel de traduction de l'interface doit être vérifié ; un simple sélecteur visuel ne vaut pas une interface entièrement traduite.\\
+Résilience & En cas d'indisponibilité d'un LLM ou de la transcription, conserver les réponses déjà saisies, afficher une erreur compréhensible et permettre une alternative manuelle.\\
+Traçabilité & Versionner les contrats, les migrations, la formule de matching et les règles de contrôle ; journaliser les opérations administratives et les accès sensibles.\\
+\bottomrule
+\end{longtable}
+
+\section{Architecture et dépendances techniques}
+
+Le dépôt courant correspond à une application React/Vite et une API FastAPI, avec une base PostgreSQL partagée et des contrats de données communs. Le modèle relationnel et les migrations sont centralisés. Les embeddings/éléments vectoriels sont prévus dans le socle partagé pour les fonctions qui en ont besoin ; ils ne remplacent pas le matching déterministe.
+
+\begin{itemize}
+  \item \textbf{Interface :} React, adaptée aux vues candidat, employeur, ministère et organisme de formation.
+  \item \textbf{API :} FastAPI en Python, avec authentification, contrôle d'accès, validation des entrées et services fonctionnels.
+  \item \textbf{Données :} PostgreSQL ; référentiels, profils, offres, candidatures, résultats de matching, gouvernance et audit.
+  \item \textbf{Services de langage :} fournisseurs compatibles API configurés côté serveur ; l'application doit rester utilisable pour les parcours manuels si ces services sont indisponibles.
+  \item \textbf{Voix :} transcription audio dépendante des composants et modèles configurés sur l'environnement d'exécution.
+  \item \textbf{Services opérationnels :} stockage privé des documents si activé, SMTP pour les courriels, et worker supervisé pour les traitements asynchrones concernés.
+\end{itemize}
+
+Le déploiement cible de production devra préciser l'hébergeur, les sauvegardes, la gestion des secrets, les environnements, les alertes et le processus de mise à jour. Ces choix ne sont pas supposés résolus par la seule présence de code.
+
+\section{Critères d'acceptation du MVP}
+
+\begin{enumerate}
+  \item Un candidat peut créer un profil sans CV, saisir ou corriger ses compétences et confirmer son enregistrement.
+  \item Une indisponibilité de l'assistant n'empêche pas de compléter le profil manuellement et n'efface pas le brouillon de l'utilisateur.
+  \item Un candidat reçoit un classement reproductible pour un même profil, les mêmes offres et la même version de la formule.
+  \item Chaque résultat affiche les facteurs pris en compte et des écarts compréhensibles ; aucune donnée de genre, âge ou origine ne contribue au score.
+  \item Une offre non publiée ou expirée n'apparaît pas dans les résultats destinés aux candidats.
+  \item Un employeur peut créer, relire, corriger et publier une offre ; aucune génération automatique ne publie sans action explicite.
+  \item Une formulation signalée par le contrôle anti-discrimination affiche l'alerte et la règle correspondante ; l'employeur garde la décision finale. Si le moteur de règles n'est pas encore livré, la fonction est déclarée indisponible plutôt que simulée.
+  \item Un candidat peut déposer une candidature admissible et un autre candidat ne peut pas consulter ou modifier cette candidature.
+  \item Un employeur ne peut consulter que ses offres et les candidatures auxquelles son rôle donne accès ; les consultations de données personnelles sensibles sont auditées.
+  \item Un acteur ministère ne peut consulter que les fonctions autorisées ; les agrégats respectent les seuils de confidentialité et les imports gardent leur provenance.
+  \item Les tests automatisés couvrent le scoring, les règles de publication, les permissions essentielles et les contrats de données concernés.
+\end{enumerate}
+
+\section{Indicateurs de réussite}
+
+Les indicateurs servent à évaluer la qualité du service, pas à mesurer une promesse d'emploi :
+\begin{itemize}
+  \item taux de complétion du profil et part des profils créés sans import de CV ;
+  \item proportion des profils pour lesquels des compétences sont correctement rattachées au référentiel après validation ;
+  \item proportion des résultats de matching pour lesquels l'explication est disponible et cohérente avec le score ;
+  \item taux de conversion offre publiée $\rightarrow$ consultation $\rightarrow$ candidature ;
+  \item nombre et types d'alertes de formulation employeur, ainsi que leur résolution humaine ;
+  \item qualité et fraîcheur des données de marché et du catalogue de formation ;
+  \item taux d'erreur, indisponibilité et durée des services externes, notamment LLM et transcription.
+\end{itemize}
+
+Les seuils chiffrés de réussite restent à fixer après obtention d'une base de référence et des données de test représentatives.
+
+\section{Risques, dépendances et décisions à confirmer}
+
+\begin{longtable}{>{\raggedright\arraybackslash}p{0.24\textwidth} >{\raggedright\arraybackslash}p{0.62\textwidth}}
+\toprule
+\textbf{Sujet} & \textbf{Point à cadrer avant généralisation}\\
+\midrule
+\endhead
+Taxonomie initiale & Confirmer les secteurs prioritaires et les métiers/compétences tunisiens à couvrir ; vérifier les sources et licences des référentiels externes.\\
+Règles anti-discrimination & Définir les catégories et exemples de formulations, les langues couvertes, les niveaux d'alerte, les reformulations autorisées et les responsables de validation. Le data layer prévoit un champ de conservation, pas le catalogue complet des règles.\\
+Langues produit & Confirmer les langues de l'interface complète et des sorties de chaque assistant ; distinguer langue d'interface, langue des données et langue de transcription.\\
+Fournisseur LLM & Confirmer fournisseur, budget, localisation des traitements, conservation par le fournisseur, limites de débit et plan de secours.\\
+Données du marché & Confirmer les sources officielles, droits d'utilisation, fréquence de mise à jour et seuils statistiques avant publication de benchmarks.\\
+Déploiement & Confirmer hébergement, stockage privé des fichiers, SMTP, supervision des workers, sauvegardes, HTTPS et processus de restauration.\\
+Politique de conservation & Fixer les durées des profils, CV, transcriptions, réponses d'entretien, candidatures, audits et jeux d'import.\\
+Ordonnancement des modules & Confirmer quels services complémentaires doivent être livrés dans la première version utilisable et lesquels peuvent suivre sans être retirés de la cible.\\
+\bottomrule
+\end{longtable}
+
+\section{Conclusion}
+
+Le périmètre consolidé garde les trois engagements fondateurs -- profil accessible sans CV, matching explicable et aide à la rédaction d'offres -- tout en préservant les services déjà engagés dans le projet. La mise en œuvre doit rester vérifiable : les fonctions présentes dans le dépôt sont qualifiées selon leur état réel, les dépendances externes sont explicites et les fonctions incomplètes ne sont jamais simulées comme disponibles.
+
+\vspace{0.5cm}
+\noindent\textbf{Références internes de consolidation :} README du dépôt ; contrats JSON partagés ; documents des work packages Employee, Employer, Matching et Data Layer ; modules FastAPI candidats, employeurs, matching, formation et ministère.
+
+\end{document}

@@ -63,7 +63,13 @@ def get_current_user(
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+        payload = jwt.decode(
+            token,
+            settings.jwt_secret,
+            algorithms=[settings.jwt_algorithm],
+            issuer="mahara-match",
+            audience="mahara-match-platform",
+        )
         email = str(payload.get("email") or payload.get("sub") or "").strip().lower()
         if not email or not payload.get("user_id"):
             raise credentials_error

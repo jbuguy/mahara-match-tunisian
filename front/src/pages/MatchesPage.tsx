@@ -3,12 +3,14 @@ import { Link } from 'react-router-dom'
 
 import { applyToOffer, askAboutMatch, getMyApplications, getMyMatches, getMyRoadmap, updateApplicationContactConsent, type CandidateApplication, type MatchAssistantSource, type MatchResult, type MatchRoadmap, type RankedMatches } from '../lib/api'
 import { ChatPanel, type ChatMessage } from '../components/ChatPanel'
+import { useI18n } from '../lib/i18n'
 
 function formatSkillCode(code: string) {
   return code.startsWith('UNMAPPED:') ? code.slice('UNMAPPED:'.length) : code
 }
 
 export function MatchesPage() {
+  const { t } = useI18n()
   const [matches, setMatches] = useState<RankedMatches | null>(null)
   const [applications, setApplications] = useState<CandidateApplication[]>([])
   const [applying, setApplying] = useState('')
@@ -23,6 +25,7 @@ export function MatchesPage() {
   const [assistantError, setAssistantError] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(Boolean(localStorage.getItem('mahara_access_token')))
+  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     if (!localStorage.getItem('mahara_access_token')) {
@@ -40,7 +43,7 @@ export function MatchesPage() {
       .catch((cause) => { if (active) setError(cause instanceof Error ? cause.message : 'Could not load job matches.') })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
-  }, [])
+  }, [reloadKey])
 
   async function loadRoadmap(match: MatchResult) {
     setRoadmapLoading(match.job_offer_id)
@@ -97,17 +100,17 @@ export function MatchesPage() {
   }
 
   if (!localStorage.getItem('mahara_access_token')) {
-    return <div className="stacked-view"><h2>Job matches</h2><p>Sign in to see roles matched to your candidate profile.</p><Link className="primary-btn" to="/signin">Sign in</Link></div>
+    return <div className="stacked-view"><h2>{t('matches.title')}</h2><p>{t('matches.signInDescription')}</p><Link className="primary-btn" to="/signin">{t('nav.signIn')}</Link></div>
   }
 
-  if (loading) return <div className="stacked-view"><p>Finding your best matches…</p></div>
+  if (loading) return <div className="stacked-view"><p>{t('status.loading')}</p></div>
 
   const profileMissing = error === 'profile not found'
 
   return (
     <div className="stacked-view">
       <header className="panel-header">
-        <div><p className="eyebrow">WP3 · Skill matching</p><h2>Your job matches</h2></div>
+        <div><p className="eyebrow">WP3 · Skill matching</p><h2>{t('matches.title')}</h2></div>
         {matches && <span className="module-tag">{matches.items.length} roles</span>}
       </header>
 
@@ -115,9 +118,9 @@ export function MatchesPage() {
         <h3>Complete your profile first</h3>
         <p>Matches are calculated from your saved skills, experience, and location.</p>
         <Link className="primary-btn" to="/candidate">Open candidate profile</Link>
-      </section> : error && <p className="form-error" role="alert">{error}</p>}
+      </section> : error && <div className="stacked-inline-error"><p className="form-error" role="alert">{error}</p><button className="secondary-btn" type="button" onClick={() => { setError(''); setMatches(null); setLoading(true); setReloadKey((current) => current + 1) }}>{t('common.tryAgain')}</button></div>}
 
-      {matches && matches.items.length === 0 && <section className="detail-panel"><h3>No offers to match yet</h3><p>New offers will appear here when they are available.</p></section>}
+      {matches && matches.items.length === 0 && <section className="detail-panel"><h3>{t('matches.noOffersTitle')}</h3><p>{t('matches.noOffersDescription')}</p></section>}
 
       {matches && matches.items.length > 0 && <section className="detail-panel match-results" aria-label="Ranked job matches">
         <label className="consent-checkbox"><input type="checkbox" checked={employerContactConsent} onChange={(event) => setEmployerContactConsent(event.target.checked)} />

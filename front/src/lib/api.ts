@@ -202,16 +202,21 @@ export async function requestJson<T>(path: string, init: RequestInit = {}): Prom
     headers.set('Content-Type', 'application/json')
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers,
-  })
+  let response: Response
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      ...init,
+      headers,
+    })
+  } catch {
+    throw new Error('Le service est momentanément indisponible. Vérifiez votre connexion puis réessayez.')
+  }
 
   if (!response.ok) {
     const body = await response.json().catch(() => null)
     const detail = body?.detail
     const message = typeof detail === 'string' ? detail : detail?.message
-    throw new Error(typeof message === 'string' ? message : `Request failed with status ${response.status}`)
+    throw new Error(typeof message === 'string' ? message : 'La demande n’a pas pu aboutir. Veuillez réessayer.')
   }
 
   if (response.status === 204) return undefined as T

@@ -1,0 +1,62 @@
+@startuml
+left to right direction
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam actorStyle awesome
+skinparam usecase {
+  BackgroundColor #E1F5EE
+  BorderColor #0F6E56
+}
+skinparam rectangle {
+  BackgroundColor white
+  BorderColor #444441
+}
+title Diagramme de cas d'utilisation - Mahara Match
+
+actor "Candidat" as CAND
+actor "Employeur" as EMP
+actor "Organisme\nde formation" as ORG
+actor "Ministère" as MIN
+
+rectangle "Mahara Match" {
+
+  usecase "Consulter les offres" as C2
+  usecase "Trouver une formation" as C3
+  usecase "Postuler à une offre" as C4
+  usecase "Préparer un entretien" as C5
+  usecase "Consulter l'assistant" as C6
+
+  usecase "Rédiger une offre" as E1
+  usecase "Voir les candidats" as E3
+  usecase "Décider et inviter" as E4
+
+  usecase "Gérer les cours" as F1 
+  usecase "Demande par région" as F2 
+
+  usecase "Gérer le référentiel" as M1 
+  usecase "Importer des données" as M2 
+  usecase "Voir les indicateurs" as M3 
+  usecase "Valider les centres" as M4 
+}
+
+CAND --> C2
+CAND --> C3
+CAND --> C4
+CAND --> C5
+CAND --> C6
+
+EMP --> E1
+EMP --> E3
+EMP --> E4
+
+ORG --> F1
+ORG --> F2
+
+MIN --> M1
+MIN --> M2
+MIN --> M3
+MIN --> M4
+
+C3 .> C2 : <<extend>>
+
+@enduml

@@ -1,5 +1,5 @@
-import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom'
-import { useEffect, useState } from 'react'
+import { BrowserRouter, Link, NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import { useEffect, useState, type ReactNode } from 'react'
 
 import { API_BASE_URL, requestJson } from './lib/api'
 import { DashboardPage } from './pages/DashboardPage'
@@ -13,6 +13,8 @@ import { MockInterviewPage } from './pages/MockInterviewPage'
 import { SignInPage } from './pages/SignInPage'
 import { SignUpPage } from './pages/SignUpPage'
 import { MinistryPage } from './pages/MinistryPage'
+import { PasswordResetPage } from './pages/PasswordResetPage'
+import { I18nProvider, useI18n, type Language } from './lib/i18n'
 
 type HealthResponse = {
   status: string
@@ -41,6 +43,8 @@ function PlatformShell({
   loading: boolean
 }) {
   const location = useLocation()
+  const { language, setLanguage, t } = useI18n()
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [account, setAccount] = useState<{ kind: 'candidate'; hasProfile: boolean } | { kind: 'employer' } | { kind: 'ministry' } | null>(null)
   const [accountLoading, setAccountLoading] = useState(true)
 
@@ -81,8 +85,14 @@ function PlatformShell({
     }
   }, [location.pathname])
 
+  const isAuthPage = location.pathname === '/signin' || location.pathname === '/signup' || location.pathname === '/auth/callback'
+  const cycleLanguage = () => {
+    const next: Language = language === 'fr' ? 'en' : language === 'en' ? 'ar' : 'fr'
+    setLanguage(next)
+  }
+
   return (
-    <main className="mahara-app-shell">
+    <main className={location.pathname === '/signup' ? 'mahara-app-shell signup-shell' : location.pathname === '/signin' ? 'mahara-app-shell signin-shell' : 'mahara-app-shell'}>
       <div className="app-frame">
         <aside className="sidebar">
           <div className="brand-block">
@@ -94,17 +104,17 @@ function PlatformShell({
           </div>
 
           <nav className="sidebar-nav" aria-label="main navigation">
-            {accountLoading && <span className="nav-link" role="status">Loading workspace…</span>}
+            {accountLoading && <span className="nav-link" role="status">{t('nav.loadingWorkspace')}</span>}
             {!accountLoading && !account && <>
-              <NavLink to="/signin" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>Sign in</NavLink>
-              <NavLink to="/signup" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>Create account</NavLink>
+              <NavLink to="/signin" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>{t('nav.signIn')}</NavLink>
+              <NavLink to="/signup" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>{t('nav.createAccount')}</NavLink>
             </>}
             {!accountLoading && account?.kind === 'candidate' && <>
-              <NavLink to="/dashboard" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>Overview</NavLink>
-              {!account.hasProfile && <NavLink to="/candidate/start" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>Set up my profile</NavLink>}
-              <NavLink to="/candidate" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>My profile</NavLink>
-              <NavLink to="/matches" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>Job matches</NavLink>
-              <NavLink to="/mock-interview" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>Interview practice</NavLink>
+              <NavLink to="/dashboard" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>{t('nav.overview')}</NavLink>
+              {!account.hasProfile && <NavLink to="/candidate/start" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>{t('nav.setupProfile')}</NavLink>}
+              <NavLink to="/candidate" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>{t('nav.profile')}</NavLink>
+              <NavLink to="/matches" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>{t('nav.matches')}</NavLink>
+              <NavLink to="/mock-interview" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>{t('nav.interview')}</NavLink>
             </>}
             {!accountLoading && account?.kind === 'employer' && <>
               <NavLink to="/dashboard" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>Overview</NavLink>
@@ -118,29 +128,65 @@ function PlatformShell({
 
           <div className="sidebar-panel">
             <p className="eyebrow">Platform status</p>
-            {loading ? <p>Loading…</p> : <p>{health?.status ?? 'unknown'}</p>}
+            {loading ? <p>{t('status.loading')}</p> : <p>{health?.status === 'ok' ? t('status.ok') : health?.status ?? 'unknown'}</p>}
           </div>
         </aside>
 
         <section className="main-panel">
+          {!isAuthPage && <header className="product-topbar">
+            <div className="product-topbar-search">
+              <span aria-hidden="true">⌕</span>
+              <input aria-label={t('nav.searchPlaceholder')} placeholder={t('nav.searchPlaceholder')} />
+            </div>
+            <div className="product-topbar-actions">
+              <button className="topbar-icon-button" type="button" onClick={cycleLanguage} aria-label={t('nav.changeLanguage')} title={t('nav.changeLanguage')}>文 <span>{language.toUpperCase()}</span></button>
+              <div className="notification-control"><button className="topbar-icon-button" type="button" onClick={() => setNotificationsOpen((open) => !open)} aria-label={t('nav.notifications')} aria-expanded={notificationsOpen} title={t('nav.notifications')}>♢</button>{notificationsOpen && <div className="notification-popover" role="status"><strong>{t('nav.notifications')}</strong><span>{language === 'ar' ? 'لا توجد إشعارات جديدة.' : language === 'en' ? 'No new notifications.' : 'Aucune nouvelle notification.'}</span></div>}</div>
+              {account ? <span className="topbar-account"><strong>{account.kind === 'candidate' ? (language === 'ar' ? 'مترشح' : language === 'en' ? 'Candidate' : 'Candidat') : account.kind === 'employer' ? (language === 'ar' ? 'مشغّل' : language === 'en' ? 'Employer' : 'Employeur') : (language === 'ar' ? 'وزارة' : language === 'en' ? 'Ministry' : 'Ministère')}</strong><small>{t('nav.activeWorkspace')}</small></span> : <Link className="topbar-signin" to="/signin">{t('nav.signIn')}</Link>}
+            </div>
+          </header>}
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/signin" element={<SignInPage />} />
             <Route path="/signup" element={<SignUpPage />} />
+            <Route path="/password-reset" element={<PasswordResetPage />} />
             <Route path="/auth/callback" element={<AuthCallbackPage />} />
             <Route path="/dashboard" element={<DashboardPage health={health} modules={modules} />} />
-            <Route path="/onboarding" element={<OnboardingPage />} />
-            <Route path="/candidate/start" element={<CandidateStartPage />} />
-            <Route path="/candidate" element={<CandidatePage />} />
-            <Route path="/matches" element={<MatchesPage />} />
-            <Route path="/mock-interview" element={<MockInterviewPage />} />
-            <Route path="/employer" element={<EmployerPage />} />
-            <Route path="/ministry" element={<MinistryPage />} />
+            <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
+            <Route path="/candidate/start" element={<ProtectedRoute><CandidateStartPage /></ProtectedRoute>} />
+            <Route path="/candidate" element={<ProtectedRoute><CandidatePage /></ProtectedRoute>} />
+            <Route path="/matches" element={<ProtectedRoute><MatchesPage /></ProtectedRoute>} />
+            <Route path="/mock-interview" element={<ProtectedRoute><MockInterviewPage /></ProtectedRoute>} />
+            <Route path="/employer" element={<ProtectedRoute><EmployerPage /></ProtectedRoute>} />
+            <Route path="/ministry" element={<ProtectedRoute><MinistryPage /></ProtectedRoute>} />
           </Routes>
         </section>
       </div>
     </main>
   )
+}
+
+function ProtectedRoute({ children }: { children: ReactNode }) {
+  const [status, setStatus] = useState<'checking' | 'authenticated' | 'unauthenticated'>('checking')
+
+  useEffect(() => {
+    let active = true
+    const token = localStorage.getItem('mahara_access_token')
+    if (!token) {
+      setStatus('unauthenticated')
+      return () => { active = false }
+    }
+    requestJson('/api/v1/me/roles')
+      .then(() => { if (active) setStatus('authenticated') })
+      .catch(() => {
+        localStorage.removeItem('mahara_access_token')
+        window.dispatchEvent(new Event('mahara-auth-changed'))
+        if (active) setStatus('unauthenticated')
+      })
+    return () => { active = false }
+  }, [])
+
+  if (status === 'checking') return <div className="stacked-view"><p role="status">Checking your session…</p></div>
+  return status === 'authenticated' ? <>{children}</> : <Navigate to="/signin" replace />
 }
 
 function App() {
@@ -171,7 +217,7 @@ function App() {
 
   return (
     <BrowserRouter>
-      <PlatformShell health={health} modules={modules} loading={loading} />
+      <I18nProvider><PlatformShell health={health} modules={modules} loading={loading} /></I18nProvider>
     </BrowserRouter>
   )
 }
