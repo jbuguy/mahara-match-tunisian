@@ -1,12 +1,8 @@
 """One-time email verification and password reset flows."""
 
 from datetime import UTC, datetime, timedelta
-from email.message import EmailMessage
 import hashlib
-import logging
 import secrets
-import smtplib
-import ssl
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -16,10 +12,10 @@ from sqlalchemy.orm import Session
 
 from .config import Settings, get_settings
 from .database import get_db
+from .email_delivery import mail_configured, send_email
 from .models import AccountActionToken, AuthIdentity, AuthProvider, Employer, User, normalize_email
 from .security import hash_password
 
-logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth/email", tags=["email authentication"])
 VERIFY = "email_verification"
 RESET = "password_reset"
@@ -53,36 +49,11 @@ class EmailActionResponse(BaseModel):
 
 
 def _mail_configured(settings: Settings) -> bool:
-    return bool(settings.smtp_host and settings.smtp_from_email)
+    return mail_configured(settings)
 
 
 def _send_email(settings: Settings, recipient: str, subject: str, body: str) -> bool:
-    if not _mail_configured(settings):
-        return False
-    message = EmailMessage()
-    message["Subject"] = subject
-    message["From"] = f"{settings.smtp_from_name} <{settings.smtp_from_email}>"
-    message["To"] = recipient
-    message.set_content(body)
-    try:
-        if settings.smtp_use_ssl:
-            with smtplib.SMTP_SSL(settings.smtp_host, settings.smtp_port, timeout=10, context=ssl.create_default_context()) as client:
-                if settings.smtp_username:
-                    client.login(settings.smtp_username, settings.smtp_password or "")
-                client.send_message(message)
-        else:
-            with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=10) as client:
-                client.ehlo()
-                if settings.smtp_starttls:
-                    client.starttls(context=ssl.create_default_context())
-                    client.ehlo()
-                if settings.smtp_username:
-                    client.login(settings.smtp_username, settings.smtp_password or "")
-                client.send_message(message)
-        return True
-    except (OSError, smtplib.SMTPException):
-        logger.warning("Unable to send account security email")
-        return False
+    return send_email(settings, recipient, subject, body)
 
 
 def _issue_token(db: Session, user: User, purpose: str, settings: Settings) -> bool:

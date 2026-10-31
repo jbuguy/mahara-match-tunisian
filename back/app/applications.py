@@ -19,6 +19,7 @@ from mahara_data.enums import ApplicationStatus, HiringDecision, OfferStatus
 from mahara_data.schemas.common import Page
 from mahara_data.schemas.offer import NormalizedJobOffer
 from .config import get_settings
+from .security import ensure_employer_email_verified
 
 from .services.applications import (
     ApplicationWorkflowError,
@@ -383,6 +384,7 @@ def create_application_router(get_db: Any, get_current_user: Any, get_current_em
                                       db: Annotated[Session, Depends(get_db)],
                                       employer: Annotated[Employer, Depends(get_current_employer)]):
         settings = get_settings()
+        ensure_employer_email_verified(db, employer)
         if not all((settings.smtp_host, settings.smtp_from_email)):
             raise HTTPException(status_code=503, detail="Interview notification delivery is not configured")
         application = (db.query(Application).join(JobOffer, JobOffer.id == Application.job_offer_id)

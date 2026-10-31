@@ -3,7 +3,7 @@ import uuid
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, Enum, ForeignKey, Index, Numeric, String, Uuid, UniqueConstraint, func
+from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, Enum, ForeignKey, Index, Numeric, String, Text, Uuid, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from mahara_data.db.base import JSONType, pg_enum
 from mahara_data.enums import EducationLevel, LiteracyLevel, OnboardingPath, UserRole
@@ -191,6 +191,10 @@ class Employer(Base):
         Enum(CompanySize, name="company_size", values_callable=lambda enum: [member.value for member in enum]),
         nullable=False,
     )
+    tax_id: Mapped[str | None] = mapped_column(String(32), unique=True)
+    governorate_code: Mapped[str | None] = mapped_column(String(8))
+    website: Mapped[str | None] = mapped_column(String(255))
+    description: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 

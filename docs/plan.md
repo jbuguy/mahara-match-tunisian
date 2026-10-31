@@ -1,6 +1,6 @@
 # Feature Plan and Current Status
 
-**Checked against the repository on 15 October 2026.** This plan tracks the candidate mock interview and the training-center actor, and records the recent conversion of the main product screens to React. A checked item means code exists; it does not imply the feature is production-verified or complete end to end.
+**Checked against the repository on 29 October 2026.** This plan tracks the candidate mock interview, training-center actor, employer experience, and transactional email delivery. A checked item means code exists; it does not imply the feature is production-verified or complete end to end.
 
 ## 1. React application screens
 
@@ -16,12 +16,36 @@
 
 ### Still needed
 
-- [ ] Install frontend dependencies and run the production TypeScript/Vite build; this has not yet been verified because `tsc` is unavailable in the current workspace.
+- [x] Install frontend dependencies and run the production TypeScript/Vite build.
 - [ ] Manually verify candidate, employer, signup, and training-provider flows against a running backend and representative accounts.
 - [ ] Add frontend/backend integration coverage for offer creation and publishing, application decisions, and profile updates.
 - [ ] Review keyboard navigation, screen-reader labels, responsive layouts, and localized text for every new React route.
 
-## 2. AI mock interview
+## 2. Employer experience and transactional email
+
+### Implemented
+
+- [x] Employer signup leads to a dedicated email-verification screen with a free resend action and a client-side 60-second cooldown (`front/src/pages/VerifyEmailPage.tsx`).
+- [x] Verification links are confirmed through the existing one-time-token endpoint; links expire after 24 hours and resend requests remain rate-limited (`back/app/email_auth.py`).
+- [x] Resend is supported as the preferred transactional-email provider for verification, password reset, and employer notification emails, with SMTP fallback (`back/app/email_delivery.py`).
+- [x] Added server-side Resend configuration placeholders: `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, and `RESEND_FROM_NAME` (`back/.env.example`).
+- [x] Employer profile API and workspace editor expose tax ID, governorate, website, and company description, with visible email/company verification status (`back/app/schemas.py`, `front/src/pages/EmployerPage.tsx`).
+
+### UX and feature improvements still needed
+
+- [x] Enforce verified email before publishing offers or sending employer communications.
+- [ ] Add employer contact person fields, legal terms acceptance, and a formal company-verification submission workflow.
+- [ ] Add employer-specific dashboard onboarding, settings, team access, working search, and real notifications.
+- [ ] Localize the complete employer workspace in French and Arabic, including right-to-left review.
+- [ ] Replace raw JSON skill/language editing with validated search and selection controls.
+- [ ] Add applicant search, sorting, pagination, notes, rejection reasons, comparison, confirmation dialogs, and bulk actions.
+- [ ] Add calendar links, reminders, rescheduling, cancellation, and delivery tracking for interviews.
+- [ ] Add Resend delivery-event webhooks, bounce/complaint handling, idempotency keys, provider health checks, and email-delivery integration tests.
+- [ ] Manually verify Resend in development with a verified sending domain and representative employer accounts; never commit API keys.
+
+**Current status:** The core employer journey and resend UI are implemented. Resend is integrated behind a provider-neutral delivery helper, but production domain verification, environment configuration, delivery-event monitoring, server-side verification enforcement, and the broader employer UX improvements remain outstanding.
+
+## 3. AI mock interview
 
 ### Existing building blocks
 
@@ -45,7 +69,7 @@
 
 **Current status:** Reusable LLM and transcription infrastructure exists, but no mock-interview feature, interview-session API, or review UI has been implemented.
 
-## 3. Training-center actor
+## 4. Training-center actor
 
 ### Existing foundations
 
@@ -72,12 +96,13 @@
 
 ## Recommended next steps
 
-1. [ ] Install the frontend dependencies and run the TypeScript/Vite production build; fix compile errors before adding more UI.
+1. [ ] Configure Resend with a verified sending domain and run verification/password-reset delivery tests.
 2. [ ] Start the backend and frontend and manually exercise the candidate and employer flows with test accounts, including offer creation/publishing and application status changes.
-3. [ ] Decide and implement the MFPE-controlled training-provider provisioning and approval lifecycle; until then, create/link one authorized provider account in the development database for UI verification.
-4. [ ] Add training-provider API tests for role checks, provider ownership, course creation, taxonomy validation, and availability changes.
-5. [ ] Implement provider course draft/review/publish lifecycle and prevent unapproved courses from candidate-facing discovery and RAG.
-6. [ ] Revisit candidate discovery to surface real training courses and clearly distinguish verified provider status.
-7. [ ] Build the candidate mock interview as a separate feature after agreeing on languages, question design, feedback boundaries, and audio retention.
+3. [ ] Enforce verified-email requirements and complete the employer onboarding/profile trust flow.
+4. [ ] Add employer applicant-workflow improvements and full French/Arabic localization.
+5. [ ] Decide and implement the MFPE-controlled training-provider provisioning and approval lifecycle; until then, create/link one authorized provider account in the development database for UI verification.
+6. [ ] Add training-provider API tests for role checks, provider ownership, course creation, taxonomy validation, and availability changes.
+7. [ ] Implement provider course draft/review/publish lifecycle and prevent unapproved courses from candidate-facing discovery and RAG.
+8. [ ] Build the candidate mock interview as a separate feature after agreeing on languages, question design, feedback boundaries, and audio retention.
 
 See the detailed proposals in [mock-interview-plan.md](./mock-interview-plan.md) and [training-center-actor-plan.md](./training-center-actor-plan.md).

@@ -1,16 +1,14 @@
 """SMTP delivery worker for transactional employer notifications."""
 
 import logging
-import smtplib
-import ssl
 import time
 from datetime import datetime, timedelta, timezone
-from email.message import EmailMessage
 
 from sqlalchemy import or_, select
 
 from ...config import get_settings
 from ...database import SessionLocal
+from ...email_delivery import mail_configured, send_email
 from mahara_data.db.models.platform import NotificationOutbox
 
 logger = logging.getLogger("notification_outbox")
@@ -42,25 +40,10 @@ def _claim_one() -> NotificationOutbox | None:
 
 def _deliver(item: NotificationOutbox) -> None:
     settings = get_settings()
-    if not settings.smtp_host or not settings.smtp_from_email:
-        raise RuntimeError("SMTP host and sender address are required")
-    message = EmailMessage()
-    message["From"] = settings.smtp_from_email
-    message["To"] = item.recipient_email
-    message["Subject"] = item.subject
-    message["Message-ID"] = f"<{item.id}@mahara-match>"
-    message.set_content(item.body)
-    context = ssl.create_default_context()
-    with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=20) as smtp:
-        smtp.ehlo()
-        if settings.smtp_use_starttls:
-            smtp.starttls(context=context)
-            smtp.ehlo()
-        elif settings.environment.lower() == "production":
-            raise RuntimeError("STARTTLS must be enabled for production SMTP")
-        if settings.smtp_username:
-            smtp.login(settings.smtp_username, settings.smtp_password or "")
-        smtp.send_message(message)
+    if not mail_configured(settings):
+        raise RuntimeError("Resend or SMTP email delivery must be configured")
+    if not send_email(settings, item.recipient_email, item.subject, item.body, f"<{item.id}@mahara-match>"):
+        raise RuntimeError("Transactional email delivery failed")
 
 
 def process_one() -> bool:
@@ -88,9 +71,9 @@ def process_one() -> bool:
 
 def run_forever() -> None:
     settings = get_settings()
-    if not settings.smtp_host or not settings.smtp_from_email:
-        raise RuntimeError("SMTP_HOST and SMTP_FROM_EMAIL must be configured")
-    if settings.environment.lower() == "production" and not settings.smtp_use_starttls:
+    if not mail_configured(settings):
+        raise RuntimeError("Configure RESEND_API_KEY and RESEND_FROM_EMAIL, or SMTP_HOST and SMTP_FROM_EMAIL")
+    if settings.environment.lower() == "production" and settings.smtp_host and not settings.smtp_use_starttls and not settings.resend_api_key:
         raise RuntimeError("SMTP_USE_STARTTLS must be enabled in production")
     logger.info("Starting transactional notification worker")
     while True:

@@ -96,6 +96,29 @@ export type EmployerOffer = {
   archived_at?: string | null
 }
 
+export type EmployerProfile = {
+  id: string
+  company_name: string
+  email: string
+  sector: string
+  company_size: string
+  tax_id: string | null
+  governorate_code: string | null
+  website: string | null
+  description: string | null
+  created_at: string
+  verified: boolean
+  email_verified: boolean
+}
+
+export function getEmployerProfile(): Promise<EmployerProfile> {
+  return requestJson<EmployerProfile>('/employers/me')
+}
+
+export function updateEmployerProfile(profile: Partial<Pick<EmployerProfile, 'company_name' | 'sector' | 'company_size' | 'tax_id' | 'governorate_code' | 'website' | 'description'>>): Promise<EmployerProfile> {
+  return requestJson<EmployerProfile>('/employers/me', { method: 'PATCH', body: JSON.stringify(profile) })
+}
+
 export type MockInterviewQuestion = { theme: string; prompt: string; follow_up: string; tip: string }
 export type MockInterviewFeedback = {
   overall_summary: string

@@ -14,6 +14,7 @@ import { SignInPage } from './pages/SignInPage'
 import { SignUpPage } from './pages/SignUpPage'
 import { MinistryPage } from './pages/MinistryPage'
 import { PasswordResetPage } from './pages/PasswordResetPage'
+import { VerifyEmailPage } from './pages/VerifyEmailPage'
 import { I18nProvider, useI18n, type Language } from './lib/i18n'
 
 type HealthResponse = {
@@ -85,7 +86,7 @@ function PlatformShell({
     }
   }, [location.pathname])
 
-  const isAuthPage = location.pathname === '/signin' || location.pathname === '/signup' || location.pathname === '/auth/callback'
+  const isAuthPage = location.pathname === '/signin' || location.pathname === '/signup' || location.pathname === '/auth/callback' || location.pathname === '/verify-email'
   const cycleLanguage = () => {
     const next: Language = language === 'fr' ? 'en' : language === 'en' ? 'ar' : 'fr'
     setLanguage(next)
@@ -149,6 +150,7 @@ function PlatformShell({
             <Route path="/signin" element={<SignInPage />} />
             <Route path="/signup" element={<SignUpPage />} />
             <Route path="/password-reset" element={<PasswordResetPage />} />
+            <Route path="/verify-email" element={<VerifyEmailPage />} />
             <Route path="/auth/callback" element={<AuthCallbackPage />} />
             <Route path="/dashboard" element={<DashboardPage health={health} modules={modules} />} />
             <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />

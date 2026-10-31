@@ -42,6 +42,21 @@ class Settings(BaseSettings):
     smtp_starttls: bool = True
     smtp_use_ssl: bool = False
     smtp_use_starttls: bool = True
+    resend_api_key: str | None = None
+    resend_from_email: str | None = None
+    resend_from_name: str = "Mahara Match"
+    stt_provider: str = "whisper"
+    whisper_model: str = "TheBiggyBang/whisper-small-tunisian-derja"
+    whisper_device: str = "auto"
+    whisper_compute_type: str = "int8"
+    whisper_beam_size: int = 5
+    whisper_vad_filter: bool = True
+    whisper_language_detection: bool = True
+    farukstt_model: str = "medyas/FarukSTT"
+    farukstt_device: str = "auto"
+    farukstt_compute_type: str = "float32"
+    farukstt_language: str = "auto"
+    stt_max_audio_bytes: int = 25 * 1024 * 1024
 
     @property
     def cors_origin_list(self) -> list[str]:

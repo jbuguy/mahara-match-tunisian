@@ -15,6 +15,7 @@ from mahara_data.db.models.taxonomy import Skill
 from mahara_data.repositories.taxonomy import get_validated_skills_by_codes
 from mahara_data.schemas.offer import NormalizedJobOffer
 from shared_llm import LLMError, OpenAICompatibleClient
+from ...security import ensure_employer_email_verified
 
 from .workflow import (
     FIELD_QUESTIONS,
@@ -83,6 +84,7 @@ def create_employer_agent_router(
         current: Any = Depends(get_current_employer),
         db: Session = Depends(get_db),
     ) -> dict[str, Any]:
+        ensure_employer_email_verified(db, current)
         session = _owned_session(db, session_model, session_id, current.id)
         if session.state.get("mode", "chat") != "form":
             raise HTTPException(status_code=409, detail="This session uses conversational mode")

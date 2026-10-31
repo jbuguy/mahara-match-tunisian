@@ -12,6 +12,9 @@ class EmployerSignup(BaseModel):
     password: str = Field(min_length=8, max_length=128)
     sector: str = Field(min_length=1, max_length=120)
     company_size: CompanySize
+    tax_id: str | None = Field(default=None, max_length=32)
+    governorate_code: str | None = Field(default=None, max_length=8)
+    website: str | None = Field(default=None, max_length=255)
 
     @field_validator("password")
     @classmethod
@@ -34,6 +37,10 @@ class EmployerUpdate(BaseModel):
     company_name: str | None = Field(default=None, min_length=1, max_length=160)
     sector: str | None = Field(default=None, min_length=1, max_length=120)
     company_size: CompanySize | None = None
+    tax_id: str | None = Field(default=None, max_length=32)
+    governorate_code: str | None = Field(default=None, max_length=8)
+    website: str | None = Field(default=None, max_length=255)
+    description: str | None = Field(default=None, max_length=5000)
 
 
 class CandidateSignup(BaseModel):
@@ -100,8 +107,13 @@ class EmployerProfile(BaseModel):
     email: EmailStr
     sector: str
     company_size: CompanySize
+    tax_id: str | None
+    governorate_code: str | None
+    website: str | None
+    description: str | None
     created_at: datetime
     verified: bool
+    email_verified: bool = False
 
 
 class Token(BaseModel):

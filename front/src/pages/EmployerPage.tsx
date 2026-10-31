@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 
-import { archiveEmployerOffer, decideApplication, getEmployerApplication, getEmployerApplications, getEmployerOfferEditor, getEmployerOffers, getInterviewInvitations, inviteCandidateToInterview, requestJson, setEmployerOfferStatus, updateEmployerOffer, type EmployerApplication, type EmployerApplicationDetail, type EmployerOffer, type EmployerOfferEditor } from '../lib/api'
+import { archiveEmployerOffer, decideApplication, getEmployerApplication, getEmployerApplications, getEmployerOfferEditor, getEmployerOffers, getEmployerProfile, getInterviewInvitations, inviteCandidateToInterview, requestJson, setEmployerOfferStatus, updateEmployerOffer, updateEmployerProfile, type EmployerApplication, type EmployerApplicationDetail, type EmployerOffer, type EmployerOfferEditor, type EmployerProfile } from '../lib/api'
 import { useVoiceInput } from '../lib/useVoiceInput'
 import { ChatPanel, type ChatMessage } from '../components/ChatPanel'
 
@@ -32,6 +32,9 @@ export function EmployerPage() {
   const [offerReview, setOfferReview] = useState<OfferReview | null>(null)
   const [applications, setApplications] = useState<EmployerApplication[]>([])
   const [offers, setOffers] = useState<EmployerOffer[]>([])
+  const [employerProfile, setEmployerProfile] = useState<EmployerProfile | null>(null)
+  const [profileEditing, setProfileEditing] = useState(false)
+  const [profileForm, setProfileForm] = useState<Partial<EmployerProfile>>({})
   const [selectedApplication, setSelectedApplication] = useState<string | null>(null)
   const [offerFilter, setOfferFilter] = useState('all')
   const [candidateDetail, setCandidateDetail] = useState<EmployerApplicationDetail | null>(null)
@@ -74,6 +77,9 @@ export function EmployerPage() {
         }
       })
       .catch((requestError) => { if (active) setError(requestError instanceof Error ? requestError.message : 'Could not load employer data.') })
+    getEmployerProfile()
+      .then((profile) => { if (active) { setEmployerProfile(profile); setProfileForm(profile) } })
+      .catch(() => { if (active) setEmployerProfile(null) })
     requestJson<AgentSession[]>('/employer-agent/sessions')
       .then((sessions) => {
         if (active) {
@@ -132,6 +138,24 @@ export function EmployerPage() {
     } finally {
       setPending(false)
     }
+  }
+
+  async function saveProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setPending(true); setError('')
+    try {
+      const updated = await updateEmployerProfile({
+        company_name: profileForm.company_name?.trim(),
+        sector: profileForm.sector?.trim(),
+        company_size: profileForm.company_size,
+        tax_id: profileForm.tax_id?.trim() || null,
+        governorate_code: profileForm.governorate_code?.trim() || null,
+        website: profileForm.website?.trim() || null,
+        description: profileForm.description?.trim() || null,
+      })
+      setEmployerProfile(updated); setProfileForm(updated); setProfileEditing(false); setNotice('Company profile saved.')
+    } catch (requestError) { setError(requestError instanceof Error ? requestError.message : 'Could not save your company profile.') }
+    finally { setPending(false) }
   }
 
   async function generateOfferFromForm(event: FormEvent<HTMLFormElement>) {
@@ -316,7 +340,8 @@ export function EmployerPage() {
       </header>
       {notice && <p className="form-notice" role="status">{notice}</p>}
       {error && <p className="form-error" role="alert">{error}</p>}
-      <section className="employer-intro-banner"><div><strong>National employment network</strong><p>Employer account connected to Mahara Match recruitment services.</p></div><span>Verified workspace</span></section>
+      <section className="employer-intro-banner"><div><strong>National employment network</strong><p>Employer account connected to Mahara Match recruitment services.</p></div><span>{employerProfile?.email_verified ? 'Email verified' : 'Email verification pending'}</span></section>
+      {employerProfile && <section className="detail-panel employer-trust-panel">{profileEditing ? <form className="employer-profile-form" onSubmit={(event) => void saveProfile(event)}><div><p className="eyebrow">Employer profile</p><h3>Complete your company details</h3></div><div className="employer-profile-grid"><label>Company name<input required value={profileForm.company_name ?? ''} onChange={(event) => setProfileForm((current) => ({ ...current, company_name: event.target.value }))} /></label><label>Sector<input required value={profileForm.sector ?? ''} onChange={(event) => setProfileForm((current) => ({ ...current, sector: event.target.value }))} /></label><label>Tax ID<input value={profileForm.tax_id ?? ''} onChange={(event) => setProfileForm((current) => ({ ...current, tax_id: event.target.value }))} /></label><label>Governorate code<input placeholder="TN-11" value={profileForm.governorate_code ?? ''} onChange={(event) => setProfileForm((current) => ({ ...current, governorate_code: event.target.value }))} /></label><label>Website<input type="url" value={profileForm.website ?? ''} onChange={(event) => setProfileForm((current) => ({ ...current, website: event.target.value }))} /></label></div><label>Company description<textarea rows={3} value={profileForm.description ?? ''} onChange={(event) => setProfileForm((current) => ({ ...current, description: event.target.value }))} /></label><div className="employer-creator-choices"><button className="secondary-btn" type="button" onClick={() => setProfileEditing(false)} disabled={pending}>Cancel</button><button className="primary-btn" type="submit" disabled={pending}>{pending ? 'Saving…' : 'Save company profile'}</button></div></form> : <><div><p className="eyebrow">Employer profile readiness</p><h3>{employerProfile.company_name}</h3><p>{employerProfile.email}</p></div><div className="employer-trust-status"><span className={employerProfile.email_verified ? 'trust-ok' : 'trust-pending'}>{employerProfile.email_verified ? 'Email verified' : 'Verify email to publish'}</span><span className={employerProfile.verified ? 'trust-ok' : 'trust-pending'}>{employerProfile.verified ? 'Company verified' : 'Company verification pending'}</span><small>{[!employerProfile.tax_id && 'tax ID', !employerProfile.governorate_code && 'governorate', !employerProfile.website && 'website'].filter(Boolean).length ? `Complete your profile: ${[!employerProfile.tax_id && 'tax ID', !employerProfile.governorate_code && 'governorate', !employerProfile.website && 'website'].filter(Boolean).join(', ')}.` : 'Company profile details are complete.'}</small><button className="secondary-btn" type="button" onClick={() => setProfileEditing(true)}>Edit company profile</button></div></> }</section>}
       <section className="employer-kpis" aria-label="Recruitment activity"><article><span>Active offers</span><strong>{offers.filter((offer) => offer.status === 'published').length}</strong><small>Published roles</small></article><article><span>Applications</span><strong>{totalApplicants}</strong><small>Across your offers</small></article><article><span>Shortlisted</span><strong>{offers.reduce((sum, offer) => sum + offer.shortlisted_count, 0)}</strong><small>Candidate reviews</small></article><article><span>Hires</span><strong>{offers.reduce((sum, offer) => sum + offer.hired_count, 0)}</strong><small>Successful placements</small></article></section>
       {draftSessions.some((item) => !item.draft || item.draft.status !== 'published') && <section className="detail-panel">
         <h3>Your drafts</h3>

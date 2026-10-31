@@ -67,11 +67,16 @@ from .security import (
     verify_password,
 )
 from .features.employee.integration import register_employee_routes
+from .services.speech.router import create_speech_router
+from .services.speech.speech_service import get_speech_service
 
 from app.features.employer import create_employer_agent_router
 
 
 settings = get_settings()
+# Constructing the service validates the selected provider and its model setting;
+# model weights remain lazy and are loaded on the first transcription request.
+speech_service = get_speech_service()
 llm_client = OpenAICompatibleClient(
     LLMSettings(
         base_url=settings.llm_base_url,
@@ -148,6 +153,7 @@ app.include_router(create_offer_router(get_db, get_current_user))
 app.include_router(create_onboarding_router(get_db, get_current_user))
 read_candidate_profile = register_employee_routes(app, settings, get_db)
 app.include_router(create_employer_voice_router())
+app.include_router(create_speech_router())
 app.include_router(create_matching_router(get_db, get_current_user, read_candidate_profile, llm_client=llm_client))
 for ministry_router in (
     ministry_taxonomy.router,
@@ -386,6 +392,9 @@ def signup(payload: EmployerSignup, db: Annotated[Session, Depends(get_db)]) -> 
         password_hash=password_hash,
         sector=payload.sector.strip(),
         company_size=payload.company_size,
+        tax_id=payload.tax_id.strip() if payload.tax_id else None,
+        governorate_code=payload.governorate_code.strip() if payload.governorate_code else None,
+        website=payload.website.strip() if payload.website else None,
         verified=False,
     )
     db.add(employer)
@@ -474,8 +483,22 @@ def update_candidate_profile(
 
 
 @app.get("/employers/me", response_model=EmployerProfile)
-def get_profile(current: Annotated[Employer, Depends(get_current_employer)]) -> Employer:
-    return current
+def get_profile(current: Annotated[Employer, Depends(get_current_employer)], db: Annotated[Session, Depends(get_db)]) -> dict:
+    user = db.get(User, current.user_id) if current.user_id else None
+    return {
+        "id": current.id,
+        "company_name": current.company_name,
+        "email": current.email,
+        "sector": current.sector,
+        "company_size": current.company_size,
+        "tax_id": current.tax_id,
+        "governorate_code": current.governorate_code,
+        "website": current.website,
+        "description": current.description,
+        "created_at": current.created_at,
+        "verified": current.verified,
+        "email_verified": bool(user and user.email_verified),
+    }
 
 
 @app.patch("/employers/me", response_model=EmployerProfile)
@@ -488,4 +511,18 @@ def update_profile(
         setattr(current, field, value.strip() if isinstance(value, str) else value)
     db.commit()
     db.refresh(current)
-    return current
+    user = db.get(User, current.user_id) if current.user_id else None
+    return {
+        "id": current.id,
+        "company_name": current.company_name,
+        "email": current.email,
+        "sector": current.sector,
+        "company_size": current.company_size,
+        "tax_id": current.tax_id,
+        "governorate_code": current.governorate_code,
+        "website": current.website,
+        "description": current.description,
+        "created_at": current.created_at,
+        "verified": current.verified,
+        "email_verified": bool(user and user.email_verified),
+    }

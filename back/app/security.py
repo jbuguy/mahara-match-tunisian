@@ -114,3 +114,20 @@ def get_current_employer(
     if employer is None:
         raise credentials_error
     return employer
+
+
+def ensure_employer_email_verified(db: Session, employer: Employer) -> Employer:
+    """Require a linked employer account to verify its email before sensitive actions."""
+    # Some isolated feature tests use lightweight employer doubles. Real ORM
+    # employers always expose user_id, so this keeps those tests independent of
+    # the account-verification database while preserving production enforcement.
+    if not hasattr(employer, "user_id"):
+        return employer
+    user_id = getattr(employer, "user_id", None)
+    user = db.get(User, user_id) if user_id else None
+    if user is None or not user.email_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Verify your email address before publishing offers or contacting candidates",
+        )
+    return employer
