@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from shared_llm import LLMSettings, OpenAICompatibleClient
 
 from .applications import create_application_router
+from .analytics import record_event
 from .offers import create_offer_router
 from .config import get_settings
 from .database import get_db
@@ -28,6 +29,7 @@ from .features.mock_interview_retention import run_retention_loop
 from .email_auth import router as email_auth_router
 from .features.training.router import create_training_provider_router
 from .features.ministry.routers import analytics as ministry_analytics
+from .features.ministry.routers import admin_dashboard
 from .features.ministry.routers import ingestion as ministry_ingestion
 from .features.ministry.routers import market as ministry_market
 from .features.ministry.routers import monitoring as ministry_monitoring
@@ -163,6 +165,7 @@ for ministry_router in (
     ministry_ingestion.router,
     ministry_analytics.router,
     ministry_monitoring.router,
+    admin_dashboard.router,
 ):
     app.include_router(ministry_router, prefix="/api/v1")
 
@@ -398,6 +401,15 @@ def signup(payload: EmployerSignup, db: Annotated[Session, Depends(get_db)]) -> 
         verified=False,
     )
     db.add(employer)
+    db.flush()
+    record_event(
+        db,
+        "employer.signup_completed",
+        actor_user_id=user.id,
+        actor_role="employer",
+        entity_type="employer",
+        entity_id=employer.id,
+    )
     try:
         db.commit()
     except IntegrityError:
@@ -433,6 +445,15 @@ def candidate_signup(payload: CandidateSignup, db: Annotated[Session, Depends(ge
     candidate = get_or_create_candidate_for_user(db, user, onboarding_path=payload.onboarding_path or "cv_upload")
     user.preferred_language = (payload.preferred_language or "fr").strip() or "fr"
     candidate.governorate_code = payload.governorate_code.strip() if payload.governorate_code else None
+    record_event(
+        db,
+        "candidate.signup_completed",
+        actor_user_id=user.id,
+        actor_role="candidate",
+        entity_type="candidate",
+        entity_id=candidate.id,
+        properties={"onboarding_path": candidate.onboarding_path.value},
+    )
     db.commit()
     db.refresh(candidate)
     return candidate

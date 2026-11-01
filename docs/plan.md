@@ -1,108 +1,138 @@
-# Feature Plan and Current Status
+# Mahara Match MVP plan
 
-**Checked against the repository on 29 October 2026.** This plan tracks the candidate mock interview, training-center actor, employer experience, and transactional email delivery. A checked item means code exists; it does not imply the feature is production-verified or complete end to end.
+**Updated 31 October 2026 against the consolidated cahier des charges and the current repository.**
 
-## 1. React application screens
+## Product priority
 
-### Implemented
+The next feature to flesh out and complete is the **trusted matching loop**:
 
-- [x] Candidate portal is a React route with profile, opportunities, applications, profile editing, offer details, and matching-roadmap views (`front/src/App.tsx`).
-- [x] Candidate portal uses the existing profile, offer, application, matching, and roadmap APIs; candidate sign-in and onboarding lead to this route.
-- [x] Employer workspace is a React route with employer offers, applications, hiring decisions, and the conversational offer-generation/review/publish flow.
-- [x] Signup is routed to the React signup form. Candidate, employer, and invited training-provider sign-in routes use React.
-- [x] `/dashboard` redirects to the candidate portal instead of showing the old role-state demo page.
-- [x] Removed the standalone dashboard, employer, and signup HTML pages and their iframe route component.
-- [x] Added responsive styling for candidate, employer, and training-center workspaces in `front/src/styles.css`.
+> A candidate creates or corrects a profile without a CV, receives a reproducible and explainable ranking of eligible offers, and can submit an application while the matching context is preserved.
 
-### Still needed
+This is the most important MVP slice because it joins the three commitments in the cahier des charges: F1 (accessible profile), F2 (explainable matching), and the minimum useful part of F3 (a published employer offer). It should be completed and demonstrated before expanding mock interviews, training-center workflows, or ministry features.
 
-- [x] Install frontend dependencies and run the production TypeScript/Vite build.
-- [ ] Manually verify candidate, employer, signup, and training-provider flows against a running backend and representative accounts.
-- [ ] Add frontend/backend integration coverage for offer creation and publishing, application decisions, and profile updates.
-- [ ] Review keyboard navigation, screen-reader labels, responsive layouts, and localized text for every new React route.
+The target is not a new matching algorithm. The target is a trustworthy end-to-end product path around the existing deterministic scorer: validated inputs, correct eligibility rules, clear explanations, secure ownership, resilient fallbacks, and tests.
 
-## 2. Employer experience and transactional email
+## MVP definition of done
 
-### Implemented
+- [ ] A candidate can sign up, create or edit a profile without uploading a CV, review the proposed data, give the required consent, and save it.
+- [ ] Skills and occupations use validated taxonomy codes where available; unknown values are visible and never silently treated as confirmed skills.
+- [ ] The candidate can open a matches view containing only published, non-expired offers.
+- [ ] Matching is deterministic and versioned. The current documented weights are technical skills 50%, experience 20%, soft skills 15%, and location 15%.
+- [ ] Every match explains the component scores, matched requirements, missing or insufficient skills, and relevant data limitations. Age, gender, and origin never contribute to the score.
+- [ ] A candidate can view an eligible offer, apply once, and see the application status and match snapshot later.
+- [ ] An employer can create an offer with the required fields, review and edit the draft, and publish it explicitly. A draft or expired offer cannot enter candidate matching.
+- [ ] A candidate cannot read another candidate's profile or application; an employer can access only its own offers and authorized applications.
+- [ ] LLM, speech, or other external-service failure does not erase saved profile data or prevent manual profile completion.
+- [ ] Automated tests cover scoring, eligibility, explanation consistency, application ownership/idempotency, publication rules, and the key data contracts.
+- [ ] One manual demo is recorded with representative candidate, employer, published, draft, expired, and rejected-access cases.
 
-- [x] Employer signup leads to a dedicated email-verification screen with a free resend action and a client-side 60-second cooldown (`front/src/pages/VerifyEmailPage.tsx`).
-- [x] Verification links are confirmed through the existing one-time-token endpoint; links expire after 24 hours and resend requests remain rate-limited (`back/app/email_auth.py`).
-- [x] Resend is supported as the preferred transactional-email provider for verification, password reset, and employer notification emails, with SMTP fallback (`back/app/email_delivery.py`).
-- [x] Added server-side Resend configuration placeholders: `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, and `RESEND_FROM_NAME` (`back/.env.example`).
-- [x] Employer profile API and workspace editor expose tax ID, governorate, website, and company description, with visible email/company verification status (`back/app/schemas.py`, `front/src/pages/EmployerPage.tsx`).
+## Current repository status
 
-### UX and feature improvements still needed
+### Already present or substantially present
 
-- [x] Enforce verified email before publishing offers or sending employer communications.
-- [ ] Add employer contact person fields, legal terms acceptance, and a formal company-verification submission workflow.
-- [ ] Add employer-specific dashboard onboarding, settings, team access, working search, and real notifications.
-- [ ] Localize the complete employer workspace in French and Arabic, including right-to-left review.
-- [ ] Replace raw JSON skill/language editing with validated search and selection controls.
-- [ ] Add applicant search, sorting, pagination, notes, rejection reasons, comparison, confirmation dialogs, and bulk actions.
-- [ ] Add calendar links, reminders, rescheduling, cancellation, and delivery tracking for interviews.
-- [ ] Add Resend delivery-event webhooks, bounce/complaint handling, idempotency keys, provider health checks, and email-delivery integration tests.
-- [ ] Manually verify Resend in development with a verified sending domain and representative employer accounts; never commit API keys.
+- [x] React/Vite candidate and employer workspaces, authentication routes, onboarding, profile editing, offers, applications, matches, and roadmap views.
+- [x] Candidate-facing offer and match services, persisted match results, skill-gap data, and application flow.
+- [x] Employer structured/form and conversational offer creation, draft review, explicit publication, and employer application views.
+- [x] Shared taxonomy schemas/contracts and deterministic matching integration coverage in `back/tests/test_wp3_integration.py`.
+- [x] Candidate voice/transcription infrastructure and CV import building blocks.
+- [x] Training-provider routes/workspace and mock-interview UI exist as separate, incomplete or operationally dependent modules.
 
-**Current status:** The core employer journey and resend UI are implemented. Resend is integrated behind a provider-neutral delivery helper, but production domain verification, environment configuration, delivery-event monitoring, server-side verification enforcement, and the broader employer UX improvements remain outstanding.
+### Must be verified before calling the MVP complete
 
-## 3. AI mock interview
+- [ ] Run the complete candidate-to-application journey against a running backend and frontend with realistic seeded data.
+- [ ] Confirm that profile consent, correction, deletion, and sensitive-data access behavior work end to end.
+- [ ] Confirm that only published and non-expired offers are returned by every candidate matching/discovery path, including cached or persisted results.
+- [ ] Confirm score/explanation consistency and that the scoring formula/version are stored with the result.
+- [ ] Confirm application duplicate prevention, status transitions, and ownership at the API boundary.
+- [ ] Confirm employer ownership and verified-email publication requirements in both UI and API paths.
+- [ ] Replace any UI-only claim that a non-discrimination guardrail is active unless an auditable rule engine and rule catalog are actually enabled. The cahier explicitly says it must be declared unavailable rather than simulated.
+- [ ] Validate accessibility, mobile layout, keyboard navigation, French/Arabic/Derja language behavior, and manual fallbacks.
 
-### Existing building blocks
+## Implementation plan: trusted matching loop
 
-- [x] React/Vite candidate app and candidate navigation exist (`front/src/App.tsx`).
-- [x] Shared OpenAI-compatible chat completion client exists (`back/shared_llm/client.py`).
-- [x] Candidate voice transcription endpoint and in-memory audio processing exist (`back/app/features/employee/routers/assistant.py`, `back/app/features/employee/services/voice.py`).
-- [x] Candidate occupation, skill, profile, and job-match data are available to existing app features.
+### Phase 0 — Baseline and contracts
 
-### Feature work still needed
+- [ ] Map the actual routes, schemas, migrations, and frontend calls for profile, offers, matches, and applications.
+- [ ] Seed a small deterministic fixture set: one candidate profile, two matching offers, one draft, one expired offer, one unknown skill, and one second user for authorization tests.
+- [ ] Define the match-result contract, including `formula_version`, component scores, matched skills, gaps, missing-data indicators, and offer eligibility metadata.
+- [ ] Decide and document retention/deletion behavior for profile, match, and application records used in the MVP demo.
 
-- [ ] Add a candidate-only mock interview page, setup flow, navigation link, and route.
-- [ ] Generate role-focused questions one at a time, with optional follow-up questions.
-- [ ] Accept typed responses and preserve interview state for the current session.
-- [ ] Add audio recording with explicit microphone consent, transcript correction, and retry/error states.
-- [ ] Generate structured feedback on understanding, relevance, specificity, and answer structure, with evidence and practical suggestions.
-- [ ] Add optional, clearly explained confidence coaching; do not infer confidence from face, accent, or demographic traits.
-- [ ] Add a final review and candidate-controlled retry flow; do not create a hiring score or pass/fail result.
-- [ ] Keep interview results private from employers and matching/ranking features; do not persist raw audio/video by default.
-- [ ] Validate model output, provider failure behavior, language quality, accessibility, and privacy behavior.
-- [ ] Consider candidate-controlled video playback only after the text/audio experience is validated; no face-based confidence analysis.
+**Exit:** fixture data reproduces the same expected ranking and every required endpoint has a documented request/response shape.
 
-**Current status:** Reusable LLM and transcription infrastructure exists, but no mock-interview feature, interview-session API, or review UI has been implemented.
+### Phase 1 — Candidate profile reliability (F1)
 
-## 4. Training-center actor
+- [ ] Make manual profile creation the guaranteed path; preserve drafts across assistant/STT/LLM failures.
+- [ ] Validate skill, occupation, language, experience, and governorate values against the shared taxonomy or mark them as unresolved.
+- [ ] Show a review step before saving assistant/CV/audio-derived values; do not let generated content silently become confirmed profile data.
+- [ ] Enforce explicit consent and implement or verify correction/deletion requests and candidate-only access.
+- [ ] Add endpoint tests for missing profile, malformed values, unknown taxonomy values, consent, retry, and cross-account access.
 
-### Existing foundations
+**Exit:** a candidate can complete and save a useful profile with no CV and with every proposed value reviewable.
 
-- [x] Shared `training_provider` user role, provider/course/course-skill/certification models, and training schemas exist.
-- [x] Training-course records are used by matching knowledge and roadmap features.
-- [x] Added training-provider password sign-in at `/training-providers/login`; provider accounts must be provisioned and linked by MFPE.
-- [x] Added authenticated, provider-owned APIs for reading the linked center, listing its courses, creating courses, and toggling course availability (`back/app/features/training/router.py`).
-- [x] Provider APIs enforce the `training_provider` role and scope course operations to the linked provider; course skills must come from the validated taxonomy.
-- [x] Added a React training-center workspace with dashboard, accreditation reference display, course catalog, course creation, availability controls, statistics, settings, support, and guide views (`front/src/App.tsx`).
-- [x] Added a training-center sign-in choice and Vite development proxy route.
+### Phase 2 — Matching correctness and explanations (F2)
 
-### Still needed
+- [x] Centralize the deterministic scoring formula and expose a version identifier with each result.
+- [ ] Enforce eligibility at query and service layers: published status, non-expired date, valid taxonomy references, and any offer-specific candidate rules.
+- [ ] Ensure only approved reference relationships contribute to skill similarity; unknown or missing data is represented as unknown rather than as a zero presented as certainty.
+- [ ] Generate explanations from the same score inputs used by the scorer, not from an LLM or separately inferred text.
+- [ ] Return matched requirements, missing/insufficient skills, component breakdown, and limitations in the API contract.
+- [ ] Test stable ordering/tie behavior, formula changes, expired/draft exclusion, protected-attribute exclusion, and explanation/score consistency.
 
-- [ ] Add a controlled provider onboarding/linking workflow; current provider login works only for a verified user with a `TrainingProvider.user_id` association already provisioned.
-- [ ] Add provider verification lifecycle fields and reviewer workflows. The current accreditation reference is informational and must not be shown as verified status.
-- [ ] Add edit, draft, preview, publish, archive, and restore workflows for courses; the current API creates active courses and toggles availability.
-- [ ] Enforce that only approved-provider courses enter candidate discovery, matching context, roadmaps, and embeddings. The current training model/API has no provider approval state.
-- [ ] Add candidate-facing course details and application/enrollment only after the required course availability and contact data are defined.
-- [ ] Add audit events for provider/course administration and authorization tests for cross-provider access.
-- [ ] Define migrations and a visibility policy for existing provider/course records.
-- [ ] Add backend and frontend coverage for provider login, unlinked providers, course validation, ownership, and availability changes.
+**Exit:** the same profile, offers, and formula version always produce the same ordered results and an auditable explanation.
 
-**Current status:** The center workspace and limited provider-scoped catalog API are implemented. Account provisioning/linking, accreditation approval, full course lifecycle, audit coverage, and approved-course candidate discovery remain outstanding.
+### Phase 3 — Employer offer readiness (minimum F3)
 
-## Recommended next steps
+- [ ] Require title, responsibilities, location, contract type, and required skills before publication.
+- [ ] Validate suggested skills against the taxonomy and let the employer correct them.
+- [ ] Keep draft, published, closed, and archived transitions explicit and server-authorized.
+- [ ] Require employer email verification before publication and preserve an explicit review/confirmation action.
+- [ ] Implement a rules-based non-discrimination guardrail for the agreed initial languages only, or mark the guardrail unavailable until its rule catalog is ready. Store auditable `guardrail_flags`; never let a hidden LLM decision publish or reject an offer.
+- [ ] Test that edits, publication, expiry, closure, and archive status immediately affect candidate eligibility.
 
-1. [ ] Configure Resend with a verified sending domain and run verification/password-reset delivery tests.
-2. [ ] Start the backend and frontend and manually exercise the candidate and employer flows with test accounts, including offer creation/publishing and application status changes.
-3. [ ] Enforce verified-email requirements and complete the employer onboarding/profile trust flow.
-4. [ ] Add employer applicant-workflow improvements and full French/Arabic localization.
-5. [ ] Decide and implement the MFPE-controlled training-provider provisioning and approval lifecycle; until then, create/link one authorized provider account in the development database for UI verification.
-6. [ ] Add training-provider API tests for role checks, provider ownership, course creation, taxonomy validation, and availability changes.
-7. [ ] Implement provider course draft/review/publish lifecycle and prevent unapproved courses from candidate-facing discovery and RAG.
-8. [ ] Build the candidate mock interview as a separate feature after agreeing on languages, question design, feedback boundaries, and audio retention.
+**Exit:** an employer can safely publish one valid offer, and a candidate can see it in matching only while it is eligible.
 
-See the detailed proposals in [mock-interview-plan.md](./mock-interview-plan.md) and [training-center-actor-plan.md](./training-center-actor-plan.md).
+### Phase 4 — Application handoff
+
+- [x] Allow a candidate to apply only to an eligible offer and prevent duplicate applications.
+- [ ] Store the match-result/formula snapshot used at application time so later score changes do not rewrite history.
+- [ ] Expose candidate application history only to that candidate and authorized employer users.
+- [ ] Test allowed status transitions, unauthorized reads/updates, duplicate submission, closed-offer behavior, and sensitive-access audit events.
+
+**Exit:** the complete candidate → match explanation → application → employer review path works with ownership enforced by the API.
+
+### Phase 5 — Demo hardening and release gate
+
+- [ ] Run backend tests and the frontend production build.
+- [ ] Run a manual smoke test with seeded accounts and record failures by actor and route.
+- [ ] Check responsive behavior, keyboard access, labels, empty/loading/error states, and language fallback.
+- [ ] Check logs/secrets, migration status, external-service configuration, and absence of credentials in the browser or repository.
+- [ ] Publish a short known-limitations note: complementary features may exist in the codebase but are not part of the completed MVP gate.
+
+**Release gate:** all MVP definition-of-done items pass, or the unmet item is explicitly documented as a blocker rather than presented as complete.
+
+## Deferred after the core loop
+
+These remain valuable, but should not displace the trusted matching loop:
+
+1. **Mock interview:** complete the existing candidate UI/backend integration, provider configuration, retention cleanup, rate limits, language evaluation, and privacy tests. It must remain private coaching and never become a hiring score.
+2. **Training center:** finish provider verification, course lifecycle, approved-provider visibility, ownership tests, and index refresh rules before exposing courses in candidate matching or roadmaps.
+3. **Employer depth:** applicant search/sorting, notes, bulk actions, calendar scheduling, delivery webhooks, and full French/Arabic localization.
+4. **Ministry governance:** taxonomy review, imports, audit events, protected aggregates, and operational dashboards.
+
+## Decisions required before expanding scope
+
+- Confirm the launch languages for the full interface and for assistant/transcription output.
+- Confirm the initial taxonomy sectors, occupations, and skill coverage for Tunisia.
+- Confirm the formula versioning and policy for recalculating existing matches.
+- Confirm data retention periods for profiles, CVs, transcripts, matches, applications, and audit events.
+- Confirm the initial non-discrimination rule catalog, supported languages, severity levels, and human review policy.
+- Confirm deployment, backups, private file storage, email provider, external AI provider, rate limits, and monitoring.
+
+## Working order
+
+1. Baseline routes, contracts, fixtures, and migration state.
+2. Make candidate profile review/consent/manual fallback reliable.
+3. Close matching eligibility, score versioning, explanation, and fairness tests.
+4. Close employer publication and guardrail behavior.
+5. Close application snapshot and authorization behavior.
+6. Run the full release gate and only then resume mock-interview/training-center expansion.

@@ -95,6 +95,23 @@ def require_roles(*required_roles: str):
     return dependency
 
 
+def require_any_role(*allowed_roles: str):
+    """Require at least one role for shared admin/operator surfaces."""
+    normalized = {role.strip().lower() for role in allowed_roles if role.strip()}
+
+    def dependency(user: Annotated[User, Depends(get_current_user)]) -> User:
+        user_roles = {str(role).strip().lower() for role in user.roles}
+        if not user_roles.intersection(normalized):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Insufficient role permissions",
+            )
+
+        return user
+
+    return dependency
+
+
 def get_current_employer(
     token: Annotated[str, Depends(oauth2_scheme)], db: Annotated[Session, Depends(get_db)]
 ) -> Employer:

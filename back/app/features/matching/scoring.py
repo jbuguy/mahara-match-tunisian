@@ -153,8 +153,9 @@ def classer_offres(profil, offres, related_skills=None):
     """Calcule le match pour chaque offre et trie du meilleur au moins bon."""
     items = sorted(
         (calculer_match(profil, o, related_skills=related_skills) for o in offres),
-        key=lambda m: m["score_global"],
-        reverse=True,
+        # The offer id is the stable tie-breaker. This keeps repeated requests
+        # reproducible even when two offers have the same score.
+        key=lambda m: (-m["score_global"], m["job_offer_id"]),
     )
     return {
         "subject_id": profil.get("candidate_id"),

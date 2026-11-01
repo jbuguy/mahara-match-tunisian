@@ -127,3 +127,18 @@ class AuditLog(CreatedAtMixin, Base):
     entity_type: Mapped[str] = mapped_column(String(64), nullable=False)
     entity_id: Mapped[str | None] = mapped_column(String(64))
     payload: Mapped[dict] = mapped_column(JSONType, default=dict, nullable=False)
+
+
+class AnalyticsEvent(CreatedAtMixin, Base):
+    """Privacy-safe product event used for funnel and operational analytics."""
+
+    __tablename__ = "analytics_events"
+
+    id: Mapped[int] = mapped_column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True)
+    event_name: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    actor_user_id: Mapped[uuid.UUID | None] = mapped_column(Uuid(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), index=True)
+    actor_role: Mapped[str | None] = mapped_column(String(32))
+    entity_type: Mapped[str | None] = mapped_column(String(64))
+    entity_id: Mapped[str | None] = mapped_column(String(64))
+    session_id: Mapped[str | None] = mapped_column(String(128), index=True)
+    properties: Mapped[dict] = mapped_column(JSONType, default=dict, nullable=False)

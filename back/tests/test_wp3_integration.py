@@ -157,3 +157,39 @@ def test_missing_profile_and_unknown_offer_return_not_found(wp3_client):
 
     assert missing_profile.status_code == 404
     assert unknown_offer.status_code == 404
+
+
+def test_matching_order_is_stable_for_equal_scores(wp3_client):
+    client, _active_user, _user, _other_user, _candidate_id, offer_id, _reads, sessions = wp3_client
+
+    with sessions() as db:
+        offer = db.get(JobOffer, offer_id)
+        second_offer = JobOffer(
+            title="Another developer",
+            description_raw="Build software.",
+            contract_type=offer.contract_type,
+            work_mode=offer.work_mode,
+            governorate_code=offer.governorate_code,
+            status=OfferStatus.PUBLISHED,
+            source=OfferSource.EMPLOYER_FORM,
+            positions_count=1,
+            min_years_experience=offer.min_years_experience,
+            languages_required=[],
+        )
+        db.add(second_offer)
+        db.flush()
+        skills_by_code = {
+            skill.code: skill for skill in db.query(Skill).filter(Skill.code.in_(("SK-0101", "SK-0102"))).all()
+        }
+        db.add_all([
+            JobOfferSkill(job_offer_id=second_offer.id, skill_id=skills_by_code["SK-0101"].id,
+                          requirement=RequirementLevel.REQUIRED, min_level=3),
+            JobOfferSkill(job_offer_id=second_offer.id, skill_id=skills_by_code["SK-0102"].id,
+                          requirement=RequirementLevel.PREFERRED, min_level=3),
+        ])
+        db.commit()
+
+    first = client.get("/api/v1/me/matches").json()["items"]
+    second = client.get("/api/v1/me/matches").json()["items"]
+    assert [item["job_offer_id"] for item in first] == [item["job_offer_id"] for item in second]
+    assert [item["job_offer_id"] for item in first] == sorted(item["job_offer_id"] for item in first)

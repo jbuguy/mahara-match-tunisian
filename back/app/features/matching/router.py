@@ -62,7 +62,10 @@ def _published_offers(db: Session) -> list[dict[str, Any]]:
         skills = (
             db.query(JobOfferSkill, Skill)
             .join(Skill, Skill.id == JobOfferSkill.skill_id)
-            .filter(JobOfferSkill.job_offer_id == offer.id)
+            .filter(
+                JobOfferSkill.job_offer_id == offer.id,
+                Skill.status == TaxonomyStatus.VALIDATED,
+            )
             .all()
         )
         result.append(

@@ -44,6 +44,16 @@ class ApplicationWorkflowError(Exception):
         self.detail = detail
 
 
+def _is_expired(expires_at: datetime | None) -> bool:
+    if expires_at is None:
+        return False
+    # PostgreSQL returns an aware value for timestamptz; SQLite test fixtures
+    # may return a naive value. Treat persisted naive timestamps as UTC.
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    return expires_at <= datetime.now(timezone.utc)
+
+
 def _application_payload(application: Application, offer: JobOffer, match: MatchResult | None = None) -> dict:
     contract = ApplicationRead(
         application_id=application.id,
@@ -88,7 +98,11 @@ def create_candidate_application(
         raise ApplicationWorkflowError(422, "Consent to employer contact is required before applying")
 
     offer = repository.get_offer(db, job_offer_id)
-    if offer is None or offer.status is not OfferStatus.PUBLISHED:
+    if (
+        offer is None
+        or offer.status is not OfferStatus.PUBLISHED
+        or _is_expired(offer.expires_at)
+    ):
         raise ApplicationWorkflowError(404, "Published offer not found")
 
     match = repository.get_current_match(db, candidate.id, offer.id)

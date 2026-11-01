@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from fastapi import FastAPI
@@ -187,3 +188,16 @@ def test_candidate_application_list_is_scoped_to_own_profile(application_client)
     active_user["value"] = type("UserRef", (), {"id": uuid.uuid4()})()
 
     assert client.get("/api/v1/me/applications").status_code == 404
+
+
+def test_candidate_cannot_apply_to_expired_published_offer(application_client):
+    client, sessions, _user, _employer, _candidate_id, _employer_id, _other_id, offer_id = application_client
+    with sessions() as db:
+        db.get(JobOffer, offer_id).expires_at = datetime.now(timezone.utc) - timedelta(minutes=1)
+        db.commit()
+
+    response = client.post(
+        "/api/v1/me/applications",
+        json={"job_offer_id": str(offer_id), "employer_contact_consent": True},
+    )
+    assert response.status_code == 404
