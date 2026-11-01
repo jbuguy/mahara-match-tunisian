@@ -10,6 +10,7 @@ import jwt
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from jwt import PyJWKClient
+from sqlalchemy.orm import Session
 
 from .config import Settings, get_settings
 from .database import get_db
@@ -152,7 +153,7 @@ async def finish_google_sign_in(
     state: str | None = None,
     error: str | None = None,
     settings: Settings = Depends(get_settings),
-    db=Depends(get_db),
+    db: Session = Depends(get_db),
     jwks: PyJWKClient = Depends(get_google_jwks_client),
 ) -> RedirectResponse:
     if error:

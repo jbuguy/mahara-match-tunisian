@@ -274,13 +274,13 @@ def get_health() -> dict[str, str]:
 
 
 @app.get("/api/v1/me/roles")
-def get_my_roles(current: Annotated[User, Depends(get_current_user)]) -> dict[str, list[str]]:
+def get_my_roles(current: User = Depends(get_current_user)) -> dict[str, list[str]]:
     """Expose the signed-in user's effective platform roles for role-aware navigation."""
     return {"roles": sorted({str(role).strip().lower() for role in current.roles})}
 
 
 @app.get("/ready")
-def get_readiness(db: Annotated[Session, Depends(get_db)]) -> dict[str, object]:
+def get_readiness(db: Session = Depends(get_db)) -> dict[str, object]:
     try:
         db.execute(text("SELECT 1"))
         database_status = "ok"
@@ -374,8 +374,10 @@ def validate_onboarding_profile_contract(payload: dict[str, Any]) -> dict[str, o
 
 
 @app.post("/employers/signup", response_model=EmployerProfile, status_code=status.HTTP_201_CREATED)
-def signup(payload: EmployerSignup, db: Annotated[Session, Depends(get_db)]) -> Employer:
+def signup(payload: EmployerSignup, db: Session = Depends(get_db)) -> Employer:
     email = payload.email.lower()
+    if db.query(Employer).filter(Employer.email == email).first():
+        raise HTTPException(status_code=409, detail="An employer with this email already exists")
     user = get_or_create_user(db, email, roles=["employer"], email_verified=False)
     password_hash = hash_password(payload.password)
     AuthIdentity.link_user(
@@ -420,7 +422,7 @@ def signup(payload: EmployerSignup, db: Annotated[Session, Depends(get_db)]) -> 
 
 
 @app.post("/employers/login", response_model=Token)
-def login(payload: EmployerLogin, db: Annotated[Session, Depends(get_db)]) -> Token:
+def login(payload: EmployerLogin, db: Session = Depends(get_db)) -> Token:
     employer = db.query(Employer).filter(Employer.email == payload.email.lower()).first()
     if employer is None or not verify_password(payload.password, employer.password_hash):
         raise HTTPException(status_code=401, detail="Invalid email or password")
@@ -428,7 +430,7 @@ def login(payload: EmployerLogin, db: Annotated[Session, Depends(get_db)]) -> To
 
 
 @app.post("/candidates/signup", response_model=CandidateProfile, status_code=status.HTTP_201_CREATED)
-def candidate_signup(payload: CandidateSignup, db: Annotated[Session, Depends(get_db)]) -> Candidate:
+def candidate_signup(payload: CandidateSignup, db: Session = Depends(get_db)) -> Candidate:
     email = payload.email.lower()
     user = get_or_create_user(db, email, roles=["candidate"], email_verified=False)
     password_hash = hash_password(payload.password)
@@ -460,7 +462,7 @@ def candidate_signup(payload: CandidateSignup, db: Annotated[Session, Depends(ge
 
 
 @app.post("/candidates/login", response_model=Token)
-def candidate_login(payload: CandidateLogin, db: Annotated[Session, Depends(get_db)]) -> Token:
+def candidate_login(payload: CandidateLogin, db: Session = Depends(get_db)) -> Token:
     email = payload.email.lower()
     user = db.query(User).filter(User.email == email).first()
     if user is None:
@@ -478,7 +480,7 @@ def candidate_login(payload: CandidateLogin, db: Annotated[Session, Depends(get_
 
 
 @app.get("/candidates/me", response_model=CandidateProfile)
-def get_candidate_profile(current: Annotated[User, Depends(require_roles("candidate"))], db: Annotated[Session, Depends(get_db)]) -> Candidate:
+def get_candidate_profile(current: User = Depends(require_roles("candidate")), db: Session = Depends(get_db)) -> Candidate:
     candidate = db.query(Candidate).filter(Candidate.user_id == current.id).first()
     if candidate is None:
         candidate = get_or_create_candidate_for_user(db, current)
@@ -488,8 +490,8 @@ def get_candidate_profile(current: Annotated[User, Depends(require_roles("candid
 @app.patch("/candidates/me", response_model=CandidateProfile)
 def update_candidate_profile(
     payload: CandidateUpdate,
-    current: Annotated[User, Depends(require_roles("candidate"))],
-    db: Annotated[Session, Depends(get_db)],
+    current: User = Depends(require_roles("candidate")),
+    db: Session = Depends(get_db),
 ) -> Candidate:
     candidate = db.query(Candidate).filter(Candidate.user_id == current.id).first()
     if candidate is None:
@@ -504,7 +506,7 @@ def update_candidate_profile(
 
 
 @app.get("/employers/me", response_model=EmployerProfile)
-def get_profile(current: Annotated[Employer, Depends(get_current_employer)], db: Annotated[Session, Depends(get_db)]) -> dict:
+def get_profile(current: Employer = Depends(get_current_employer), db: Session = Depends(get_db)) -> dict:
     user = db.get(User, current.user_id) if current.user_id else None
     return {
         "id": current.id,
@@ -525,8 +527,8 @@ def get_profile(current: Annotated[Employer, Depends(get_current_employer)], db:
 @app.patch("/employers/me", response_model=EmployerProfile)
 def update_profile(
     payload: EmployerUpdate,
-    current: Annotated[Employer, Depends(get_current_employer)],
-    db: Annotated[Session, Depends(get_db)],
+    current: Employer = Depends(get_current_employer),
+    db: Session = Depends(get_db),
 ) -> Employer:
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(current, field, value.strip() if isinstance(value, str) else value)

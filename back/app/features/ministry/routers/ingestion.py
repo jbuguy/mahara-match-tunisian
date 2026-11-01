@@ -21,7 +21,7 @@ router = APIRouter(
 
 @router.get("/jobs", response_model=Page[IngestionJobOut])
 def list_jobs(
-    db: Annotated[Session, Depends(get_db)],
+    db: Session = Depends(get_db),
     status_filter: Annotated[ProcessingStatus | None, Query(alias="status")] = None,
     source: IngestionSource | None = None,
     page: Annotated[int, Query(ge=1)] = 1,
@@ -40,7 +40,7 @@ def list_jobs(
 
 
 @router.get("/jobs/{job_id}", response_model=IngestionJobOut)
-def read_job(job_id: uuid.UUID, db: Annotated[Session, Depends(get_db)]) -> IngestionJobOut:
+def read_job(job_id: uuid.UUID, db: Session = Depends(get_db)) -> IngestionJobOut:
     """The full report, rejected rows included."""
     job = service.get_job(db, job_id)
     if job is None:

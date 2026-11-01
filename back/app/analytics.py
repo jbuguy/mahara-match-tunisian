@@ -1,12 +1,12 @@
 """Shared, privacy-safe product analytics helpers."""
 
+import uuid
 from collections.abc import Mapping
 from typing import Any
-import uuid
 
 from sqlalchemy.orm import Session
 
-from mahara_data.db.models.platform import AnalyticsEvent
+from .models import AnalyticsEvent
 
 
 MAX_PROPERTIES = 32

@@ -44,8 +44,8 @@ router = APIRouter(prefix="/api/v1/employer/market", tags=["employer-market"])
 @router.get("/salaries", response_model=SalaryBenchmarkOut)
 def salary_benchmark(
     occupation_code: Annotated[str, Query(min_length=2, max_length=32)],
-    db: Annotated[Session, Depends(get_db)],
-    _employer: Annotated[Employer, Depends(get_current_employer)],
+    db: Session = Depends(get_db),
+    _employer: Employer = Depends(get_current_employer),
     governorate_code: Annotated[str | None, Query(max_length=8)] = None,
     region: Literal["grand_tunis"] | None = None,
     period_start: date | None = None,

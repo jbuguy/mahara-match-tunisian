@@ -62,8 +62,8 @@ def create_onboarding_router(get_db: Any, get_current_user: Any) -> APIRouter:
 
     @router.post("/sessions", status_code=201)
     def create_session(
-        db: Annotated[Session, Depends(get_db)],
-        user: Annotated[Any, Depends(get_current_user)],
+        db: Session = Depends(get_db),
+        user: Any = Depends(get_current_user),
     ):
         session = CandidateOnboardingSession(user_id=user.id, answers={}, status="active")
         db.add(session)
@@ -77,8 +77,8 @@ def create_onboarding_router(get_db: Any, get_current_user: Any) -> APIRouter:
     @router.get("/sessions/{session_id}")
     def get_session(
         session_id: uuid.UUID,
-        db: Annotated[Session, Depends(get_db)],
-        user: Annotated[Any, Depends(get_current_user)],
+        db: Session = Depends(get_db),
+        user: Any = Depends(get_current_user),
     ):
         session = _session_or_404(db, session_id, user.id)
         question = _current_question(session.answers)
@@ -92,8 +92,8 @@ def create_onboarding_router(get_db: Any, get_current_user: Any) -> APIRouter:
     @router.get("/sessions/{session_id}/offre", response_class=PlainTextResponse)
     def get_generated_offer(
         session_id: uuid.UUID,
-        db: Annotated[Session, Depends(get_db)],
-        user: Annotated[Any, Depends(get_current_user)],
+        db: Session = Depends(get_db),
+        user: Any = Depends(get_current_user),
     ) -> str:
         session = _session_or_404(db, session_id, user.id)
         if _current_question(session.answers) is not None:
@@ -103,8 +103,8 @@ def create_onboarding_router(get_db: Any, get_current_user: Any) -> APIRouter:
     @router.post("/sessions/{session_id}/finalize")
     def finalize_session(
         session_id: uuid.UUID,
-        db: Annotated[Session, Depends(get_db)],
-        user: Annotated[Any, Depends(get_current_user)],
+        db: Session = Depends(get_db),
+        user: Any = Depends(get_current_user),
     ):
         session = _session_or_404(db, session_id, user.id)
         if _current_question(session.answers) is not None:
@@ -153,8 +153,8 @@ def create_onboarding_router(get_db: Any, get_current_user: Any) -> APIRouter:
     def submit_answer(
         session_id: uuid.UUID,
         audio: Annotated[UploadFile, File()],
-        db: Annotated[Session, Depends(get_db)],
-        user: Annotated[Any, Depends(get_current_user)],
+        db: Session = Depends(get_db),
+        user: Any = Depends(get_current_user),
     ):
         session = _session_or_404(db, session_id, user.id)
         question = _current_question(session.answers)

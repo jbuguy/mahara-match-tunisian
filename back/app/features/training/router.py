@@ -73,7 +73,7 @@ def create_training_provider_router(get_db: Any, get_current_user: Any) -> APIRo
 
     @router.get("/me")
     def get_provider(
-        db: Annotated[Session, Depends(get_db)], user: Annotated[Any, Depends(get_current_user)],
+        db: Session = Depends(get_db), user: Any = Depends(get_current_user),
     ):
         provider = current_provider(db, user)
         region = db.get(Governorate, provider.governorate_code) if provider.governorate_code else None
@@ -83,7 +83,7 @@ def create_training_provider_router(get_db: Any, get_current_user: Any) -> APIRo
 
     @router.get("/courses")
     def list_courses(
-        db: Annotated[Session, Depends(get_db)], user: Annotated[Any, Depends(get_current_user)],
+        db: Session = Depends(get_db), user: Any = Depends(get_current_user),
     ):
         provider = current_provider(db, user)
         courses = db.query(TrainingCourse).filter(TrainingCourse.provider_id == provider.id).order_by(TrainingCourse.created_at.desc()).all()
@@ -91,7 +91,7 @@ def create_training_provider_router(get_db: Any, get_current_user: Any) -> APIRo
 
     @router.post("/courses", status_code=status.HTTP_201_CREATED)
     def create_course(
-        body: CourseInput, db: Annotated[Session, Depends(get_db)], user: Annotated[Any, Depends(get_current_user)],
+        body: CourseInput, db: Session = Depends(get_db), user: Any = Depends(get_current_user),
     ):
         provider = current_provider(db, user)
         if body.governorate_code and db.get(Governorate, body.governorate_code) is None:
@@ -107,8 +107,8 @@ def create_training_provider_router(get_db: Any, get_current_user: Any) -> APIRo
 
     @router.patch("/courses/{course_id}/availability")
     def set_course_availability(
-        course_id: uuid.UUID, is_active: bool, db: Annotated[Session, Depends(get_db)],
-        user: Annotated[Any, Depends(get_current_user)],
+        course_id: uuid.UUID, is_active: bool, db: Session = Depends(get_db),
+        user: Any = Depends(get_current_user),
     ):
         provider = current_provider(db, user)
         course = db.query(TrainingCourse).filter(TrainingCourse.id == course_id, TrainingCourse.provider_id == provider.id).one_or_none()

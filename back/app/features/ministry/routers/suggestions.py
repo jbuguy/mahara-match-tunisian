@@ -50,7 +50,7 @@ def _target_skill(db: Session, code: str) -> Skill:
 
 @router.get("", response_model=Page[SkillSuggestionRead])
 def list_suggestions(
-    db: Annotated[Session, Depends(get_db)],
+    db: Session = Depends(get_db),
     status_filter: Annotated[
         SuggestionStatus | None, Query(alias="status")
     ] = SuggestionStatus.PENDING,
@@ -80,8 +80,8 @@ def list_suggestions(
 def approve_suggestion(
     suggestion_id: uuid.UUID,
     payload: SuggestionApprove,
-    db: Annotated[Session, Depends(get_db)],
-    admin: Annotated[User, Depends(require_roles("ministry_admin"))],
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_roles("ministry_admin")),
 ) -> SkillRead:
     """The label was genuinely new. Creates the entry as a draft, to be validated separately."""
     suggestion = _pending_or_error(db, suggestion_id)
@@ -94,8 +94,8 @@ def approve_suggestion(
 def merge_suggestion(
     suggestion_id: uuid.UUID,
     payload: SuggestionMerge,
-    db: Annotated[Session, Depends(get_db)],
-    admin: Annotated[User, Depends(require_roles("ministry_admin"))],
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_roles("ministry_admin")),
 ) -> SkillRead:
     """The label was a synonym. Enriches an existing entry instead of duplicating it."""
     suggestion = _pending_or_error(db, suggestion_id)
@@ -106,8 +106,8 @@ def merge_suggestion(
 def reject_suggestion(
     suggestion_id: uuid.UUID,
     payload: SuggestionReject,
-    db: Annotated[Session, Depends(get_db)],
-    admin: Annotated[User, Depends(require_roles("ministry_admin"))],
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_roles("ministry_admin")),
 ) -> SkillSuggestionRead:
     """Noise, typo, or not a skill. The refusal is recorded, never erased."""
     suggestion = _pending_or_error(db, suggestion_id)

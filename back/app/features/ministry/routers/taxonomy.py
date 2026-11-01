@@ -32,8 +32,8 @@ def _get_or_404(db: Session, code: str) -> Skill:
 @router.post("/skills", response_model=SkillRead, status_code=status.HTTP_201_CREATED)
 def create_skill(
     payload: SkillCreate,
-    db: Annotated[Session, Depends(get_db)],
-    admin: Annotated[User, Depends(require_roles("ministry_admin"))],
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_roles("ministry_admin")),
 ) -> SkillRead:
     if service.get_by_code(db, payload.code) is not None:
         raise HTTPException(status_code=409, detail=f"Skill code {payload.code} already exists")
@@ -42,7 +42,7 @@ def create_skill(
 
 @router.get("/skills", response_model=Page[SkillRead])
 def list_skills(
-    db: Annotated[Session, Depends(get_db)],
+    db: Session = Depends(get_db),
     status_filter: Annotated[TaxonomyStatus | None, Query(alias="status")] = None,
     skill_type: SkillType | None = None,
     search: Annotated[str | None, Query(max_length=200)] = None,
@@ -66,7 +66,7 @@ def list_skills(
 
 
 @router.get("/skills/{code}", response_model=SkillRead)
-def read_skill(code: str, db: Annotated[Session, Depends(get_db)]) -> SkillRead:
+def read_skill(code: str, db: Session = Depends(get_db)) -> SkillRead:
     return service.to_read(_get_or_404(db, code))
 
 
@@ -74,8 +74,8 @@ def read_skill(code: str, db: Annotated[Session, Depends(get_db)]) -> SkillRead:
 def edit_skill(
     code: str,
     payload: SkillUpdate,
-    db: Annotated[Session, Depends(get_db)],
-    admin: Annotated[User, Depends(require_roles("ministry_admin"))],
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_roles("ministry_admin")),
 ) -> SkillRead:
     """Editorial corrections. Cannot change the status: see the dedicated routes."""
     return service.to_read(service.update_skill(db, _get_or_404(db, code), payload, admin.id))
@@ -84,8 +84,8 @@ def edit_skill(
 @router.post("/skills/{code}/validate", response_model=SkillRead)
 def validate_skill(
     code: str,
-    db: Annotated[Session, Depends(get_db)],
-    admin: Annotated[User, Depends(require_roles("ministry_admin"))],
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_roles("ministry_admin")),
 ) -> SkillRead:
     return service.to_read(service.validate_skill(db, _get_or_404(db, code), admin.id))
 
@@ -93,8 +93,8 @@ def validate_skill(
 @router.delete("/skills/{code}", response_model=RemovalOut)
 def remove_skill(
     code: str,
-    db: Annotated[Session, Depends(get_db)],
-    admin: Annotated[User, Depends(require_roles("ministry_admin"))],
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_roles("ministry_admin")),
 ) -> RemovalOut:
     """Deletes an unused draft, retires anything else. Never breaks existing profiles."""
     skill = _get_or_404(db, code)

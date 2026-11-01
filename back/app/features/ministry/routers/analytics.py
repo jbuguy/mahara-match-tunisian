@@ -30,7 +30,7 @@ def _safe_csv_cell(value):
 
 @router.get("/skill-gaps", response_model=SkillGapMap)
 def skill_gaps(
-    db: Annotated[Session, Depends(get_db)],
+    db: Session = Depends(get_db),
     period_start: date | None = None,
     period_end: date | None = None,
     governorate_code: Annotated[str | None, Query(max_length=8)] = None,
@@ -58,7 +58,7 @@ def skill_gaps(
 
 @router.get("/labour-market", response_model=LabourMarketOverview)
 def labour_market(
-    db: Annotated[Session, Depends(get_db)],
+    db: Session = Depends(get_db),
     period_start: date | None = None,
     period_end: date | None = None,
     limit: Annotated[int, Query(ge=1, le=20)] = 5,
@@ -88,8 +88,8 @@ def labour_market(
 
 @router.get("/labour-market/export.csv", include_in_schema=True)
 def export_labour_market_csv(
-    db: Annotated[Session, Depends(get_db)],
-    admin: Annotated[User, Depends(require_roles("ministry_admin"))],
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_roles("ministry_admin")),
     period_start: date | None = None,
     period_end: date | None = None,
 ) -> StreamingResponse:
@@ -128,8 +128,8 @@ def export_labour_market_csv(
 
 @router.get("/labour-market/export.pdf")
 def export_labour_market_pdf(
-    db: Annotated[Session, Depends(get_db)],
-    admin: Annotated[User, Depends(require_roles("ministry_admin"))],
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_roles("ministry_admin")),
     period_start: date | None = None,
     period_end: date | None = None,
 ):

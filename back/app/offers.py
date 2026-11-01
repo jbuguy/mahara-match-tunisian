@@ -15,8 +15,8 @@ def create_offer_router(get_db: Any, get_current_user: Any) -> APIRouter:
 
     @router.get("/api/v1/me/offers")
     def get_candidate_offers(
-        db: Annotated[Session, Depends(get_db)],
-        user: Annotated[Any, Depends(get_current_user)],
+        db: Session = Depends(get_db),
+        user: Any = Depends(get_current_user),
     ) -> list[dict]:
         try:
             return list_candidate_offers(db, user_id=UUID(str(user.id)))

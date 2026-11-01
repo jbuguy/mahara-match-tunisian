@@ -54,7 +54,7 @@ def create_user_access_token(user: User) -> str:
 
 
 def get_current_user(
-    token: Annotated[str, Depends(oauth2_scheme)], db: Annotated[Session, Depends(get_db)]
+    token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)
 ) -> User:
     settings = get_settings()
     credentials_error = HTTPException(
@@ -83,7 +83,7 @@ def get_current_user(
 
 
 def require_roles(*required_roles: str):
-    def dependency(user: Annotated[User, Depends(get_current_user)]) -> User:
+    def dependency(user: User = Depends(get_current_user)) -> User:
         user_roles = {str(role).strip().lower() for role in user.roles}
         if not set(required_roles).issubset(user_roles):
             raise HTTPException(
@@ -99,7 +99,7 @@ def require_any_role(*allowed_roles: str):
     """Require at least one role for shared admin/operator surfaces."""
     normalized = {role.strip().lower() for role in allowed_roles if role.strip()}
 
-    def dependency(user: Annotated[User, Depends(get_current_user)]) -> User:
+    def dependency(user: User = Depends(get_current_user)) -> User:
         user_roles = {str(role).strip().lower() for role in user.roles}
         if not user_roles.intersection(normalized):
             raise HTTPException(
@@ -113,7 +113,7 @@ def require_any_role(*allowed_roles: str):
 
 
 def get_current_employer(
-    token: Annotated[str, Depends(oauth2_scheme)], db: Annotated[Session, Depends(get_db)]
+    token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)
 ) -> Employer:
     settings = get_settings()
     credentials_error = HTTPException(

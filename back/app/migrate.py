@@ -22,6 +22,7 @@ from .config import get_settings
 MIGRATION_FILENAME = re.compile(r"^(?P<version>\d{14})_[a-z0-9_]+\.sql$")
 MIGRATION_TABLE = "public.platform_schema_migrations"
 MIGRATION_LOCK_ID = 8_675_309_123_456_789
+ACTIVE_MIGRATION_CUTOFF = "20261006000000"
 LEGACY_BASELINE_VERSIONS = (
     "20260920000000",
     "20260921000000",
@@ -87,7 +88,7 @@ class MigrationReport:
     baselined_versions: tuple[str, ...]
 
 
-def discover_migrations(directory: Path) -> list[Migration]:
+def discover_migrations(directory: Path, *, include_future: bool = False) -> list[Migration]:
     migrations = []
     versions = set()
     for path in sorted(directory.glob("*.sql")):
@@ -97,6 +98,8 @@ def discover_migrations(directory: Path) -> list[Migration]:
         version = match.group("version")
         if version in versions:
             raise MigrationError(f"Duplicate migration version: {version}")
+        if not include_future and version > ACTIVE_MIGRATION_CUTOFF:
+            continue
         content = path.read_bytes()
         if not content.strip():
             raise MigrationError(f"Migration is empty: {path.name}")
@@ -286,10 +289,15 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Verify and stamp the known legacy schema before applying newer migrations",
     )
+    parser.add_argument(
+        "--include-future",
+        action="store_true",
+        help="Include work-package migrations newer than the currently shipped baseline",
+    )
     args = parser.parse_args(argv)
 
     try:
-        migrations = discover_migrations(args.migrations_dir)
+        migrations = discover_migrations(args.migrations_dir, include_future=args.include_future)
         database_url = args.database_url or get_settings().database_url
         if not database_url:
             raise MigrationError("Set DATABASE_URL to the Supabase PostgreSQL connection string")
