@@ -16,6 +16,9 @@ type SkillRow = { code: string; label_fr: string; label_ar: string | null; label
 type OccupationRow = { code: string; isco_code: string | null; title_fr: string; title_ar: string | null; alt_titles: string[]; sector_code: string | null; status: string; skills: RequiredSkill[] }
 type Removal = { code: string; outcome: string }
 type IngestionJob = { job_id: string; source: string; status: string; pipeline_version: string; records_total: number; records_ok: number; records_failed: number; errors: Row[]; started_at: string | null; finished_at: string | null; created_at: string }
+type RouteStats = { route: string; requests: number; refusals: number; errors: number; avg_ms: number; max_ms: number }
+type TaxonomyStats = { skills: Record<string, number>; occupations: Record<string, number>; suggestions: Record<string, number>; occupations_without_skills: number }
+type MonitoringDetail = { routes: RouteStats[] | null; routesError: string; taxonomy: TaxonomyStats | null; taxonomyError: string }
 type JobDetail = { jobId: string; report: IngestionJob | null; loading: boolean; error: string }
 type Editor = { kind: TaxonomyKind; mode: 'create' } | { kind: TaxonomyKind; mode: 'edit' | 'skills'; row: Row }
 
@@ -132,6 +135,43 @@ function SkillForm({ skill, busy, onSubmit, onCancel }: { skill: SkillRow | null
       <button className="secondary-btn" type="button" onClick={onCancel} disabled={busy}>Annuler</button>
     </div>
   </form>
+}
+
+const suggestionStatusLabels: Record<string, string> = { pending: 'En attente', approved: 'Homologuées', merged: 'Fusionnées', rejected: 'Rejetées' }
+const ROUTES_PREVIEW = 20
+
+function RouteTraffic({ routes, error }: { routes: RouteStats[] | null; error: string }) {
+  const [showAll, setShowAll] = useState(false)
+  if (error) return <div className="ministry-alert error" role="alert"><strong>Trafic indisponible</strong><span>{error}</span></div>
+  if (!routes) return null
+  if (!routes.length) return <div className="ministry-empty-selection"><strong>Aucun appel enregistré</strong><p>Les compteurs repartent de zéro à chaque redémarrage du service.</p></div>
+  const visible = showAll ? routes : routes.slice(0, ROUTES_PREVIEW)
+  return <>
+    <div className="ministry-table-wrap"><table className="ministry-table"><thead><tr><th scope="col">Route</th><th scope="col">Appels</th><th scope="col">Refus (4xx)</th><th scope="col">Erreurs (5xx)</th><th scope="col">Durée moyenne</th><th scope="col">Durée maximale</th></tr></thead>
+      <tbody>{visible.map((row) => <tr key={row.route}><td>{row.route}</td><td>{row.requests}</td><td>{row.refusals}</td><td>{row.errors}</td><td>{row.avg_ms} ms</td><td>{row.max_ms} ms</td></tr>)}</tbody></table></div>
+    {routes.length > ROUTES_PREVIEW && <button className="ghost-btn" type="button" onClick={() => setShowAll(!showAll)}>{showAll ? `Afficher les ${ROUTES_PREVIEW} routes les plus sollicitées` : `Afficher toutes les routes (${routes.length})`}</button>}
+    <p className="ministry-cell-subtitle">Les chemins contenant un code (métier, compétence, lot) apparaissent un par un : le compteur de la plateforme enregistre l’URL appelée.</p>
+  </>
+}
+
+function TaxonomyQuality({ stats, error }: { stats: TaxonomyStats | null; error: string }) {
+  if (error) return <div className="ministry-alert error" role="alert"><strong>Indicateurs du référentiel indisponibles</strong><span>{error}</span></div>
+  if (!stats) return null
+  const statuses = Object.keys(statusLabels)
+  const suggestionEntries = Object.entries(stats.suggestions)
+  return <>
+    <div className="ministry-metrics-row">
+      <div><span>Propositions en attente</span><strong>{stats.suggestions.pending ?? 0}</strong></div>
+      <div><span>Métiers sans compétence requise (tous statuts)</span><strong>{stats.occupations_without_skills}</strong></div>
+      <div><span>Compétences en brouillon</span><strong>{stats.skills.draft ?? 0}</strong></div>
+    </div>
+    <div className="ministry-market-grid">
+      <section><h4>Référentiel par statut</h4><div className="ministry-table-wrap"><table className="ministry-table"><thead><tr><th scope="col">Statut</th><th scope="col">Compétences</th><th scope="col">Métiers</th></tr></thead>
+        <tbody>{statuses.map((status) => <tr key={status}><td>{statusLabels[status]}</td><td>{stats.skills[status] ?? 0}</td><td>{stats.occupations[status] ?? 0}</td></tr>)}</tbody></table></div></section>
+      <section><h4>Propositions par décision</h4>{suggestionEntries.length ? <div className="ministry-table-wrap"><table className="ministry-table"><thead><tr><th scope="col">Décision</th><th scope="col">Nombre</th></tr></thead>
+        <tbody>{suggestionEntries.map(([status, count]) => <tr key={status}><td>{suggestionStatusLabels[status] ?? status}</td><td>{count}</td></tr>)}</tbody></table></div> : <p>Aucune proposition reçue des pipelines.</p>}</section>
+    </div>
+  </>
 }
 
 function formatDate(value: string | null): string {
@@ -275,6 +315,7 @@ export function MinistryPage() {
   // Separate from `error`, which means the list failed to load and hides it.
   const [actionError, setActionError] = useState('')
   const [jobDetail, setJobDetail] = useState<JobDetail | null>(null)
+  const [monitoring, setMonitoring] = useState<MonitoringDetail>({ routes: null, routesError: '', taxonomy: null, taxonomyError: '' })
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -284,7 +325,21 @@ export function MinistryPage() {
       const result = await requestJson<unknown>(endpoint)
       setData(result)
       if (section === 'analytics') setAnalytics(result as SkillGapMap)
-      if (section === 'monitoring') setOverview(result as Overview)
+      if (section === 'monitoring') {
+        setOverview(result as Overview)
+        // Each panel fails on its own: one unavailable indicator must not hide the other.
+        const [routes, taxonomy] = await Promise.allSettled([
+          requestJson<RouteStats[]>('/api/v1/admin/monitoring/routes'),
+          requestJson<TaxonomyStats>('/api/v1/admin/monitoring/taxonomy'),
+        ])
+        const reason = (outcome: PromiseRejectedResult) => outcome.reason instanceof Error ? outcome.reason.message : 'Indicateur indisponible.'
+        setMonitoring({
+          routes: routes.status === 'fulfilled' ? routes.value : null,
+          routesError: routes.status === 'rejected' ? reason(routes) : '',
+          taxonomy: taxonomy.status === 'fulfilled' ? taxonomy.value : null,
+          taxonomyError: taxonomy.status === 'rejected' ? reason(taxonomy) : '',
+        })
+      }
       if (section === 'labour-market') setLabourMarket(result as LabourMarket)
     } catch (cause) {
       setData(null)
@@ -572,6 +627,8 @@ export function MinistryPage() {
       {section === 'labour-market' && labourMarket && <div className="ministry-privacy-note"><strong>Données agrégées et anonymisées</strong><span>{labourMarket.cells_suppressed} cellule(s) supprimée(s), seuil k={labourMarket.k_anonymity}. Ratio version {labourMarket.definition_version}. Période de comparaison : {labourMarket.comparison_period_start} – {labourMarket.comparison_period_end}.</span></div>}
       {section === 'labour-market' && labourMarket && <div className="ministry-market-grid"><section><h4>Demande par gouvernorat</h4><div className="ministry-table-wrap"><table className="ministry-table"><thead><tr><th>Gouvernorat</th><th>Postes</th><th>Offres</th></tr></thead><tbody>{labourMarket.demand_by_governorate.map((row) => <tr key={String(row.governorate_code)}><td>{String(row.governorate_name)}</td><td>{String(row.demand_positions)}</td><td>{String(row.published_offers)}</td></tr>)}</tbody></table>{!labourMarket.demand_by_governorate.length && <p>Aucune demande publiée pendant cette période.</p>}</div></section><section><h4>Métiers à tension élevée</h4><div className="ministry-table-wrap"><table className="ministry-table"><thead><tr><th>Métier</th><th>Gouvernorat</th><th>Postes</th><th>Viviers</th><th>Ratio</th><th>Évolution</th></tr></thead><tbody>{labourMarket.occupations_under_tension.map((row, index) => <tr key={`${String(row.occupation_code)}-${String(row.governorate_code)}-${index}`}><td>{String(row.occupation_title)}<small className="ministry-cell-subtitle">{String(row.occupation_code)}</small></td><td>{String(row.governorate_name)}</td><td>{String(row.demand_positions)}</td><td>{String(row.candidate_supply)}</td><td>{String(row.demand_supply_ratio)}</td><td>{row.demand_change_percent == null ? '—' : `${String(row.demand_change_percent)}%`}</td></tr>)}</tbody></table>{!labourMarket.occupations_under_tension.length && <p>Aucune donnée de tension disponible.</p>}</div></section></div>}
       {section === 'monitoring' && overview && <div className="ministry-metrics-row"><div><span>Requêtes</span><strong>{overview.requests_total}</strong></div><div><span>Refus d’accès</span><strong>{overview.refusals_total}</strong></div><div><span>Temps de fonctionnement</span><strong>{Math.floor(overview.uptime_seconds / 3600)} h</strong></div></div>}
+      {section === 'monitoring' && !loading && !error && <section className="ministry-monitoring-panel" aria-label="Qualité du référentiel"><h4>Qualité du référentiel</h4><TaxonomyQuality stats={monitoring.taxonomy} error={monitoring.taxonomyError} /></section>}
+      {section === 'monitoring' && !loading && !error && <section className="ministry-monitoring-panel" aria-label="Trafic par route"><h4>Trafic par route</h4><RouteTraffic routes={monitoring.routes} error={monitoring.routesError} /></section>}
 
       {section === 'suggestions' && rows?.length ? <div className="ministry-review-layout">
         <div className="ministry-suggestion-list" aria-label="Propositions à examiner">{filteredRows.map((row) => <button key={value(row, 'suggestion_id')} type="button" className={`ministry-suggestion${selected?.suggestion_id === row.suggestion_id ? ' selected' : ''}`} onClick={() => { setSelected(row); setSkillLabel(value(row, 'proposed_label')); setSkillCode(''); setMergeCode(''); setRejectReason('') }}><span className="suggestion-type">{value(row, 'skill_type')}</span><strong>{value(row, 'proposed_label')}</strong><small>{value(row, 'source')} · {value(row, 'occurrences')} occurrence(s)</small><span className="module-tag">{value(row, 'status')}</span></button>)}</div>

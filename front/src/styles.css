@@ -1239,3 +1239,6 @@ pre {
 .ministry-row-actions .secondary-btn, .ministry-row-actions .ghost-btn { padding: 6px 10px; font-size: .78rem; }
 .ministry-inline-form { display: grid; grid-template-columns: minmax(0,1fr) minmax(140px,auto) auto; gap: 10px; align-items: end; }
 @media (max-width: 760px) { .ministry-inline-form { grid-template-columns: 1fr; } }
+.ministry-monitoring-panel { display: grid; gap: 12px; margin: 0 0 18px; padding-top: 14px; border-top: 1px solid var(--line); }
+.ministry-monitoring-panel > h4 { margin: 0; color: var(--primary); font: 600 1rem var(--font-display); }
+.ministry-monitoring-panel .ghost-btn { justify-self: start; }
