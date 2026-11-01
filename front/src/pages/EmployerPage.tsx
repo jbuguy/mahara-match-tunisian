@@ -169,7 +169,11 @@ export function EmployerPage() {
         method: 'POST', body: JSON.stringify({ answers: formAnswers }),
       })
       rememberSession(updated)
-      setNotice('The draft is ready. Review every detail before publishing.')
+      if (updated.draft) {
+        setNotice('The draft is ready. Review every detail before publishing.')
+      } else {
+        setError(updated.messages[updated.messages.length - 1]?.content || 'Could not generate the draft.')
+      }
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'Could not generate the draft.')
     } finally { setPending(false) }

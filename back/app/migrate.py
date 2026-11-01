@@ -22,7 +22,7 @@ from .config import get_settings
 MIGRATION_FILENAME = re.compile(r"^(?P<version>\d{14})_[a-z0-9_]+\.sql$")
 MIGRATION_TABLE = "public.platform_schema_migrations"
 MIGRATION_LOCK_ID = 8_675_309_123_456_789
-ACTIVE_MIGRATION_CUTOFF = "20261006000000"
+ACTIVE_MIGRATION_CUTOFF = "20261031000000"
 LEGACY_BASELINE_VERSIONS = (
     "20260920000000",
     "20260921000000",

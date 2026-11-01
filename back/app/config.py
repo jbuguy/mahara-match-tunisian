@@ -62,6 +62,10 @@ class Settings(BaseSettings):
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
 
+    @property
+    def email_verification_required(self) -> bool:
+        return self.app_env.strip().lower() != "development"
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore", case_sensitive=False)
 
 

@@ -14,13 +14,15 @@ Mahara Match is one React frontend and one FastAPI backend for candidate onboard
 
 Requirements: Python 3.11+, Node.js 18+, and PostgreSQL. Configure `back/.env` from `back/.env.example`; set `DATABASE_URL` and a strong `JWT_SECRET`. Optional Google OAuth, Groq, and OpenAI-compatible LLM settings are documented in that file. Email verification and password reset require SMTP settings (`SMTP_HOST`, `SMTP_FROM_EMAIL`, and, when required, SMTP credentials) before the API can deliver links.
 
+When `APP_ENV=development`, employer email verification is skipped so local offer workflows can be tested without SMTP. Verification remains required in other environments.
+
 Apply ordered SQL migrations and start the API in one terminal:
 
 ```powershell
 cd back
 python -m pip install -r requirements.txt
 python -m app.migrate
-python -m uvicorn app.main:app --reload --port 8000
+python -m uvicorn app.main:asgi_app --reload --port 8000
 ```
 
 Start the frontend in another terminal:

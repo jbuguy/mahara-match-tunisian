@@ -1,10 +1,14 @@
+import pytest
+from fastapi import HTTPException
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 from fastapi.testclient import TestClient
 
 from app.database import Base, get_db
-from app.main import app
+from app.main import app, asgi_app
+from app.models import AuthIdentity, Employer, User
+from app.security import ensure_employer_email_verified
 
 
 test_engine = create_engine(
@@ -49,6 +53,39 @@ def test_signup_returns_profile_without_password_hash():
     assert body["email"] == valid_payload["email"]
     assert body["verified"] is False
     assert "password_hash" not in body
+
+
+def test_development_signup_skips_employer_email_verification():
+    response = client.post("/employers/signup", json=valid_payload)
+
+    assert response.status_code == 201
+    assert response.json()["email_verified"] is True
+    with TestSession() as db:
+        user = db.query(User).filter_by(email=valid_payload["email"]).one()
+        identity = db.query(AuthIdentity).filter_by(user_id=user.id).one()
+        employer = db.query(Employer).filter_by(email=valid_payload["email"]).one()
+
+        assert user.email_verified is True
+        assert identity.email_verified is True
+        assert ensure_employer_email_verified(db, employer) is employer
+
+
+def test_production_signup_still_requires_employer_email_verification(monkeypatch):
+    monkeypatch.setattr("app.main.settings.app_env", "production")
+
+    response = client.post("/employers/signup", json=valid_payload)
+
+    assert response.status_code == 201
+    assert response.json()["email_verified"] is False
+    with TestSession() as db:
+        user = db.query(User).filter_by(email=valid_payload["email"]).one()
+        employer = db.query(Employer).filter_by(email=valid_payload["email"]).one()
+
+        assert user.email_verified is False
+        with pytest.raises(HTTPException) as exc_info:
+            ensure_employer_email_verified(db, employer)
+
+    assert exc_info.value.status_code == 403
 
 
 def test_duplicate_email_is_rejected():
@@ -134,7 +171,7 @@ def test_platform_health_and_readiness_endpoints_are_available():
 
 
 def test_development_cors_allows_vite_fallback_port():
-    response = client.options(
+    response = TestClient(asgi_app).options(
         "/health",
         headers={
             "Origin": "http://127.0.0.1:5174",

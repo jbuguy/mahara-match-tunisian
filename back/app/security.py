@@ -135,6 +135,9 @@ def get_current_employer(
 
 def ensure_employer_email_verified(db: Session, employer: Employer) -> Employer:
     """Require a linked employer account to verify its email before sensitive actions."""
+    if not get_settings().email_verification_required:
+        return employer
+
     # Some isolated feature tests use lightweight employer doubles. Real ORM
     # employers always expose user_id, so this keeps those tests independent of
     # the account-verification database while preserving production enforcement.

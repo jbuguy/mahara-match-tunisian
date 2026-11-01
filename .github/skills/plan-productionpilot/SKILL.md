@@ -1,3 +1,8 @@
+---
+name: plan-productionpilot
+description: plan-productionPilot
+disable-model-invocation: true
+---
 ## Plan: Production Pilot Application
 
 Target a limited real-user pilot, not a public-scale launch. Deliver one deployable product around the critical loop: candidate account and profile → ranked real offers → application → employer review and decision. Preserve the proven WP2/WP4/WP6 implementations where useful, but make WP1 PostgreSQL models/contracts and the root server/frontend the production source of truth.

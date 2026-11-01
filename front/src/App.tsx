@@ -177,13 +177,25 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
       setStatus('unauthenticated')
       return () => { active = false }
     }
-    requestJson('/api/v1/me/roles')
-      .then(() => { if (active) setStatus('authenticated') })
-      .catch(() => {
-        localStorage.removeItem('mahara_access_token')
-        window.dispatchEvent(new Event('mahara-auth-changed'))
-        if (active) setStatus('unauthenticated')
-      })
+    async function authenticate() {
+      try {
+        await requestJson('/api/v1/me/roles')
+        if (active) setStatus('authenticated')
+        return
+      } catch {
+        try {
+          await requestJson('/employers/me')
+          if (active) setStatus('authenticated')
+          return
+        } catch {
+          localStorage.removeItem('mahara_access_token')
+          window.dispatchEvent(new Event('mahara-auth-changed'))
+          if (active) setStatus('unauthenticated')
+        }
+      }
+    }
+
+    void authenticate()
     return () => { active = false }
   }, [])
 

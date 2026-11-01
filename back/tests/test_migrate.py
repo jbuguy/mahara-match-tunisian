@@ -82,6 +82,12 @@ def test_discover_migrations_sorts_and_hashes_sql(tmp_path):
     assert len(found[0].checksum) == 64
 
 
+def test_default_migrations_include_the_active_analytics_schema():
+    found = discover_migrations(ROOT_MIGRATIONS_DIR)
+
+    assert any(item.filename == "20261031000000_analytics_events.sql" for item in found)
+
+
 def test_discover_rejects_invalid_and_duplicate_versions(tmp_path):
     write_migration(tmp_path, "bad-name.sql", "select 1;")
     with pytest.raises(MigrationError, match="Invalid migration filename"):
@@ -129,7 +135,7 @@ def test_existing_schema_requires_explicit_baseline():
 
 def test_baseline_validates_wp1_schema_then_applies_new_migrations(tmp_path):
     migrations = discover_migrations(ROOT_MIGRATIONS_DIR)
-    migrations.append(migration("20261006000000", "20261006000000_new.sql", "select 2;"))
+    migrations.append(migration("20261101000000", "20261101000000_new.sql", "select 2;"))
     schema = {
         (table, "id"): "text"
         for table in _legacy_table_names(migrations)
@@ -151,7 +157,9 @@ def test_baseline_validates_wp1_schema_then_applies_new_migrations(tmp_path):
     report = apply_migrations(connection, migrations, baseline_existing=True)
 
     assert report.baselined_versions == LEGACY_BASELINE_VERSIONS
-    assert report.applied_versions == ("20261004010000", "20261005000000", "20261006000000")
+    assert report.applied_versions == tuple(
+        item.version for item in migrations if item.version not in LEGACY_BASELINE_VERSIONS
+    )
 
 
 def test_baseline_rejects_incomplete_legacy_schema():

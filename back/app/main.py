@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+from starlette.types import ASGIApp
 
 from shared_llm import LLMSettings, OpenAICompatibleClient
 
@@ -107,18 +108,6 @@ app = FastAPI(
     version=settings.app_version,
     description="Production-oriented API shell for Mahara Match, with module-specific services behind a single platform surface.",
     lifespan=lifespan,
-)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.cors_origin_list,
-    allow_origin_regex=(
-        r"https?://(?:localhost|127\.0\.0\.1)(?::\d+)?"
-        if settings.app_env == "development"
-        else None
-    ),
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
 )
 
 
@@ -374,11 +363,12 @@ def validate_onboarding_profile_contract(payload: dict[str, Any]) -> dict[str, o
 
 
 @app.post("/employers/signup", response_model=EmployerProfile, status_code=status.HTTP_201_CREATED)
-def signup(payload: EmployerSignup, db: Session = Depends(get_db)) -> Employer:
+def signup(payload: EmployerSignup, db: Session = Depends(get_db)) -> dict[str, Any]:
     email = payload.email.lower()
     if db.query(Employer).filter(Employer.email == email).first():
         raise HTTPException(status_code=409, detail="An employer with this email already exists")
-    user = get_or_create_user(db, email, roles=["employer"], email_verified=False)
+    email_verified = not settings.email_verification_required
+    user = get_or_create_user(db, email, roles=["employer"], email_verified=email_verified)
     password_hash = hash_password(payload.password)
     AuthIdentity.link_user(
         db,
@@ -386,7 +376,7 @@ def signup(payload: EmployerSignup, db: Session = Depends(get_db)) -> Employer:
         provider=AuthProvider.PASSWORD,
         provider_user_id=f"email:{email}",
         email=email,
-        email_verified=False,
+        email_verified=email_verified,
         password_hash=password_hash,
     )
 
@@ -418,7 +408,7 @@ def signup(payload: EmployerSignup, db: Session = Depends(get_db)) -> Employer:
         db.rollback()
         raise HTTPException(status_code=409, detail="An employer with this email already exists") from None
     db.refresh(employer)
-    return employer
+    return employer_profile_payload(employer, db)
 
 
 @app.post("/employers/login", response_model=Token)
@@ -507,6 +497,10 @@ def update_candidate_profile(
 
 @app.get("/employers/me", response_model=EmployerProfile)
 def get_profile(current: Employer = Depends(get_current_employer), db: Session = Depends(get_db)) -> dict:
+    return employer_profile_payload(current, db)
+
+
+def employer_profile_payload(current: Employer, db: Session) -> dict[str, Any]:
     user = db.get(User, current.user_id) if current.user_id else None
     return {
         "id": current.id,
@@ -520,7 +514,7 @@ def get_profile(current: Employer = Depends(get_current_employer), db: Session =
         "description": current.description,
         "created_at": current.created_at,
         "verified": current.verified,
-        "email_verified": bool(user and user.email_verified),
+        "email_verified": bool(user and user.email_verified) or not settings.email_verification_required,
     }
 
 
@@ -534,18 +528,22 @@ def update_profile(
         setattr(current, field, value.strip() if isinstance(value, str) else value)
     db.commit()
     db.refresh(current)
-    user = db.get(User, current.user_id) if current.user_id else None
-    return {
-        "id": current.id,
-        "company_name": current.company_name,
-        "email": current.email,
-        "sector": current.sector,
-        "company_size": current.company_size,
-        "tax_id": current.tax_id,
-        "governorate_code": current.governorate_code,
-        "website": current.website,
-        "description": current.description,
-        "created_at": current.created_at,
-        "verified": current.verified,
-        "email_verified": bool(user and user.email_verified),
-    }
+    return employer_profile_payload(current, db)
+
+
+def create_cors_asgi_app(application: ASGIApp) -> CORSMiddleware:
+    return CORSMiddleware(
+        app=application,
+        allow_origins=settings.cors_origin_list,
+        allow_origin_regex=(
+            r"https?://(?:localhost|127\.0\.0\.1)(?::\d+)?"
+            if settings.app_env == "development"
+            else None
+        ),
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+
+asgi_app = create_cors_asgi_app(app)
