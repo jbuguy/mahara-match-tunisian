@@ -9,6 +9,133 @@ type SkillGapMap = { period_start: string; period_end: string; k_anonymity: numb
 type Overview = { module: string; status: string; uptime_seconds: number; database_latency_ms: number | null; requests_total: number; refusals_total: number; errors_total: number }
 type LabourMarket = { period_start: string; period_end: string; comparison_period_start: string; comparison_period_end: string; definition_version: string; k_anonymity: number; cells_suppressed: number; demand_by_governorate: Row[]; occupations_under_tension: Row[] }
 type UploadPreview = { preview_id: string; expires_at: string; records_total: number; records_valid: number; records_invalid: number; sample: Row[]; rejections: { index: number; reason: string }[] }
+type TaxonomyKind = 'skills' | 'occupations'
+type Requirement = 'required' | 'preferred'
+type RequiredSkill = { skill_code: string; requirement: Requirement }
+type OccupationRow = { code: string; isco_code: string | null; title_fr: string; title_ar: string | null; alt_titles: string[]; sector_code: string | null; status: string; skills: RequiredSkill[] }
+type Removal = { code: string; outcome: string }
+type Editor = { kind: TaxonomyKind; mode: 'create' } | { kind: TaxonomyKind; mode: 'edit' | 'skills'; row: Row }
+
+const taxonomyPaths: Record<TaxonomyKind, string> = {
+  skills: '/api/v1/admin/taxonomy/skills',
+  occupations: '/api/v1/admin/taxonomy/occupations',
+}
+const statusLabels: Record<string, string> = { draft: 'brouillon', validated: 'validé', deprecated: 'déprécié' }
+const requirementLabels: Record<Requirement, string> = { required: 'Obligatoire', preferred: 'Souhaitée' }
+
+function entryLabel(kind: TaxonomyKind, code: string): string {
+  return kind === 'skills' ? `La compétence ${code}` : `Le métier ${code}`
+}
+
+// French past participles agree with the entry: « validé » for a métier, « validée » for a compétence.
+function agreed(kind: TaxonomyKind, participle: string): string {
+  return kind === 'skills' ? `${participle}e` : participle
+}
+
+function removalNotice(kind: TaxonomyKind, removal: Removal): string {
+  const entry = entryLabel(kind, removal.code)
+  if (removal.outcome === 'deleted') return `${entry} a été ${agreed(kind, 'supprimé')} définitivement : c’était un brouillon jamais utilisé.`
+  if (removal.outcome === 'deprecated') return `${entry} a été ${agreed(kind, 'déprécié')} au lieu d’être ${agreed(kind, 'supprimé')} : ${kind === 'skills' ? 'elle reste rattachée aux profils existants' : 'il reste rattaché aux offres existantes'}, mais n’est plus ${agreed(kind, 'proposé')}.`
+  return `${entry} : résultat du retrait « ${removal.outcome} ».`
+}
+
+function linesOf(value: string): string[] {
+  return value.split('\n').map((item) => item.trim()).filter(Boolean)
+}
+
+function textOrNull(value: string): string | null {
+  return value.trim() || null
+}
+
+/** Keep only the fields that differ from the row: PATCH routes apply exactly what they receive. */
+function changedFields(next: Record<string, unknown>, original: Row): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(next).filter(([key, item]) => JSON.stringify(item) !== JSON.stringify(original[key] ?? null)))
+}
+
+function OccupationForm({ occupation, busy, onSubmit, onCancel }: { occupation: OccupationRow | null; busy: boolean; onSubmit: (payload: Record<string, unknown>) => void; onCancel: () => void }) {
+  const [code, setCode] = useState('')
+  const [titleFr, setTitleFr] = useState(occupation?.title_fr ?? '')
+  const [titleAr, setTitleAr] = useState(occupation?.title_ar ?? '')
+  const [iscoCode, setIscoCode] = useState(occupation?.isco_code ?? '')
+  const [sectorCode, setSectorCode] = useState(occupation?.sector_code ?? '')
+  const [altTitles, setAltTitles] = useState((occupation?.alt_titles ?? []).join('\n'))
+  const [description, setDescription] = useState('')
+  const [formError, setFormError] = useState('')
+
+  function submit(event: FormEvent) {
+    event.preventDefault()
+    setFormError('')
+    const fields = { title_fr: titleFr.trim(), title_ar: textOrNull(titleAr), isco_code: textOrNull(iscoCode), sector_code: textOrNull(sectorCode), alt_titles: linesOf(altTitles) }
+    const extra = description.trim() ? { description: description.trim() } : {}
+    if (!occupation) return onSubmit({ code: code.trim(), ...fields, ...extra })
+    const changes = { ...changedFields(fields, occupation), ...extra }
+    if (!Object.keys(changes).length) return setFormError('Aucune modification à enregistrer.')
+    onSubmit(changes)
+  }
+
+  return <form className="ministry-decision-form" onSubmit={submit}>
+    <h5>{occupation ? `Corriger le métier ${occupation.code}` : 'Nouveau métier'}</h5>
+    <p className="ministry-cell-subtitle">{occupation ? `Correction éditoriale : le statut (${statusLabels[occupation.status] ?? occupation.status}) ne change pas.` : 'Le métier sera créé en brouillon. Sa validation est une étape séparée.'}</p>
+    {!occupation && <label>Code ROME<input required maxLength={32} value={code} onChange={(event) => setCode(event.target.value)} placeholder="ROME-H2913" /></label>}
+    <label>Intitulé français<input required maxLength={200} value={titleFr} onChange={(event) => setTitleFr(event.target.value)} /></label>
+    <label>Intitulé arabe<input dir="rtl" maxLength={200} value={titleAr} onChange={(event) => setTitleAr(event.target.value)} /></label>
+    <label>Code CITP (ISCO-08)<input maxLength={8} value={iscoCode} onChange={(event) => setIscoCode(event.target.value)} placeholder="7212" /></label>
+    <label>Code secteur<input maxLength={32} value={sectorCode} onChange={(event) => setSectorCode(event.target.value)} placeholder="Facultatif — doit exister dans le référentiel des secteurs" /></label>
+    <label>Intitulés alternatifs (un par ligne)<textarea value={altTitles} onChange={(event) => setAltTitles(event.target.value)} /></label>
+    <label>Description{occupation && ' — laissez vide pour conserver la description actuelle'}<textarea value={description} onChange={(event) => setDescription(event.target.value)} /></label>
+    {formError && <p className="form-error" role="alert">{formError}</p>}
+    <div className="ministry-form-actions">
+      <button className="primary-btn" type="submit" disabled={busy}>{busy ? 'Enregistrement…' : occupation ? 'Enregistrer la correction' : 'Créer en brouillon'}</button>
+      <button className="secondary-btn" type="button" onClick={onCancel} disabled={busy}>Annuler</button>
+    </div>
+  </form>
+}
+
+function RequiredSkillsEditor({ occupation, busy, onSave, onCancel }: { occupation: OccupationRow; busy: boolean; onSave: (skills: RequiredSkill[], summary: string) => void; onCancel: () => void }) {
+  const [lines, setLines] = useState<RequiredSkill[]>(occupation.skills)
+  const [newCode, setNewCode] = useState('')
+  const [newRequirement, setNewRequirement] = useState<Requirement>('required')
+  const [formError, setFormError] = useState('')
+  const original = new Map(occupation.skills.map((line) => [line.skill_code, line.requirement]))
+  const current = new Set(lines.map((line) => line.skill_code))
+  const added = lines.filter((line) => !original.has(line.skill_code))
+  const removed = occupation.skills.filter((line) => !current.has(line.skill_code))
+  const changed = lines.filter((line) => original.has(line.skill_code) && original.get(line.skill_code) !== line.requirement)
+  const dirty = added.length + removed.length + changed.length > 0
+  const summary = `${added.length} ajout(s), ${removed.length} retrait(s), ${changed.length} exigence(s) modifiée(s)`
+
+  function addLine(event: FormEvent) {
+    event.preventDefault()
+    const skillCode = newCode.trim()
+    if (!skillCode) return
+    if (current.has(skillCode)) return setFormError(`${skillCode} figure déjà dans la liste.`)
+    setLines([...lines, { skill_code: skillCode, requirement: newRequirement }])
+    setNewCode('')
+    setFormError('')
+  }
+
+  return <div className="ministry-decision-form">
+    <h5>Compétences requises — {occupation.title_fr} ({occupation.code})</h5>
+    <div className="ministry-privacy-note"><strong>L’enregistrement remplace la liste entière</strong><span>La fiche aura exactement les compétences listées ci-dessous. Pour en retirer une, retirez-la de la liste puis enregistrez.</span></div>
+    {lines.length ? <div className="ministry-table-wrap"><table className="ministry-table"><thead><tr><th scope="col">Compétence</th><th scope="col">Exigence</th><th scope="col">Action</th></tr></thead><tbody>{lines.map((line) => <tr key={line.skill_code}>
+      <td>{line.skill_code}{!original.has(line.skill_code) && <small className="ministry-cell-subtitle">Ajoutée — pas encore enregistrée</small>}</td>
+      <td><select aria-label={`Exigence pour ${line.skill_code}`} value={line.requirement} onChange={(event) => setLines(lines.map((item) => item.skill_code === line.skill_code ? { ...item, requirement: event.target.value as Requirement } : item))}>{Object.entries(requirementLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></td>
+      <td><button className="danger-text-btn" type="button" onClick={() => setLines(lines.filter((item) => item.skill_code !== line.skill_code))}>Retirer de la liste</button></td>
+    </tr>)}</tbody></table></div> : <div className="ministry-empty-selection"><strong>Aucune compétence requise</strong><p>{occupation.skills.length ? 'Enregistrer maintenant videra la liste de ce métier.' : 'Ajoutez les compétences attendues pour ce métier.'}</p></div>}
+    {removed.length > 0 && <p className="form-error">Seront retirées à l’enregistrement : {removed.map((line) => line.skill_code).join(', ')}</p>}
+    <form className="ministry-inline-form" onSubmit={addLine}>
+      <label>Ajouter une compétence (code)<input value={newCode} maxLength={32} onChange={(event) => setNewCode(event.target.value)} placeholder="REM-E1204" /></label>
+      <label>Exigence<select value={newRequirement} onChange={(event) => setNewRequirement(event.target.value as Requirement)}>{Object.entries(requirementLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
+      <button className="secondary-btn" type="submit" disabled={!newCode.trim()}>Ajouter à la liste</button>
+    </form>
+    {formError && <p className="form-error" role="alert">{formError}</p>}
+    <p className="ministry-cell-subtitle">{dirty ? `Modifications non enregistrées : ${summary}.` : 'Aucune modification par rapport à la fiche enregistrée.'}</p>
+    <div className="ministry-form-actions">
+      <button className="primary-btn" type="button" disabled={busy || !dirty} onClick={() => onSave(lines, summary)}>{busy ? 'Enregistrement…' : lines.length ? `Remplacer la liste (${lines.length} compétence${lines.length === 1 ? '' : 's'})` : 'Vider la liste des compétences requises'}</button>
+      <button className="secondary-btn" type="button" onClick={onCancel} disabled={busy}>Annuler</button>
+    </div>
+  </div>
+}
 
 const sections: { id: Section; label: string; endpoint: string }[] = [
   { id: 'skills', label: 'Compétences (REM)', endpoint: '/api/v1/admin/taxonomy/skills?page=1&page_size=50' },
@@ -27,6 +154,12 @@ function value(row: Row, key: string): string {
   if (item === null || item === undefined || item === '') return '—'
   if (typeof item === 'object') return JSON.stringify(item)
   return String(item)
+}
+
+// value() renders a missing field as '—', which is truthy: read the raw identifiers instead.
+function rowKey(row: Row, index: number): string {
+  const id = ['skill_id', 'occupation_id', 'dataset_id', 'job_id', 'id'].map((key) => row[key]).find((item) => typeof item === 'string' || typeof item === 'number')
+  return id === undefined ? String(index) : String(id)
 }
 
 function tableData(data: unknown): Row[] | null {
@@ -62,6 +195,9 @@ export function MinistryPage() {
   const [marketPeriodEnd, setMarketPeriodEnd] = useState('')
   const [uploadPreview, setUploadPreview] = useState<UploadPreview | null>(null)
   const [acceptValidRows, setAcceptValidRows] = useState(false)
+  const [editor, setEditor] = useState<Editor | null>(null)
+  // Separate from `error`, which means the list failed to load and hides it.
+  const [actionError, setActionError] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -81,7 +217,7 @@ export function MinistryPage() {
     }
   }, [section, page])
 
-  useEffect(() => { void load(); setSelected(null); setQuery('') }, [load])
+  useEffect(() => { void load(); setSelected(null); setQuery(''); setEditor(null); setActionError('') }, [load])
   useEffect(() => {
     if (!localStorage.getItem('mahara_access_token')) return
     void Promise.allSettled([
@@ -101,6 +237,83 @@ export function MinistryPage() {
   const filteredRows = useMemo(() => rows?.filter((row) => JSON.stringify(row).toLocaleLowerCase().includes(query.toLocaleLowerCase())) ?? [], [rows, query])
   const activeSection = sections.find((item) => item.id === section)!
   const total = data && typeof data === 'object' && 'total' in data && typeof data.total === 'number' ? data.total : rows?.length ?? 0
+  const taxonomyKind: TaxonomyKind | null = section === 'skills' || section === 'occupations' ? section : null
+
+  /** Run one governance act, then show what the API actually reported and refresh the list. */
+  async function runAction(perform: () => Promise<string>) {
+    setBusy(true); setActionError(''); setNotice('')
+    try {
+      setNotice(await perform())
+      setEditor(null)
+      await load()
+    } catch (cause) {
+      setActionError(cause instanceof Error ? cause.message : 'L’opération n’a pas pu aboutir.')
+    } finally { setBusy(false) }
+  }
+
+  function entryPath(kind: TaxonomyKind, code: string): string {
+    return `${taxonomyPaths[kind]}/${encodeURIComponent(code)}`
+  }
+
+  function validateEntry(kind: TaxonomyKind, code: string) {
+    void runAction(async () => {
+      await requestJson(`${entryPath(kind, code)}/validate`, { method: 'POST' })
+      return `${entryLabel(kind, code)} a été ${agreed(kind, 'validé')}.`
+    })
+  }
+
+  function removeEntry(kind: TaxonomyKind, code: string) {
+    if (!window.confirm(`Retirer ${code} ? Un brouillon jamais utilisé est supprimé définitivement ; dans tous les autres cas, l’entrée est dépréciée et conservée pour l’historique.`)) return
+    void runAction(async () => removalNotice(kind, await requestJson<Removal>(entryPath(kind, code), { method: 'DELETE' })))
+  }
+
+  function createOccupation(payload: Record<string, unknown>) {
+    void runAction(async () => {
+      const created = await requestJson<OccupationRow>(taxonomyPaths.occupations, { method: 'POST', body: JSON.stringify(payload) })
+      return `Le métier ${created.code} a été créé (statut : ${statusLabels[created.status] ?? created.status}). Sa validation est une étape séparée.`
+    })
+  }
+
+  function updateOccupation(code: string, changes: Record<string, unknown>) {
+    void runAction(async () => {
+      const updated = await requestJson<OccupationRow>(entryPath('occupations', code), { method: 'PATCH', body: JSON.stringify(changes) })
+      return `Le métier ${updated.code} a été corrigé (${Object.keys(changes).join(', ')}). Statut inchangé : ${statusLabels[updated.status] ?? updated.status}.`
+    })
+  }
+
+  function saveRequiredSkills(code: string, skills: RequiredSkill[], summary: string) {
+    void runAction(async () => {
+      const updated = await requestJson<OccupationRow>(`${entryPath('occupations', code)}/skills`, { method: 'PUT', body: JSON.stringify({ skills }) })
+      return `Liste des compétences requises du métier ${updated.code} remplacée : ${updated.skills.length} compétence(s) enregistrée(s) (${summary}).`
+    })
+  }
+
+  function taxonomyActions(kind: TaxonomyKind, row: Row) {
+    if (typeof row.code !== 'string') return '—'
+    const code = row.code
+    return <div className="ministry-row-actions">
+      {row.status === 'draft' && <button className="secondary-btn" type="button" disabled={busy} onClick={() => validateEntry(kind, code)}>Valider</button>}
+      {kind === 'occupations' && <>
+        <button className="ghost-btn" type="button" disabled={busy} onClick={() => setEditor({ kind, mode: 'edit', row })}>Corriger</button>
+        <button className="ghost-btn" type="button" disabled={busy} onClick={() => setEditor({ kind, mode: 'skills', row })}>Compétences</button>
+        {row.status !== 'deprecated' && <button className="danger-text-btn" type="button" disabled={busy} onClick={() => removeEntry(kind, code)}>Retirer</button>}
+      </>}
+    </div>
+  }
+
+  function renderEditor(current: Editor) {
+    const close = () => setEditor(null)
+    if (current.kind === 'occupations' && current.mode === 'create') return <OccupationForm occupation={null} busy={busy} onSubmit={createOccupation} onCancel={close} />
+    if (current.kind === 'occupations' && current.mode === 'edit') {
+      const occupation = current.row as OccupationRow
+      return <OccupationForm key={occupation.code} occupation={occupation} busy={busy} onSubmit={(changes) => updateOccupation(occupation.code, changes)} onCancel={close} />
+    }
+    if (current.kind === 'occupations' && current.mode === 'skills') {
+      const occupation = current.row as OccupationRow
+      return <RequiredSkillsEditor key={occupation.code} occupation={occupation} busy={busy} onSave={(skills, summary) => saveRequiredSkills(occupation.code, skills, summary)} onCancel={close} />
+    }
+    return null
+  }
 
   async function reviewSuggestion(action: 'approve' | 'merge' | 'reject', event?: FormEvent) {
     event?.preventDefault()
@@ -230,11 +443,13 @@ export function MinistryPage() {
     <section className="ministry-main-card" aria-live="polite">
       <div className="ministry-section-heading">
         <div><p className="eyebrow">Espace de travail · {activeSection.label}</p><h3>{section === 'suggestions' ? 'File d’arbitrage des compétences REM' : activeSection.label}</h3><p>{section === 'suggestions' ? 'Examinez les propositions transmises par les centres de formation et les secteurs professionnels. Chaque décision est conservée dans le journal d’audit.' : 'Consultez les données autorisées par votre habilitation. Les vues analytiques restent agrégées et anonymisées.'}</p></div>
-        <div className="ministry-heading-actions"><span className="ministry-record-count">{loading ? 'Chargement…' : `${total} enregistrement${total === 1 ? '' : 's'}`}</span><button className="ghost-btn" type="button" onClick={() => void load()} disabled={loading || busy}>↻ Actualiser</button></div>
+        <div className="ministry-heading-actions">{section === 'occupations' && <button className="primary-btn" type="button" onClick={() => setEditor({ kind: 'occupations', mode: 'create' })} disabled={busy}>＋ Nouveau métier</button>}<span className="ministry-record-count">{loading ? 'Chargement…' : `${total} enregistrement${total === 1 ? '' : 's'}`}</span><button className="ghost-btn" type="button" onClick={() => void load()} disabled={loading || busy}>↻ Actualiser</button></div>
       </div>
 
       {error && <div className="ministry-alert error" role="alert"><strong>{error.includes('403') || error.includes('401') ? 'Accès réservé' : 'La requête a échoué'}</strong><span>{error.includes('403') || error.includes('401') ? 'Votre compte ne dispose pas des privilèges requis pour cette section.' : error}</span><button className="secondary-btn" type="button" onClick={() => void load()} disabled={loading}>Réessayer</button></div>}
       {notice && <p className="form-notice" role="status">{notice}</p>}
+      {actionError && <div className="ministry-alert error" role="alert"><strong>L’action n’a pas abouti</strong><span>{actionError}</span><button className="secondary-btn" type="button" onClick={() => setActionError('')}>Fermer</button></div>}
+      {editor && editor.kind === taxonomyKind && <section className="ministry-review-detail ministry-editor-panel" aria-label="Édition du référentiel">{renderEditor(editor)}</section>}
 
       {section === 'analytics' && analytics && <div className="ministry-privacy-note"><strong>Données agrégées et anonymisées</strong><span>{analytics.cells_suppressed} cellule(s) supprimée(s) sous le seuil de confidentialité k={analytics.k_anonymity}. Aucun dossier candidat individuel n’est affiché.</span></div>}
       {section === 'labour-market' && labourMarket && <div className="ministry-privacy-note"><strong>Données agrégées et anonymisées</strong><span>{labourMarket.cells_suppressed} cellule(s) supprimée(s), seuil k={labourMarket.k_anonymity}. Ratio version {labourMarket.definition_version}. Période de comparaison : {labourMarket.comparison_period_start} – {labourMarket.comparison_period_end}.</span></div>}
@@ -247,7 +462,7 @@ export function MinistryPage() {
       </div> : <>
         {rows && <div className="ministry-list-toolbar"><label className="ministry-search"><span aria-hidden="true">⌕</span><input aria-label="Rechercher dans les résultats" placeholder="Rechercher par libellé, code ou statut…" value={query} onChange={(event) => setQuery(event.target.value)} /></label><span>{filteredRows.length} résultat(s) affiché(s)</span></div>}
         {loading && <div className="ministry-loading" role="status"><span className="loading-line" /><span className="loading-line" /><span className="loading-line short" />Chargement des données…</div>}
-        {!loading && !error && rows && filteredRows.length > 0 && <div className="ministry-table-wrap"><table className="ministry-table"><thead><tr>{Object.keys(filteredRows[0]).map((key) => <th key={key} scope="col">{key.replaceAll('_', ' ')}</th>)}{section === 'skills' && <th scope="col">Action</th>}</tr></thead><tbody>{filteredRows.map((row, index) => <tr key={value(row, 'skill_id') || value(row, 'occupation_id') || value(row, 'dataset_id') || value(row, 'job_id') || String(index)}>{Object.keys(filteredRows[0]).map((key) => <td key={key}>{value(row, key)}</td>)}{section === 'skills' && <td>{row.status === 'draft' && typeof row.code === 'string' ? <button className="secondary-btn" type="button" disabled={busy} onClick={async () => { setBusy(true); try { await requestJson(`/api/v1/admin/taxonomy/skills/${encodeURIComponent(row.code as string)}/validate`, { method: 'POST' }); setNotice(`La compétence ${row.code} a été validée.`); await load() } catch (cause) { setError(cause instanceof Error ? cause.message : 'Validation impossible.') } finally { setBusy(false) } }}>Valider</button> : '—'}</td>}</tr>)}</tbody></table></div>}
+        {!loading && !error && rows && filteredRows.length > 0 && <div className="ministry-table-wrap"><table className="ministry-table"><thead><tr>{Object.keys(filteredRows[0]).map((key) => <th key={key} scope="col">{key.replaceAll('_', ' ')}</th>)}{taxonomyKind && <th scope="col">Actions</th>}</tr></thead><tbody>{filteredRows.map((row, index) => <tr key={rowKey(row, index)}>{Object.keys(filteredRows[0]).map((key) => <td key={key}>{value(row, key)}</td>)}{taxonomyKind && <td>{taxonomyActions(taxonomyKind, row)}</td>}</tr>)}</tbody></table></div>}
         {!loading && !error && rows && filteredRows.length === 0 && <div className="ministry-empty-selection"><strong>{query ? 'Aucun résultat correspondant' : 'Aucun enregistrement'}</strong><p>{query ? 'Modifiez la recherche pour afficher d’autres résultats.' : 'Les enregistrements apparaîtront ici après leur dépôt ou leur transmission.'}</p></div>}
         {!loading && !error && !rows && data && section !== 'labour-market' && <pre className="ministry-json">{JSON.stringify(data, null, 2)}</pre>}
         {data && typeof data === 'object' && 'page' in data && 'page_size' in data && total > (data.page_size as number) && <div className="ministry-pagination"><button className="secondary-btn" type="button" disabled={page <= 1 || loading} onClick={() => setPage((current) => current - 1)}>← Précédent</button><span>Page {page} sur {Math.ceil(total / (data.page_size as number))}</span><button className="secondary-btn" type="button" disabled={page * (data.page_size as number) >= total || loading} onClick={() => setPage((current) => current + 1)}>Suivant →</button></div>}
