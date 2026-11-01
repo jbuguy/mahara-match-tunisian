@@ -10,6 +10,9 @@ from sqlalchemy.pool import StaticPool
 
 from app.database import get_db
 from app.features.ministry.routers import analytics as ministry_analytics
+from app.features.ministry.routers import ingestion as ministry_ingestion
+from app.features.ministry.routers import market as ministry_market
+from app.features.ministry.routers import occupations as ministry_occupations
 from app.features.ministry.routers import suggestions as ministry_suggestions
 from app.features.ministry.routers import taxonomy as ministry_taxonomy
 from app.security import get_current_user
@@ -19,7 +22,7 @@ from mahara_data.db.models.candidates import Candidate, CandidateSkill
 from mahara_data.db.models.employers import JobOffer, JobOfferSkill
 from mahara_data.db.models.platform import AuditLog
 from mahara_data.db.models.reference import Governorate
-from mahara_data.db.models.taxonomy import Skill, SkillSuggestion
+from mahara_data.db.models.taxonomy import OccupationSkill, Skill, SkillSuggestion
 from mahara_data.enums import (
     ContractType,
     IngestionSource,
@@ -56,7 +59,14 @@ def ministry_client():
             yield db
 
     app = FastAPI()
-    for router in (ministry_taxonomy.router, ministry_suggestions.router, ministry_analytics.router):
+    for router in (
+        ministry_taxonomy.router,
+        ministry_suggestions.router,
+        ministry_analytics.router,
+        ministry_occupations.router,
+        ministry_market.router,
+        ministry_ingestion.router,
+    ):
         app.include_router(router, prefix="/api/v1")
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_current_user] = lambda: admin
@@ -187,3 +197,104 @@ def test_skill_gap_map_withholds_cells_of_one_to_nine_people_and_publishes_zero(
     assert cells["REM-TEN"]["supply_count"] == 10
     assert cells["REM-ZERO"]["supply_count"] == 0
     assert cells["REM-ZERO"]["demand_count"] == 1
+
+
+def _audit_actions(db, entity_type: str, entity_id: str) -> list[str]:
+    rows = db.execute(
+        select(AuditLog).where(AuditLog.entity_type == entity_type, AuditLog.entity_id == entity_id).order_by(AuditLog.id)
+    ).scalars().all()
+    return [row.action for row in rows]
+
+
+def test_occupation_lifecycle_from_draft_to_validation_to_removal(ministry_client):
+    client, sessions, admin_id = ministry_client
+    base = "/api/v1/admin/taxonomy/occupations"
+
+    created = client.post(base, json={"code": "ROME-H2913", "title_fr": "Soudeur", "isco_code": "7212"})
+    assert created.status_code == 201
+    assert created.json()["status"] == TaxonomyStatus.DRAFT.value
+
+    validated = client.post(f"{base}/ROME-H2913/validate")
+    assert validated.status_code == 200
+    assert validated.json()["status"] == TaxonomyStatus.VALIDATED.value
+
+    # A validated occupation is never erased: removing it retires it.
+    removed = client.delete(f"{base}/ROME-H2913")
+    assert removed.status_code == 200
+    assert removed.json() == {"code": "ROME-H2913", "outcome": "deprecated"}
+    assert client.get(f"{base}/ROME-H2913").json()["status"] == TaxonomyStatus.DEPRECATED.value
+
+    # An unused draft, by contrast, is really deleted.
+    client.post(base, json={"code": "ROME-DRAFT", "title_fr": "Brouillon"})
+    assert client.delete(f"{base}/ROME-DRAFT").json() == {"code": "ROME-DRAFT", "outcome": "deleted"}
+    assert client.get(f"{base}/ROME-DRAFT").status_code == 404
+
+    with sessions() as db:
+        assert _audit_actions(db, "occupation", "ROME-H2913") == ["occupation.created", "occupation.validated", "occupation.deprecated"]
+        assert _audit_actions(db, "occupation", "ROME-DRAFT") == ["occupation.created", "occupation.deleted"]
+        deprecation = db.execute(select(AuditLog).where(AuditLog.action == "occupation.deprecated")).scalar_one()
+        assert deprecation.actor_user_id == admin_id
+        assert deprecation.payload == {"previous_status": TaxonomyStatus.VALIDATED.value}
+
+
+def test_required_skills_put_replaces_the_whole_list_and_rejects_unknown_codes(ministry_client):
+    client, sessions, _admin_id = ministry_client
+    with sessions() as db:
+        db.add_all(
+            [Skill(code=code, label_fr=code, skill_type=SkillType.HARD, status=TaxonomyStatus.VALIDATED) for code in ("REM-A", "REM-B", "REM-C")]
+        )
+        db.commit()
+    client.post("/api/v1/admin/taxonomy/occupations", json={"code": "ROME-H2913", "title_fr": "Soudeur"})
+    skills_url = "/api/v1/admin/taxonomy/occupations/ROME-H2913/skills"
+
+    first = client.put(skills_url, json={"skills": [{"skill_code": "REM-A", "requirement": "required"}, {"skill_code": "REM-B", "requirement": "preferred"}]})
+    assert first.status_code == 200
+    assert first.json()["skills"] == [{"skill_code": "REM-A", "requirement": "required"}, {"skill_code": "REM-B", "requirement": "preferred"}]
+
+    # Whatever is omitted is removed: REM-A and REM-B go, REM-C stays alone.
+    second = client.put(skills_url, json={"skills": [{"skill_code": "REM-C", "requirement": "required"}]})
+    assert second.status_code == 200
+    assert second.json()["skills"] == [{"skill_code": "REM-C", "requirement": "required"}]
+
+    refused = client.put(skills_url, json={"skills": [{"skill_code": "REM-A", "requirement": "required"}, {"skill_code": "REM-NOPE", "requirement": "required"}]})
+    assert refused.status_code == 404
+    assert refused.json()["detail"] == "Unknown skill codes: REM-NOPE"
+
+    assert client.get("/api/v1/admin/taxonomy/occupations/ROME-H2913").json()["skills"] == [{"skill_code": "REM-C", "requirement": "required"}]
+    with sessions() as db:
+        assert len(db.execute(select(OccupationSkill)).scalars().all()) == 1
+        assert _audit_actions(db, "occupation", "ROME-H2913").count("occupation.skills_replaced") == 2
+
+
+def test_ingestion_job_report_exposes_rejected_rows_with_their_index(ministry_client):
+    client, sessions, _admin_id = ministry_client
+    with sessions() as db:
+        db.add(Governorate(code="TN-11", name_fr="Tunis", name_ar="تونس"))
+        db.commit()
+    row = {"indicator_type": "job_demand", "period_start": "2026-01-01", "period_end": "2026-03-31", "value": 12, "unit": "count"}
+
+    deposit = client.post(
+        "/api/v1/admin/market/datasets",
+        json={
+            "dataset": {"title": "Demande T1 2026", "origin": "official", "publisher": "ONEQ", "period_start": "2026-01-01", "period_end": "2026-03-31"},
+            "records": [
+                {**row, "governorate_code": "TN-11"},
+                {**row, "skill_code": "REM-NOPE"},
+                {**row, "occupation_code": "ROME-NOPE"},
+            ],
+        },
+    )
+    assert deposit.status_code == 201
+    job_id = deposit.json()["job_id"]
+
+    report = client.get(f"/api/v1/admin/ingestion/jobs/{job_id}")
+
+    assert report.status_code == 200
+    body = report.json()
+    assert (body["records_total"], body["records_ok"], body["records_failed"]) == (3, 1, 2)
+    assert body["status"] == "completed"  # a partial deposit is still a deposit
+    assert body["errors"] == [
+        {"index": 1, "reason": "unknown skill code: REM-NOPE"},
+        {"index": 2, "reason": "unknown occupation code: ROME-NOPE"},
+    ]
+    assert client.get(f"/api/v1/admin/ingestion/jobs/{uuid.uuid4()}").status_code == 404
