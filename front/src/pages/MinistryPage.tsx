@@ -15,6 +15,8 @@ type RequiredSkill = { skill_code: string; requirement: Requirement }
 type SkillRow = { code: string; label_fr: string; label_ar: string | null; label_derja: string | null; alt_labels: string[]; skill_type: string; status: string; version: number }
 type OccupationRow = { code: string; isco_code: string | null; title_fr: string; title_ar: string | null; alt_titles: string[]; sector_code: string | null; status: string; skills: RequiredSkill[] }
 type Removal = { code: string; outcome: string }
+type IngestionJob = { job_id: string; source: string; status: string; pipeline_version: string; records_total: number; records_ok: number; records_failed: number; errors: Row[]; started_at: string | null; finished_at: string | null; created_at: string }
+type JobDetail = { jobId: string; report: IngestionJob | null; loading: boolean; error: string }
 type Editor = { kind: TaxonomyKind; mode: 'create' } | { kind: TaxonomyKind; mode: 'edit' | 'skills'; row: Row }
 
 const taxonomyPaths: Record<TaxonomyKind, string> = {
@@ -132,6 +134,39 @@ function SkillForm({ skill, busy, onSubmit, onCancel }: { skill: SkillRow | null
   </form>
 }
 
+function formatDate(value: string | null): string {
+  return value ? new Date(value).toLocaleString('fr-FR') : '—'
+}
+
+function JobReport({ detail, onRetry, onClose }: { detail: JobDetail; onRetry: () => void; onClose: () => void }) {
+  const { report } = detail
+  // Market ingestion writes {index, reason}; other stages (e.g. the worker's fetch) write other shapes.
+  const rejections = report?.errors.filter((item) => typeof item.index === 'number' && typeof item.reason === 'string') ?? []
+  const otherErrors = report?.errors.filter((item) => !rejections.includes(item)) ?? []
+
+  return <div className="ministry-decision-form">
+    <h5>Rapport du lot {detail.jobId}</h5>
+    {detail.loading && <div className="ministry-loading" role="status"><span className="loading-line" /><span className="loading-line short" />Chargement du rapport…</div>}
+    {!detail.loading && detail.error && <div className="ministry-alert error" role="alert"><strong>Rapport indisponible</strong><span>{detail.error}</span><button className="secondary-btn" type="button" onClick={onRetry}>Réessayer</button></div>}
+    {!detail.loading && report && <>
+      <dl>
+        <div><dt>Source</dt><dd>{report.source}</dd></div>
+        <div><dt>Statut</dt><dd>{report.status}</dd></div>
+        <div><dt>Enregistrements reçus</dt><dd>{report.records_total}</dd></div>
+        <div><dt>Acceptés / rejetés</dt><dd>{report.records_ok} / {report.records_failed}</dd></div>
+        <div><dt>Version du pipeline</dt><dd>{report.pipeline_version}</dd></div>
+        <div><dt>Créé · démarré · terminé</dt><dd>{formatDate(report.created_at)} · {formatDate(report.started_at)} · {formatDate(report.finished_at)}</dd></div>
+      </dl>
+      <h5>Lignes rejetées ({rejections.length})</h5>
+      {rejections.length ? <div className="ministry-table-wrap"><table className="ministry-table"><thead><tr><th scope="col">Index</th><th scope="col">Rang dans le lot</th><th scope="col">Motif du rejet</th></tr></thead><tbody>{rejections.map((item) => <tr key={String(item.index)}><td>{String(item.index)}</td><td>{Number(item.index) + 1}</td><td>{String(item.reason)}</td></tr>)}</tbody></table></div>
+        : <div className="ministry-empty-selection"><strong>Aucune ligne rejetée</strong><p>Tous les enregistrements reçus ont été conservés.</p></div>}
+      <p className="ministry-cell-subtitle">L’index désigne la position de l’enregistrement dans le lot soumis au pipeline (à partir de 0), pas une ligne du fichier d’origine.</p>
+      {otherErrors.length > 0 && <><h5>Autres erreurs du traitement</h5><ul>{otherErrors.map((item, index) => <li key={index}>{typeof item.stage === 'string' ? `${item.stage} : ` : ''}{typeof item.reason === 'string' ? item.reason : JSON.stringify(item)}</li>)}</ul></>}
+    </>}
+    <div className="ministry-form-actions"><button className="secondary-btn" type="button" onClick={onClose}>Fermer le rapport</button></div>
+  </div>
+}
+
 function RequiredSkillsEditor({ occupation, busy, onSave, onCancel }: { occupation: OccupationRow; busy: boolean; onSave: (skills: RequiredSkill[], summary: string) => void; onCancel: () => void }) {
   const [lines, setLines] = useState<RequiredSkill[]>(occupation.skills)
   const [newCode, setNewCode] = useState('')
@@ -239,6 +274,7 @@ export function MinistryPage() {
   const [editor, setEditor] = useState<Editor | null>(null)
   // Separate from `error`, which means the list failed to load and hides it.
   const [actionError, setActionError] = useState('')
+  const [jobDetail, setJobDetail] = useState<JobDetail | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -258,7 +294,7 @@ export function MinistryPage() {
     }
   }, [section, page])
 
-  useEffect(() => { void load(); setSelected(null); setQuery(''); setEditor(null); setActionError('') }, [load])
+  useEffect(() => { void load(); setSelected(null); setQuery(''); setEditor(null); setActionError(''); setJobDetail(null) }, [load])
   useEffect(() => {
     if (!localStorage.getItem('mahara_access_token')) return
     void Promise.allSettled([
@@ -357,6 +393,23 @@ export function MinistryPage() {
       {kind === 'occupations' && <button className="ghost-btn" type="button" disabled={busy} onClick={() => setEditor({ kind, mode: 'skills', row })}>Compétences</button>}
       {row.status !== 'deprecated' && <button className="danger-text-btn" type="button" disabled={busy} onClick={() => removeEntry(kind, code)}>Retirer</button>}
     </div>
+  }
+
+  async function openJob(jobId: string) {
+    setJobDetail({ jobId, report: null, loading: true, error: '' })
+    try {
+      const report = await requestJson<IngestionJob>(`/api/v1/admin/ingestion/jobs/${encodeURIComponent(jobId)}`)
+      setJobDetail({ jobId, report, loading: false, error: '' })
+    } catch (cause) {
+      setJobDetail({ jobId, report: null, loading: false, error: cause instanceof Error ? cause.message : 'Impossible de charger le rapport du lot.' })
+    }
+  }
+
+  function jobAction(row: Row) {
+    if (typeof row.job_id !== 'string') return '—'
+    const jobId = row.job_id
+    const failed = typeof row.records_failed === 'number' ? row.records_failed : 0
+    return <button className="ghost-btn" type="button" aria-pressed={jobDetail?.jobId === jobId} onClick={() => void openJob(jobId)}>{failed ? `Voir les ${failed} rejet${failed === 1 ? '' : 's'}` : 'Voir le rapport'}</button>
   }
 
   function renderEditor(current: Editor) {
@@ -513,6 +566,7 @@ export function MinistryPage() {
       {notice && <p className="form-notice" role="status">{notice}</p>}
       {actionError && <div className="ministry-alert error" role="alert"><strong>L’action n’a pas abouti</strong><span>{actionError}</span><button className="secondary-btn" type="button" onClick={() => setActionError('')}>Fermer</button></div>}
       {editor && editor.kind === taxonomyKind && <section className="ministry-review-detail ministry-editor-panel" aria-label="Édition du référentiel">{renderEditor(editor)}</section>}
+      {section === 'ingestion' && jobDetail && <section className="ministry-review-detail ministry-editor-panel" aria-label="Rapport du lot d’ingestion"><JobReport detail={jobDetail} onRetry={() => void openJob(jobDetail.jobId)} onClose={() => setJobDetail(null)} /></section>}
 
       {section === 'analytics' && analytics && <div className="ministry-privacy-note"><strong>Données agrégées et anonymisées</strong><span>{analytics.cells_suppressed} cellule(s) supprimée(s) sous le seuil de confidentialité k={analytics.k_anonymity}. Aucun dossier candidat individuel n’est affiché.</span></div>}
       {section === 'labour-market' && labourMarket && <div className="ministry-privacy-note"><strong>Données agrégées et anonymisées</strong><span>{labourMarket.cells_suppressed} cellule(s) supprimée(s), seuil k={labourMarket.k_anonymity}. Ratio version {labourMarket.definition_version}. Période de comparaison : {labourMarket.comparison_period_start} – {labourMarket.comparison_period_end}.</span></div>}
@@ -525,7 +579,7 @@ export function MinistryPage() {
       </div> : <>
         {rows && <div className="ministry-list-toolbar"><label className="ministry-search"><span aria-hidden="true">⌕</span><input aria-label="Rechercher dans les résultats" placeholder="Rechercher par libellé, code ou statut…" value={query} onChange={(event) => setQuery(event.target.value)} /></label><span>{filteredRows.length} résultat(s) affiché(s)</span></div>}
         {loading && <div className="ministry-loading" role="status"><span className="loading-line" /><span className="loading-line" /><span className="loading-line short" />Chargement des données…</div>}
-        {!loading && !error && rows && filteredRows.length > 0 && <div className="ministry-table-wrap"><table className="ministry-table"><thead><tr>{Object.keys(filteredRows[0]).map((key) => <th key={key} scope="col">{key.replaceAll('_', ' ')}</th>)}{taxonomyKind && <th scope="col">Actions</th>}</tr></thead><tbody>{filteredRows.map((row, index) => <tr key={rowKey(row, index)}>{Object.keys(filteredRows[0]).map((key) => <td key={key}>{value(row, key)}</td>)}{taxonomyKind && <td>{taxonomyActions(taxonomyKind, row)}</td>}</tr>)}</tbody></table></div>}
+        {!loading && !error && rows && filteredRows.length > 0 && <div className="ministry-table-wrap"><table className="ministry-table"><thead><tr>{Object.keys(filteredRows[0]).map((key) => <th key={key} scope="col">{key.replaceAll('_', ' ')}</th>)}{taxonomyKind && <th scope="col">Actions</th>}{section === 'ingestion' && <th scope="col">Rapport</th>}</tr></thead><tbody>{filteredRows.map((row, index) => <tr key={rowKey(row, index)}>{Object.keys(filteredRows[0]).map((key) => <td key={key}>{value(row, key)}</td>)}{taxonomyKind && <td>{taxonomyActions(taxonomyKind, row)}</td>}{section === 'ingestion' && <td>{jobAction(row)}</td>}</tr>)}</tbody></table></div>}
         {!loading && !error && rows && filteredRows.length === 0 && <div className="ministry-empty-selection"><strong>{query ? 'Aucun résultat correspondant' : 'Aucun enregistrement'}</strong><p>{query ? 'Modifiez la recherche pour afficher d’autres résultats.' : 'Les enregistrements apparaîtront ici après leur dépôt ou leur transmission.'}</p></div>}
         {!loading && !error && !rows && data && section !== 'labour-market' && <pre className="ministry-json">{JSON.stringify(data, null, 2)}</pre>}
         {data && typeof data === 'object' && 'page' in data && 'page_size' in data && total > (data.page_size as number) && <div className="ministry-pagination"><button className="secondary-btn" type="button" disabled={page <= 1 || loading} onClick={() => setPage((current) => current - 1)}>← Précédent</button><span>Page {page} sur {Math.ceil(total / (data.page_size as number))}</span><button className="secondary-btn" type="button" disabled={page * (data.page_size as number) >= total || loading} onClick={() => setPage((current) => current + 1)}>Suivant →</button></div>}
