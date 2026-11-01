@@ -30,6 +30,7 @@ from .email_auth import router as email_auth_router
 from .features.training.router import create_training_provider_router
 from .features.ministry.routers import analytics as ministry_analytics
 from .features.ministry.routers import admin_dashboard
+from .features.ministry.routers import health as ministry_health
 from .features.ministry.routers import ingestion as ministry_ingestion
 from .features.ministry.routers import market as ministry_market
 from .features.ministry.routers import monitoring as ministry_monitoring
@@ -166,6 +167,7 @@ for ministry_router in (
     ministry_analytics.router,
     ministry_monitoring.router,
     admin_dashboard.router,
+    ministry_health.router,
 ):
     app.include_router(ministry_router, prefix="/api/v1")
 

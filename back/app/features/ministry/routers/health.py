@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from ....database import get_db
 
-router = APIRouter(prefix="/health", tags=["health"])
+router = APIRouter(prefix="/ministry/health", tags=["health"])
 
 MODULE_NAME = "wp5-admin-ministry"
 
