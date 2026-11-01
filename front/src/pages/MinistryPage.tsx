@@ -12,6 +12,7 @@ type UploadPreview = { preview_id: string; expires_at: string; records_total: nu
 type TaxonomyKind = 'skills' | 'occupations'
 type Requirement = 'required' | 'preferred'
 type RequiredSkill = { skill_code: string; requirement: Requirement }
+type SkillRow = { code: string; label_fr: string; label_ar: string | null; label_derja: string | null; alt_labels: string[]; skill_type: string; status: string; version: number }
 type OccupationRow = { code: string; isco_code: string | null; title_fr: string; title_ar: string | null; alt_titles: string[]; sector_code: string | null; status: string; skills: RequiredSkill[] }
 type Removal = { code: string; outcome: string }
 type Editor = { kind: TaxonomyKind; mode: 'create' } | { kind: TaxonomyKind; mode: 'edit' | 'skills'; row: Row }
@@ -22,6 +23,7 @@ const taxonomyPaths: Record<TaxonomyKind, string> = {
 }
 const statusLabels: Record<string, string> = { draft: 'brouillon', validated: 'validé', deprecated: 'déprécié' }
 const requirementLabels: Record<Requirement, string> = { required: 'Obligatoire', preferred: 'Souhaitée' }
+const skillTypeLabels: Record<string, string> = { hard: 'Technique / métier', soft: 'Transversale', language: 'Langue' }
 
 function entryLabel(kind: TaxonomyKind, code: string): string {
   return kind === 'skills' ? `La compétence ${code}` : `Le métier ${code}`
@@ -34,7 +36,7 @@ function agreed(kind: TaxonomyKind, participle: string): string {
 
 function removalNotice(kind: TaxonomyKind, removal: Removal): string {
   const entry = entryLabel(kind, removal.code)
-  if (removal.outcome === 'deleted') return `${entry} a été ${agreed(kind, 'supprimé')} définitivement : c’était un brouillon jamais utilisé.`
+  if (removal.outcome === 'deleted') return `${entry} a été ${agreed(kind, 'supprimé')} définitivement (c’était un brouillon)${kind === 'skills' ? ' et ne figure plus dans aucune fiche métier' : ''}.`
   if (removal.outcome === 'deprecated') return `${entry} a été ${agreed(kind, 'déprécié')} au lieu d’être ${agreed(kind, 'supprimé')} : ${kind === 'skills' ? 'elle reste rattachée aux profils existants' : 'il reste rattaché aux offres existantes'}, mais n’est plus ${agreed(kind, 'proposé')}.`
   return `${entry} : résultat du retrait « ${removal.outcome} ».`
 }
@@ -86,6 +88,45 @@ function OccupationForm({ occupation, busy, onSubmit, onCancel }: { occupation: 
     {formError && <p className="form-error" role="alert">{formError}</p>}
     <div className="ministry-form-actions">
       <button className="primary-btn" type="submit" disabled={busy}>{busy ? 'Enregistrement…' : occupation ? 'Enregistrer la correction' : 'Créer en brouillon'}</button>
+      <button className="secondary-btn" type="button" onClick={onCancel} disabled={busy}>Annuler</button>
+    </div>
+  </form>
+}
+
+function SkillForm({ skill, busy, onSubmit, onCancel }: { skill: SkillRow | null; busy: boolean; onSubmit: (payload: Record<string, unknown>) => void; onCancel: () => void }) {
+  const [code, setCode] = useState('')
+  const [labelFr, setLabelFr] = useState(skill?.label_fr ?? '')
+  const [labelAr, setLabelAr] = useState(skill?.label_ar ?? '')
+  const [labelDerja, setLabelDerja] = useState(skill?.label_derja ?? '')
+  const [altLabels, setAltLabels] = useState((skill?.alt_labels ?? []).join('\n'))
+  const [skillType, setSkillType] = useState(skill?.skill_type ?? 'hard')
+  const [description, setDescription] = useState('')
+  const [formError, setFormError] = useState('')
+
+  function submit(event: FormEvent) {
+    event.preventDefault()
+    setFormError('')
+    const fields = { label_fr: labelFr.trim(), label_ar: textOrNull(labelAr), label_derja: textOrNull(labelDerja), alt_labels: linesOf(altLabels), skill_type: skillType }
+    const extra = description.trim() ? { description: description.trim() } : {}
+    if (!skill) return onSubmit({ code: code.trim(), ...fields, ...extra })
+    const changes = { ...changedFields(fields, skill), ...extra }
+    if (!Object.keys(changes).length) return setFormError('Aucune modification à enregistrer.')
+    onSubmit(changes)
+  }
+
+  return <form className="ministry-decision-form" onSubmit={submit}>
+    <h5>{skill ? `Corriger la compétence ${skill.code}` : 'Nouvelle compétence'}</h5>
+    <p className="ministry-cell-subtitle">{skill ? `Correction éditoriale : la version passera de ${skill.version} à ${skill.version + 1} ; le statut (${statusLabels[skill.status] ?? skill.status}) ne change pas.` : 'La compétence sera créée en brouillon. Sa validation est une étape séparée.'}</p>
+    {!skill && <label>Code REM<input required maxLength={32} value={code} onChange={(event) => setCode(event.target.value)} placeholder="REM-E1204" /></label>}
+    <label>Libellé français<input required maxLength={200} value={labelFr} onChange={(event) => setLabelFr(event.target.value)} /></label>
+    <label>Libellé arabe<input dir="rtl" maxLength={200} value={labelAr} onChange={(event) => setLabelAr(event.target.value)} /></label>
+    <label>Libellé en derja<input maxLength={200} value={labelDerja} onChange={(event) => setLabelDerja(event.target.value)} /></label>
+    <label>Catégorie<select value={skillType} onChange={(event) => setSkillType(event.target.value)}>{Object.entries(skillTypeLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
+    <label>Synonymes (un par ligne, toute langue)<textarea value={altLabels} onChange={(event) => setAltLabels(event.target.value)} /></label>
+    <label>Description{skill && ' — laissez vide pour conserver la description actuelle'}<textarea value={description} onChange={(event) => setDescription(event.target.value)} /></label>
+    {formError && <p className="form-error" role="alert">{formError}</p>}
+    <div className="ministry-form-actions">
+      <button className="primary-btn" type="submit" disabled={busy}>{busy ? 'Enregistrement…' : skill ? 'Enregistrer la correction' : 'Créer en brouillon'}</button>
       <button className="secondary-btn" type="button" onClick={onCancel} disabled={busy}>Annuler</button>
     </div>
   </form>
@@ -263,7 +304,12 @@ export function MinistryPage() {
   }
 
   function removeEntry(kind: TaxonomyKind, code: string) {
-    if (!window.confirm(`Retirer ${code} ? Un brouillon jamais utilisé est supprimé définitivement ; dans tous les autres cas, l’entrée est dépréciée et conservée pour l’historique.`)) return
+    // Mirrors the backend: a draft skill required by occupations is still deleted, and the
+    // occupation_skills foreign key cascades, so those requirement lines go with it.
+    const draftRule = kind === 'skills'
+      ? 'Un brouillon est supprimé définitivement, et retiré des fiches métiers qui l’exigent'
+      : 'Un brouillon est supprimé définitivement, avec sa liste de compétences requises'
+    if (!window.confirm(`Retirer ${code} ? ${draftRule} ; une entrée déjà utilisée ailleurs ou validée est dépréciée et conservée pour l’historique.`)) return
     void runAction(async () => removalNotice(kind, await requestJson<Removal>(entryPath(kind, code), { method: 'DELETE' })))
   }
 
@@ -281,6 +327,20 @@ export function MinistryPage() {
     })
   }
 
+  function createSkill(payload: Record<string, unknown>) {
+    void runAction(async () => {
+      const created = await requestJson<SkillRow>(taxonomyPaths.skills, { method: 'POST', body: JSON.stringify(payload) })
+      return `La compétence ${created.code} a été créée (statut : ${statusLabels[created.status] ?? created.status}). Sa validation est une étape séparée.`
+    })
+  }
+
+  function updateSkill(code: string, changes: Record<string, unknown>) {
+    void runAction(async () => {
+      const updated = await requestJson<SkillRow>(entryPath('skills', code), { method: 'PATCH', body: JSON.stringify(changes) })
+      return `La compétence ${updated.code} a été corrigée (${Object.keys(changes).join(', ')}) : version ${updated.version}, statut inchangé (${statusLabels[updated.status] ?? updated.status}).`
+    })
+  }
+
   function saveRequiredSkills(code: string, skills: RequiredSkill[], summary: string) {
     void runAction(async () => {
       const updated = await requestJson<OccupationRow>(`${entryPath('occupations', code)}/skills`, { method: 'PUT', body: JSON.stringify({ skills }) })
@@ -293,16 +353,19 @@ export function MinistryPage() {
     const code = row.code
     return <div className="ministry-row-actions">
       {row.status === 'draft' && <button className="secondary-btn" type="button" disabled={busy} onClick={() => validateEntry(kind, code)}>Valider</button>}
-      {kind === 'occupations' && <>
-        <button className="ghost-btn" type="button" disabled={busy} onClick={() => setEditor({ kind, mode: 'edit', row })}>Corriger</button>
-        <button className="ghost-btn" type="button" disabled={busy} onClick={() => setEditor({ kind, mode: 'skills', row })}>Compétences</button>
-        {row.status !== 'deprecated' && <button className="danger-text-btn" type="button" disabled={busy} onClick={() => removeEntry(kind, code)}>Retirer</button>}
-      </>}
+      <button className="ghost-btn" type="button" disabled={busy} onClick={() => setEditor({ kind, mode: 'edit', row })}>Corriger</button>
+      {kind === 'occupations' && <button className="ghost-btn" type="button" disabled={busy} onClick={() => setEditor({ kind, mode: 'skills', row })}>Compétences</button>}
+      {row.status !== 'deprecated' && <button className="danger-text-btn" type="button" disabled={busy} onClick={() => removeEntry(kind, code)}>Retirer</button>}
     </div>
   }
 
   function renderEditor(current: Editor) {
     const close = () => setEditor(null)
+    if (current.kind === 'skills' && current.mode === 'create') return <SkillForm skill={null} busy={busy} onSubmit={createSkill} onCancel={close} />
+    if (current.kind === 'skills' && current.mode === 'edit') {
+      const skill = current.row as SkillRow
+      return <SkillForm key={skill.code} skill={skill} busy={busy} onSubmit={(changes) => updateSkill(skill.code, changes)} onCancel={close} />
+    }
     if (current.kind === 'occupations' && current.mode === 'create') return <OccupationForm occupation={null} busy={busy} onSubmit={createOccupation} onCancel={close} />
     if (current.kind === 'occupations' && current.mode === 'edit') {
       const occupation = current.row as OccupationRow
@@ -443,7 +506,7 @@ export function MinistryPage() {
     <section className="ministry-main-card" aria-live="polite">
       <div className="ministry-section-heading">
         <div><p className="eyebrow">Espace de travail · {activeSection.label}</p><h3>{section === 'suggestions' ? 'File d’arbitrage des compétences REM' : activeSection.label}</h3><p>{section === 'suggestions' ? 'Examinez les propositions transmises par les centres de formation et les secteurs professionnels. Chaque décision est conservée dans le journal d’audit.' : 'Consultez les données autorisées par votre habilitation. Les vues analytiques restent agrégées et anonymisées.'}</p></div>
-        <div className="ministry-heading-actions">{section === 'occupations' && <button className="primary-btn" type="button" onClick={() => setEditor({ kind: 'occupations', mode: 'create' })} disabled={busy}>＋ Nouveau métier</button>}<span className="ministry-record-count">{loading ? 'Chargement…' : `${total} enregistrement${total === 1 ? '' : 's'}`}</span><button className="ghost-btn" type="button" onClick={() => void load()} disabled={loading || busy}>↻ Actualiser</button></div>
+        <div className="ministry-heading-actions">{taxonomyKind && <button className="primary-btn" type="button" onClick={() => setEditor({ kind: taxonomyKind, mode: 'create' })} disabled={busy}>{taxonomyKind === 'skills' ? '＋ Nouvelle compétence' : '＋ Nouveau métier'}</button>}<span className="ministry-record-count">{loading ? 'Chargement…' : `${total} enregistrement${total === 1 ? '' : 's'}`}</span><button className="ghost-btn" type="button" onClick={() => void load()} disabled={loading || busy}>↻ Actualiser</button></div>
       </div>
 
       {error && <div className="ministry-alert error" role="alert"><strong>{error.includes('403') || error.includes('401') ? 'Accès réservé' : 'La requête a échoué'}</strong><span>{error.includes('403') || error.includes('401') ? 'Votre compte ne dispose pas des privilèges requis pour cette section.' : error}</span><button className="secondary-btn" type="button" onClick={() => void load()} disabled={loading}>Réessayer</button></div>}
