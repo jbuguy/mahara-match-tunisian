@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
-from typing import Annotated, Any
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field, field_validator
@@ -72,8 +72,8 @@ def create_application_router(get_db: Any, get_current_user: Any, get_current_em
 
     @router.patch("/api/v1/me/applications/{application_id}/contact-consent")
     def update_candidate_contact_consent(application_id: uuid.UUID, payload: ContactConsentUpdate,
-                                         db: Annotated[Session, Depends(get_db)],
-                                         user: Annotated[Any, Depends(get_current_user)]):
+                                         db: Session = Depends(get_db),
+                                         user: Any = Depends(get_current_user)):
         candidate = db.query(Candidate).filter(Candidate.user_id == user.id).first()
         application = db.query(Application).filter(Application.id == application_id,
             Application.candidate_id == (candidate.id if candidate else None)).with_for_update().first()
@@ -93,8 +93,8 @@ def create_application_router(get_db: Any, get_current_user: Any, get_current_em
 
     @router.get("/api/v1/me/applications")
     def list_candidate_applications(
-        db: Annotated[Session, Depends(get_db)],
-        user: Annotated[Any, Depends(get_current_user)],
+        db: Session = Depends(get_db),
+        user: Any = Depends(get_current_user),
     ):
         try:
             return get_candidate_applications(db, user_id=user.id)
@@ -104,8 +104,8 @@ def create_application_router(get_db: Any, get_current_user: Any, get_current_em
     @router.post("/api/v1/me/applications", status_code=201)
     def apply_to_offer(
         payload: ApplicationApplyRequest,
-        db: Annotated[Session, Depends(get_db)],
-        user: Annotated[Any, Depends(get_current_user)],
+        db: Session = Depends(get_db),
+        user: Any = Depends(get_current_user),
     ):
         try:
             return create_candidate_application(
@@ -120,20 +120,20 @@ def create_application_router(get_db: Any, get_current_user: Any, get_current_em
 
     @router.get("/api/v1/employer/applications")
     def list_employer_applications(
-        db: Annotated[Session, Depends(get_db)],
-        employer: Annotated[Employer, Depends(get_current_employer)],
+        db: Session = Depends(get_db),
+        employer: Employer = Depends(get_current_employer),
     ):
         return get_employer_applications(db, employer=employer)
 
     @router.get("/api/v1/employer/applications/page")
     def list_employer_applications_page(
-        db: Annotated[Session, Depends(get_db)],
-        employer: Annotated[Employer, Depends(get_current_employer)],
-        page: Annotated[int, Query(ge=1)] = 1,
-        page_size: Annotated[int, Query(ge=1, le=100)] = 25,
+        db: Session = Depends(get_db),
+        employer: Employer = Depends(get_current_employer),
+        page: int = Query(default=1, ge=1),
+        page_size: int = Query(default=25, ge=1, le=100),
         status_filter: ApplicationStatus | None = Query(default=None, alias="status"),
         job_offer_id: uuid.UUID | None = None,
-        min_score: Annotated[float | None, Query(ge=0, le=100)] = None,
+        min_score: float | None = Query(default=None, ge=0, le=100),
     ):
         items, total = get_employer_applications_page(
             db,
@@ -149,8 +149,8 @@ def create_application_router(get_db: Any, get_current_user: Any, get_current_em
     @router.get("/api/v1/employer/applications/{application_id}")
     def get_employer_application(
         application_id: uuid.UUID,
-        db: Annotated[Session, Depends(get_db)],
-        employer: Annotated[Employer, Depends(get_current_employer)],
+        db: Session = Depends(get_db),
+        employer: Employer = Depends(get_current_employer),
     ):
         try:
             return get_employer_application_detail(db, employer=employer, application_id=application_id)
@@ -159,8 +159,8 @@ def create_application_router(get_db: Any, get_current_user: Any, get_current_em
 
     @router.get("/api/v1/employer/offers")
     def list_employer_offers(
-        db: Annotated[Session, Depends(get_db)],
-        employer: Annotated[Employer, Depends(get_current_employer)],
+        db: Session = Depends(get_db),
+        employer: Employer = Depends(get_current_employer),
     ):
         rows = (
             db.query(
@@ -199,10 +199,10 @@ def create_application_router(get_db: Any, get_current_user: Any, get_current_em
 
     @router.get("/api/v1/employer/offers/page")
     def list_employer_offers_page(
-        db: Annotated[Session, Depends(get_db)],
-        employer: Annotated[Employer, Depends(get_current_employer)],
-        page: Annotated[int, Query(ge=1)] = 1,
-        page_size: Annotated[int, Query(ge=1, le=100)] = 25,
+        db: Session = Depends(get_db),
+        employer: Employer = Depends(get_current_employer),
+        page: int = Query(default=1, ge=1),
+        page_size: int = Query(default=25, ge=1, le=100),
         status_filter: OfferStatus | None = Query(default=None, alias="status"),
         include_archived: bool = False,
     ):
@@ -276,8 +276,8 @@ def create_application_router(get_db: Any, get_current_user: Any, get_current_em
         ).model_dump(mode="json")
 
     @router.get("/api/v1/employer/offers/{offer_id}/edit")
-    def read_employer_offer_for_edit(offer_id: uuid.UUID, db: Annotated[Session, Depends(get_db)],
-                                     employer: Annotated[Employer, Depends(get_current_employer)]):
+    def read_employer_offer_for_edit(offer_id: uuid.UUID, db: Session = Depends(get_db),
+                                     employer: Employer = Depends(get_current_employer)):
         offer = db.query(JobOffer).filter(JobOffer.id == offer_id, JobOffer.employer_id == employer.id,
                                           JobOffer.archived_at.is_(None)).first()
         if offer is None:
@@ -286,8 +286,8 @@ def create_application_router(get_db: Any, get_current_user: Any, get_current_em
 
     @router.put("/api/v1/employer/offers/{offer_id}")
     def edit_employer_offer(offer_id: uuid.UUID, payload: NormalizedJobOffer,
-                            db: Annotated[Session, Depends(get_db)],
-                            employer: Annotated[Employer, Depends(get_current_employer)]):
+                            db: Session = Depends(get_db),
+                            employer: Employer = Depends(get_current_employer)):
         from .features.employer.workflow import persist_published_offer
 
         offer = db.query(JobOffer).filter(JobOffer.id == offer_id, JobOffer.employer_id == employer.id).with_for_update().first()
@@ -312,8 +312,8 @@ def create_application_router(get_db: Any, get_current_user: Any, get_current_em
         return offer_editor_payload(db, offer)
 
     @router.post("/api/v1/employer/offers/{offer_id}/archive")
-    def archive_employer_offer(offer_id: uuid.UUID, db: Annotated[Session, Depends(get_db)],
-                               employer: Annotated[Employer, Depends(get_current_employer)]):
+    def archive_employer_offer(offer_id: uuid.UUID, db: Session = Depends(get_db),
+                               employer: Employer = Depends(get_current_employer)):
         offer = db.query(JobOffer).filter(JobOffer.id == offer_id, JobOffer.employer_id == employer.id).with_for_update().first()
         if offer is None:
             raise HTTPException(status_code=404, detail="Offer not found")
@@ -340,8 +340,8 @@ def create_application_router(get_db: Any, get_current_user: Any, get_current_em
     def update_employer_offer_status(
         offer_id: uuid.UUID,
         payload: EmployerOfferStatusUpdate,
-        db: Annotated[Session, Depends(get_db)],
-        employer: Annotated[Employer, Depends(get_current_employer)],
+        db: Session = Depends(get_db),
+        employer: Employer = Depends(get_current_employer),
     ):
         offer = db.query(JobOffer).filter(JobOffer.id == offer_id, JobOffer.employer_id == employer.id).with_for_update().first()
         if offer is None:
@@ -381,8 +381,8 @@ def create_application_router(get_db: Any, get_current_user: Any, get_current_em
 
     @router.post("/api/v1/employer/applications/{application_id}/interviews", status_code=202)
     def invite_candidate_to_interview(application_id: uuid.UUID, payload: InterviewInvitationRequest,
-                                      db: Annotated[Session, Depends(get_db)],
-                                      employer: Annotated[Employer, Depends(get_current_employer)]):
+                                      db: Session = Depends(get_db),
+                                      employer: Employer = Depends(get_current_employer)):
         settings = get_settings()
         ensure_employer_email_verified(db, employer)
         if not all((settings.smtp_host, settings.smtp_from_email)):
@@ -442,8 +442,8 @@ def create_application_router(get_db: Any, get_current_user: Any, get_current_em
                 "meeting_at": notification.meeting_at.isoformat(), "meeting_timezone": notification.meeting_timezone}
 
     @router.get("/api/v1/employer/applications/{application_id}/interviews")
-    def list_interview_invitations(application_id: uuid.UUID, db: Annotated[Session, Depends(get_db)],
-                                   employer: Annotated[Employer, Depends(get_current_employer)]):
+    def list_interview_invitations(application_id: uuid.UUID, db: Session = Depends(get_db),
+                                   employer: Employer = Depends(get_current_employer)):
         owns_application = db.query(Application.id).join(JobOffer, JobOffer.id == Application.job_offer_id).filter(
             Application.id == application_id, JobOffer.employer_id == employer.id
         ).scalar()
@@ -459,8 +459,8 @@ def create_application_router(get_db: Any, get_current_user: Any, get_current_em
     def record_employer_decision(
         application_id: uuid.UUID,
         payload: EmployerDecision,
-        db: Annotated[Session, Depends(get_db)],
-        employer: Annotated[Employer, Depends(get_current_employer)],
+        db: Session = Depends(get_db),
+        employer: Employer = Depends(get_current_employer),
     ):
         try:
             application = save_employer_decision(

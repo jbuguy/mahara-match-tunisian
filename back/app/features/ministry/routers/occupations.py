@@ -46,8 +46,8 @@ def _sector_id_or_404(db: Session, code: str | None):
 @router.post("", response_model=OccupationRead, status_code=status.HTTP_201_CREATED)
 def create_occupation(
     payload: OccupationCreate,
-    db: Annotated[Session, Depends(get_db)],
-    admin: Annotated[User, Depends(require_roles("ministry_admin"))],
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_roles("ministry_admin")),
 ) -> OccupationRead:
     if service.get_by_code(db, payload.code) is not None:
         raise HTTPException(status_code=409, detail=f"Occupation code {payload.code} already exists")
@@ -58,7 +58,7 @@ def create_occupation(
 
 @router.get("", response_model=Page[OccupationRead])
 def list_occupations(
-    db: Annotated[Session, Depends(get_db)],
+    db: Session = Depends(get_db),
     status_filter: Annotated[TaxonomyStatus | None, Query(alias="status")] = None,
     search: Annotated[str | None, Query(max_length=200)] = None,
     page: Annotated[int, Query(ge=1)] = 1,
@@ -76,7 +76,7 @@ def list_occupations(
 
 
 @router.get("/{code}", response_model=OccupationRead)
-def read_occupation(code: str, db: Annotated[Session, Depends(get_db)]) -> OccupationRead:
+def read_occupation(code: str, db: Session = Depends(get_db)) -> OccupationRead:
     return service.to_read(db, _get_or_404(db, code))
 
 
@@ -84,8 +84,8 @@ def read_occupation(code: str, db: Annotated[Session, Depends(get_db)]) -> Occup
 def edit_occupation(
     code: str,
     payload: OccupationUpdate,
-    db: Annotated[Session, Depends(get_db)],
-    admin: Annotated[User, Depends(require_roles("ministry_admin"))],
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_roles("ministry_admin")),
 ) -> OccupationRead:
     """Editorial corrections. Cannot change the status: see the dedicated routes."""
     occupation = _get_or_404(db, code)
@@ -99,16 +99,16 @@ def edit_occupation(
 
 @router.post("/{code}/validate", response_model=OccupationRead)
 def validate_occupation(
-    code: str, db: Annotated[Session, Depends(get_db)],
-    admin: Annotated[User, Depends(require_roles("ministry_admin"))],
+    code: str, db: Session = Depends(get_db),
+    admin: User = Depends(require_roles("ministry_admin")),
 ) -> OccupationRead:
     return service.to_read(db, service.validate_occupation(db, _get_or_404(db, code), admin.id))
 
 
 @router.delete("/{code}", response_model=RemovalOut)
 def remove_occupation(
-    code: str, db: Annotated[Session, Depends(get_db)],
-    admin: Annotated[User, Depends(require_roles("ministry_admin"))],
+    code: str, db: Session = Depends(get_db),
+    admin: User = Depends(require_roles("ministry_admin")),
 ) -> RemovalOut:
     """Deletes an unused draft, retires anything else. Never breaks existing offers."""
     occupation = _get_or_404(db, code)
@@ -117,8 +117,8 @@ def remove_occupation(
 
 @router.put("/{code}/skills", response_model=OccupationRead)
 def replace_required_skills(
-    code: str, payload: OccupationSkillsReplace, db: Annotated[Session, Depends(get_db)],
-    admin: Annotated[User, Depends(require_roles("ministry_admin"))],
+    code: str, payload: OccupationSkillsReplace, db: Session = Depends(get_db),
+    admin: User = Depends(require_roles("ministry_admin")),
 ) -> OccupationRead:
     """The complete requirement list. What you omit is removed."""
     occupation = _get_or_404(db, code)

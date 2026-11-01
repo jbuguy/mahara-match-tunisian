@@ -30,10 +30,10 @@ router = APIRouter(
 
 @router.post("/datasets/upload/preview", response_model=MarketUploadPreviewOut, status_code=201)
 async def preview_dataset_upload(
-    db: Annotated[Session, Depends(get_db)],
-    admin: Annotated[User, Depends(require_roles("ministry_admin"))],
-    dataset_json: Annotated[str, Form(alias="dataset")],
-    file: Annotated[UploadFile, File()],
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_roles("ministry_admin")),
+    dataset_json: str = Form(alias="dataset"),
+    file: UploadFile = File(),
 ) -> MarketUploadPreviewOut:
     from datetime import datetime, timedelta, timezone
     import hashlib
@@ -94,8 +94,8 @@ async def preview_dataset_upload(
 def confirm_dataset_upload(
     preview_id: uuid.UUID,
     payload: MarketUploadConfirm,
-    db: Annotated[Session, Depends(get_db)],
-    admin: Annotated[User, Depends(require_roles("ministry_admin"))],
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_roles("ministry_admin")),
 ) -> IngestionReport:
     from datetime import datetime, timezone
     import hashlib
@@ -167,8 +167,8 @@ def confirm_dataset_upload(
 @router.post("/datasets", response_model=IngestionReport, status_code=status.HTTP_201_CREATED)
 def deposit_dataset(
     submission: MarketDatasetSubmission,
-    db: Annotated[Session, Depends(get_db)],
-    admin: Annotated[User, Depends(require_roles("ministry_admin"))],
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_roles("ministry_admin")),
 ) -> IngestionReport:
     """Ministry deposit. Valid rows are kept; rejected rows come back with their position."""
     dataset, job, rejections = service.ingest(db, submission, admin.id)
@@ -185,9 +185,9 @@ def deposit_dataset(
 
 @router.post("/refresh", response_model=IngestionJobOut, status_code=status.HTTP_202_ACCEPTED)
 def enqueue_refresh(
-    db: Annotated[Session, Depends(get_db)],
-    admin: Annotated[User, Depends(require_roles("ministry_admin"))],
-    idempotency_key: Annotated[str, Header(alias="Idempotency-Key", min_length=8, max_length=128)],
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_roles("ministry_admin")),
+    idempotency_key: str = Header(alias="Idempotency-Key", min_length=8, max_length=128),
     request: MarketRefreshRequest | None = None,
 ) -> IngestionJobOut:
     """Queue a durable pull from the deployment-configured official JSON feed."""
@@ -245,7 +245,7 @@ def enqueue_refresh(
 
 @router.get("/datasets", response_model=Page[MarketDatasetOut])
 def list_datasets(
-    db: Annotated[Session, Depends(get_db)],
+    db: Session = Depends(get_db),
     origin: MarketDataOrigin | None = None,
     publisher: Annotated[str | None, Query(max_length=200)] = None,
     page: Annotated[int, Query(ge=1)] = 1,
@@ -264,7 +264,7 @@ def list_datasets(
 
 @router.get("/datasets/{dataset_id}", response_model=MarketDatasetOut)
 def read_dataset(
-    dataset_id: uuid.UUID, db: Annotated[Session, Depends(get_db)]
+    dataset_id: uuid.UUID, db: Session = Depends(get_db)
 ) -> MarketDatasetOut:
     dataset = service.get_dataset(db, dataset_id)
     if dataset is None:

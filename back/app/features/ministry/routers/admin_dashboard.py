@@ -30,8 +30,8 @@ def _count(db: Session, model, *, since: datetime | None = None) -> int:
 
 @router.get("/overview", response_model=dict)
 def admin_overview(
-    db: Annotated[Session, Depends(get_db)],
-    current: Annotated[User, Depends(require_any_role("admin", "ministry_admin"))],
+    db: Session = Depends(get_db),
+    current: User = Depends(require_any_role("admin", "ministry_admin")),
     days: Annotated[int, Query(ge=1, le=90)] = 30,
 ) -> dict:
     """Operational snapshot for platform admins and ministry operators."""

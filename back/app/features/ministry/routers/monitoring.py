@@ -50,7 +50,7 @@ class TaxonomyStatsOut(BaseModel):
 
 
 @router.get("/overview", response_model=OverviewOut, summary="Module health at a glance")
-def overview(db: Annotated[Session, Depends(get_db)]) -> OverviewOut:
+def overview(db: Session = Depends(get_db)) -> OverviewOut:
     latency = service.database_latency_ms(db)
     requests, refusals, errors = METRICS.totals()
     return OverviewOut(
@@ -71,7 +71,7 @@ def route_stats() -> list[RouteStatsOut]:
 
 
 @router.get("/taxonomy", response_model=TaxonomyStatsOut, summary="Referential quality")
-def taxonomy_stats(db: Annotated[Session, Depends(get_db)]) -> TaxonomyStatsOut:
+def taxonomy_stats(db: Session = Depends(get_db)) -> TaxonomyStatsOut:
     """Governance indicators: what is waiting, and what is incomplete."""
     return TaxonomyStatsOut(**service.taxonomy_counts(db))
 
@@ -90,7 +90,7 @@ class AuditEntryOut(BaseModel):
 
 @router.get("/audit", response_model=Page[AuditEntryOut], summary="Governance audit trail")
 def audit_trail(
-    db: Annotated[Session, Depends(get_db)],
+    db: Session = Depends(get_db),
     action: Annotated[str | None, Query(max_length=64)] = None,
     entity_type: Annotated[str | None, Query(max_length=64)] = None,
     entity_id: Annotated[str | None, Query(max_length=64)] = None,

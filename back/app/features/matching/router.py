@@ -206,8 +206,8 @@ def create_matching_router(
 
     @router.get("")
     def get_matches(
-        db: Annotated[Session, Depends(get_db)],
-        user: Annotated[Any, Depends(get_current_user)],
+        db: Session = Depends(get_db),
+        user: Any = Depends(get_current_user),
     ):
         profile = candidate_profile(db, user)
         offers = _published_offers(db)
@@ -220,8 +220,8 @@ def create_matching_router(
     async def ask_about_match(
         job_offer_id: str,
         body: MatchAssistantIn,
-        db: Annotated[Session, Depends(get_db)],
-        user: Annotated[Any, Depends(get_current_user)],
+        db: Session = Depends(get_db),
+        user: Any = Depends(get_current_user),
     ) -> dict[str, Any]:
         """Answer a candidate question from retrieved, public skill matching sources."""
         if llm_client is None:
@@ -245,8 +245,8 @@ def create_matching_router(
     @router.get("/{job_offer_id}/roadmap")
     def get_roadmap(
         job_offer_id: str,
-        db: Annotated[Session, Depends(get_db)],
-        user: Annotated[Any, Depends(get_current_user)],
+        db: Session = Depends(get_db),
+        user: Any = Depends(get_current_user),
     ):
         profile = candidate_profile(db, user)
         try:
