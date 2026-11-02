@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from mahara_data.db.models.candidates import Candidate
 
 from . import auth, config, db
-from .routers import assistant, cv, health, me, photo, profile, reference
+from .routers import assistant, cv, health, lifecycle, me, photo, profile, reference
 from .services import profile as profile_service
 
 
@@ -25,7 +25,16 @@ def register_employee_routes(app: FastAPI, settings: Any, root_get_db: Any) -> A
 
     app.dependency_overrides[db.get_db] = root_get_db
     app.dependency_overrides[auth.get_settings] = get_employee_settings
-    for router in (health.router, me.router, profile.router, reference.router, cv.router, photo.router, assistant.router):
+    for router in (
+        health.router,
+        me.router,
+        lifecycle.router,
+        profile.router,
+        reference.router,
+        cv.router,
+        photo.router,
+        assistant.router,
+    ):
         app.include_router(router, prefix="/api/v1")
 
     def get_candidate_profile(session: Any, user_id: Any):
@@ -36,4 +45,3 @@ def register_employee_routes(app: FastAPI, settings: Any, root_get_db: Any) -> A
         return (candidate.id, profile_data.model_dump(mode="json")) if profile_data else None
 
     return get_candidate_profile
-

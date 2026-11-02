@@ -14,6 +14,7 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     LargeBinary,
     Numeric,
@@ -22,6 +23,7 @@ from sqlalchemy import (
     Text,
     Uuid,
     func,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -35,6 +37,12 @@ class Candidate(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __table_args__ = (
         CheckConstraint("profile_completeness between 0 and 100", name="candidates_completeness_range"),
         CheckConstraint("years_experience >= 0", name="candidates_years_experience_positive"),
+        Index(
+            "ix_candidates_deleted_at",
+            "deleted_at",
+            postgresql_where=text("deleted_at IS NOT NULL"),
+            sqlite_where=text("deleted_at IS NOT NULL"),
+        ),
     )
 
     user_id: Mapped[uuid.UUID | None] = mapped_column(Uuid(as_uuid=True), ForeignKey("users.id"), unique=True)

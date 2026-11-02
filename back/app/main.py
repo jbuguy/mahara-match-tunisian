@@ -17,6 +17,7 @@ from shared_llm import LLMSettings, OpenAICompatibleClient
 
 from .applications import create_application_router
 from .analytics import record_event
+from .auth_rate_limit import rate_limit_dependency
 from .offers import create_offer_router
 from .config import get_settings
 from .database import get_db
@@ -27,6 +28,7 @@ from .features.employer.voice import create_employer_voice_router
 from .features.employer.market import router as employer_market_router
 from .features.mock_interviews import create_mock_interview_router
 from .features.mock_interview_retention import run_retention_loop
+from .features.employee.data_lifecycle import run_candidate_deletion_retention_loop
 from .email_auth import router as email_auth_router
 from .features.training.router import create_training_provider_router
 from .features.ministry.routers import analytics as ministry_analytics
@@ -77,6 +79,12 @@ from app.features.employer import create_employer_agent_router
 
 
 settings = get_settings()
+login_rate_limit = rate_limit_dependency(
+    "login", "auth_login_rate_limit", "auth_login_rate_window_seconds"
+)
+signup_rate_limit = rate_limit_dependency(
+    "signup", "auth_signup_rate_limit", "auth_signup_rate_window_seconds"
+)
 # Constructing the service validates the selected provider and its model setting;
 # model weights remain lazy and are loaded on the first transcription request.
 speech_service = get_speech_service()
@@ -94,12 +102,16 @@ llm_client = OpenAICompatibleClient(
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     retention_task = asyncio.create_task(run_retention_loop())
+    candidate_deletion_task = asyncio.create_task(run_candidate_deletion_retention_loop())
     try:
         yield
     finally:
         retention_task.cancel()
+        candidate_deletion_task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await retention_task
+        with contextlib.suppress(asyncio.CancelledError):
+            await candidate_deletion_task
     await llm_client.close()
 
 
@@ -362,7 +374,12 @@ def validate_onboarding_profile_contract(payload: dict[str, Any]) -> dict[str, o
     }
 
 
-@app.post("/employers/signup", response_model=EmployerProfile, status_code=status.HTTP_201_CREATED)
+@app.post(
+    "/employers/signup",
+    response_model=EmployerProfile,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(signup_rate_limit)],
+)
 def signup(payload: EmployerSignup, db: Session = Depends(get_db)) -> dict[str, Any]:
     email = payload.email.lower()
     if db.query(Employer).filter(Employer.email == email).first():
@@ -411,15 +428,24 @@ def signup(payload: EmployerSignup, db: Session = Depends(get_db)) -> dict[str, 
     return employer_profile_payload(employer, db)
 
 
-@app.post("/employers/login", response_model=Token)
+@app.post("/employers/login", response_model=Token, dependencies=[Depends(login_rate_limit)])
 def login(payload: EmployerLogin, db: Session = Depends(get_db)) -> Token:
     employer = db.query(Employer).filter(Employer.email == payload.email.lower()).first()
     if employer is None or not verify_password(payload.password, employer.password_hash):
         raise HTTPException(status_code=401, detail="Invalid email or password")
+    if employer.user_id:
+        user = db.get(User, employer.user_id)
+        if user is None or not user.is_active:
+            raise HTTPException(status_code=401, detail="Invalid email or password")
     return Token(access_token=create_access_token(employer.id))
 
 
-@app.post("/candidates/signup", response_model=CandidateProfile, status_code=status.HTTP_201_CREATED)
+@app.post(
+    "/candidates/signup",
+    response_model=CandidateProfile,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(signup_rate_limit)],
+)
 def candidate_signup(payload: CandidateSignup, db: Session = Depends(get_db)) -> Candidate:
     email = payload.email.lower()
     user = get_or_create_user(db, email, roles=["candidate"], email_verified=False)
@@ -451,11 +477,11 @@ def candidate_signup(payload: CandidateSignup, db: Session = Depends(get_db)) ->
     return candidate
 
 
-@app.post("/candidates/login", response_model=Token)
+@app.post("/candidates/login", response_model=Token, dependencies=[Depends(login_rate_limit)])
 def candidate_login(payload: CandidateLogin, db: Session = Depends(get_db)) -> Token:
     email = payload.email.lower()
     user = db.query(User).filter(User.email == email).first()
-    if user is None:
+    if user is None or not user.is_active:
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
     identity = (

@@ -34,6 +34,8 @@ def test_root_api_exposes_shared_employer_and_employee_routes():
 
     assert "/employer-agent/sessions" in paths
     assert "/api/v1/me" in paths
+    assert "/api/v1/me/export" in paths
+    assert {"get", "delete"} <= set(paths["/api/v1/me"])
     assert "/api/v1/me/profile" in paths
     assert "/api/v1/onboarding/sessions" in paths
     assert "/api/v1/reference/governorates" in paths
@@ -46,11 +48,19 @@ def test_root_api_exposes_shared_employer_and_employee_routes():
 
 def test_google_access_token_matches_shared_auth_contract():
     settings = get_settings()
-    token = _issue_access_token("candidate@example.com", "Candidate", None, settings)
+    user_id = "123e4567-e89b-12d3-a456-426614174000"
+    token = _issue_access_token(
+        "candidate@example.com",
+        "Candidate",
+        None,
+        settings,
+        user_id=user_id,
+    )
     claims = decode_token(token, Settings(jwt_secret=settings.jwt_secret))
 
     assert claims["sub"] == "candidate@example.com"
     assert claims["email"] == "candidate@example.com"
+    assert claims["user_id"] == user_id
 
 
 def test_canonical_identity_layer_supports_shared_user_and_google_link():

@@ -12,6 +12,7 @@ from fastapi.responses import RedirectResponse
 from jwt import PyJWKClient
 from sqlalchemy.orm import Session
 
+from .auth_rate_limit import rate_limit_dependency
 from .config import Settings, get_settings
 from .database import get_db
 from .models import AuthIdentity, AuthProvider, User, get_or_create_user
@@ -27,6 +28,9 @@ STATE_COOKIE = "mahara_oauth_state"
 VERIFIER_COOKIE = "mahara_oauth_verifier"
 COOKIE_PATH = "/auth"
 TOKEN_LIFETIME = timedelta(minutes=60)
+google_login_rate_limit = rate_limit_dependency(
+    "login", "auth_login_rate_limit", "auth_login_rate_window_seconds"
+)
 
 
 @lru_cache
@@ -83,7 +87,11 @@ def _decode_google_id_token(token: str, jwks: PyJWKClient, settings: Settings) -
 
 
 def _issue_access_token(
-    email: str, name: str | None, picture: str | None, settings: Settings
+    email: str,
+    name: str | None,
+    picture: str | None,
+    settings: Settings,
+    user_id: str | None = None,
 ) -> str:
     if not settings.jwt_secret or len(settings.jwt_secret.encode("utf-8")) < 32:
         raise HTTPException(
@@ -100,10 +108,12 @@ def _issue_access_token(
         "iat": now,
         "exp": now + TOKEN_LIFETIME,
     }
+    if user_id is not None:
+        claims["user_id"] = user_id
     return jwt.encode(claims, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 
-@router.get("/google")
+@router.get("/google", dependencies=[Depends(google_login_rate_limit)])
 def start_google_sign_in(
     settings: Settings = Depends(get_settings),
 ) -> RedirectResponse:
@@ -146,7 +156,7 @@ def start_google_sign_in(
     return response
 
 
-@router.get("/google/callback")
+@router.get("/google/callback", dependencies=[Depends(google_login_rate_limit)])
 async def finish_google_sign_in(
     request: Request,
     code: str | None = None,
@@ -228,6 +238,13 @@ async def finish_google_sign_in(
         return response
 
     user = get_or_create_user(db, email, roles=["candidate"], email_verified=True)
+    if not user.is_active:
+        response = RedirectResponse(
+            f"{settings.frontend_url.rstrip('/')}/auth/callback?error=account_disabled",
+            status_code=303,
+        )
+        _clear_oauth_cookies(response, settings)
+        return response
     AuthIdentity.link_user(
         db,
         user,
@@ -239,7 +256,11 @@ async def finish_google_sign_in(
     db.commit()
 
     access_token = _issue_access_token(
-        email, google_claims.get("name"), google_claims.get("picture"), settings
+        email,
+        google_claims.get("name"),
+        google_claims.get("picture"),
+        settings,
+        user_id=str(user.id),
     )
     response = RedirectResponse(
         f"{settings.frontend_url.rstrip('/')}/auth/callback#access_token={access_token}",
