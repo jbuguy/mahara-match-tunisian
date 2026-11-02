@@ -45,7 +45,6 @@ function PlatformShell({
 }) {
   const location = useLocation()
   const { language, setLanguage, t } = useI18n()
-  const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [account, setAccount] = useState<{ kind: 'candidate'; hasProfile: boolean } | { kind: 'employer' } | { kind: 'ministry' } | null>(null)
   const [accountLoading, setAccountLoading] = useState(true)
 
@@ -135,13 +134,8 @@ function PlatformShell({
 
         <section className="main-panel">
           {!isAuthPage && <header className="product-topbar">
-            <div className="product-topbar-search">
-              <span aria-hidden="true">⌕</span>
-              <input aria-label={t('nav.searchPlaceholder')} placeholder={t('nav.searchPlaceholder')} />
-            </div>
             <div className="product-topbar-actions">
               <button className="topbar-icon-button" type="button" onClick={cycleLanguage} aria-label={t('nav.changeLanguage')} title={t('nav.changeLanguage')}>文 <span>{language.toUpperCase()}</span></button>
-              <div className="notification-control"><button className="topbar-icon-button" type="button" onClick={() => setNotificationsOpen((open) => !open)} aria-label={t('nav.notifications')} aria-expanded={notificationsOpen} title={t('nav.notifications')}>♢</button>{notificationsOpen && <div className="notification-popover" role="status"><strong>{t('nav.notifications')}</strong><span>{language === 'ar' ? 'لا توجد إشعارات جديدة.' : language === 'en' ? 'No new notifications.' : 'Aucune nouvelle notification.'}</span></div>}</div>
               {account ? <span className="topbar-account"><strong>{account.kind === 'candidate' ? (language === 'ar' ? 'مترشح' : language === 'en' ? 'Candidate' : 'Candidat') : account.kind === 'employer' ? (language === 'ar' ? 'مشغّل' : language === 'en' ? 'Employer' : 'Employeur') : (language === 'ar' ? 'وزارة' : language === 'en' ? 'Ministry' : 'Ministère')}</strong><small>{t('nav.activeWorkspace')}</small></span> : <Link className="topbar-signin" to="/signin">{t('nav.signIn')}</Link>}
             </div>
           </header>}

@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from .config import get_settings
 from .database import get_db
-from .models import Employer, User, get_or_create_user
+from .models import Employer, User
 
 
 password_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
@@ -71,14 +71,15 @@ def get_current_user(
             audience="mahara-match-platform",
         )
         email = str(payload.get("email") or payload.get("sub") or "").strip().lower()
-        if not email or not payload.get("user_id"):
+        user_id = uuid.UUID(str(payload.get("user_id", "")))
+        if not email:
             raise credentials_error
-    except (JWTError, ValueError):
+    except (JWTError, ValueError, TypeError):
         raise credentials_error from None
 
     user = db.query(User).filter(User.email == email).first()
-    if user is None:
-        user = get_or_create_user(db, email, roles=[])
+    if user is None or user.id != user_id or not user.is_active:
+        raise credentials_error
     return user
 
 
@@ -124,12 +125,16 @@ def get_current_employer(
     try:
         payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
         employer_id = uuid.UUID(payload.get("sub", ""))
-    except (JWTError, ValueError):
+    except (JWTError, ValueError, TypeError):
         raise credentials_error from None
 
     employer = db.get(Employer, employer_id)
     if employer is None:
         raise credentials_error
+    if employer.user_id:
+        user = db.get(User, employer.user_id)
+        if user is None or not user.is_active:
+            raise credentials_error
     return employer
 
 

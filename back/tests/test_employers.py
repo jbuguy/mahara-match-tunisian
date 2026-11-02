@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 from app.database import Base, get_db
 from app.main import app, asgi_app
 from app.models import AuthIdentity, Employer, User
-from app.security import ensure_employer_email_verified
+from app.security import create_user_access_token, ensure_employer_email_verified
 
 
 test_engine = create_engine(
@@ -216,9 +216,104 @@ def test_platform_modules_expose_module_status_and_contract_counts():
     assert data_module["contract_count"] >= 10
     assert "candidate_profile" in data_module["contracts"]
     assert any(module["code"] == "employer" for module in modules)
+    assert any(module["code"] == "employee" for module in modules)
     matching_module = next(module for module in modules if module["code"] == "matching")
     assert matching_module["status"] == "registered"
-    assert any(module["code"] == "employee" for module in modules)
+
+
+def test_disabling_user_revokes_existing_access_and_prevents_login():
+    response = client.post("/employers/signup", json=valid_payload)
+    assert response.status_code == 201
+    token = client.post(
+        "/employers/login",
+        json={"email": valid_payload["email"], "password": valid_payload["password"]},
+    ).json()["access_token"]
+
+    with TestSession() as db:
+        user = db.query(User).filter_by(email=valid_payload["email"]).one()
+        user.is_active = False
+        db.commit()
+
+    profile = client.get("/employers/me", headers={"Authorization": f"Bearer {token}"})
+    login = client.post(
+        "/employers/login",
+        json={"email": valid_payload["email"], "password": valid_payload["password"]},
+    )
+
+    assert profile.status_code == 401
+    assert login.status_code == 401
+
+
+def test_disabling_candidate_revokes_existing_user_token():
+    with TestSession() as db:
+        user = User(email="inactive@example.com", roles=["candidate"])
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        token = create_user_access_token(user)
+        user.is_active = False
+        db.commit()
+
+    response = client.get(
+        "/api/v1/me/roles",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 401
+
+
+def test_login_rate_limit_is_configurable_and_returns_retry_after(monkeypatch):
+    monkeypatch.setattr("app.main.settings.auth_login_rate_limit", 2)
+
+    attempts = [
+        client.post(
+            "/employers/login",
+            json={"email": "unknown@example.com", "password": "WrongPassword123!"},
+        )
+        for _ in range(3)
+    ]
+
+    assert [response.status_code for response in attempts] == [401, 401, 429]
+    assert int(attempts[2].headers["retry-after"]) > 0
+
+
+def test_google_sign_in_start_uses_login_rate_limit(monkeypatch):
+    monkeypatch.setattr("app.main.settings.auth_login_rate_limit", 1)
+
+    first = client.get("/auth/google")
+    second = client.get("/auth/google")
+
+    assert first.status_code == 503
+    assert second.status_code == 429
+
+
+def test_signup_rate_limit_is_configurable(monkeypatch):
+    monkeypatch.setattr("app.main.settings.auth_signup_rate_limit", 1)
+
+    first = client.post("/employers/signup", json=valid_payload)
+    second = client.post("/employers/signup", json=valid_payload)
+
+    assert first.status_code == 201
+    assert second.status_code == 429
+
+
+def test_email_verification_and_password_reset_routes_are_rate_limited(monkeypatch):
+    monkeypatch.setattr("app.main.settings.auth_email_rate_limit", 1)
+    email_payload = {"email": "unknown@example.com"}
+
+    for path in ("/auth/email/verification/request", "/auth/email/password-reset/request"):
+        assert client.post(path, json=email_payload).status_code == 202
+        assert client.post(path, json=email_payload).status_code == 429
+
+    verify_payload = {"token": "not-a-valid-verification-token"}
+    reset_payload = {
+        "token": "not-a-valid-password-reset-token",
+        "new_password": "StrongPassword123!",
+    }
+    assert client.post("/auth/email/verification/confirm", json=verify_payload).status_code == 400
+    assert client.post("/auth/email/verification/confirm", json=verify_payload).status_code == 429
+    assert client.post("/auth/email/password-reset/confirm", json=reset_payload).status_code == 400
+    assert client.post("/auth/email/password-reset/confirm", json=reset_payload).status_code == 429
 
 
 def test_platform_validates_employer_offers_and_candidate_profiles():

@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -12,6 +13,12 @@ class Settings(BaseSettings):
     jwt_secret: str = "mahara-match-super-secret-key-change-this-in-production"
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60
+    auth_login_rate_limit: int = Field(default=10, ge=1)
+    auth_login_rate_window_seconds: int = Field(default=900, ge=1)
+    auth_signup_rate_limit: int = Field(default=5, ge=1)
+    auth_signup_rate_window_seconds: int = Field(default=3600, ge=1)
+    auth_email_rate_limit: int = Field(default=5, ge=1)
+    auth_email_rate_window_seconds: int = Field(default=3600, ge=1)
     google_client_id: str | None = None
     google_client_secret: str | None = None
     api_base_url: str = "http://localhost:8000"

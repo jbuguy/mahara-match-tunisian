@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from .config import Settings, get_settings
 from .db import get_db
 from .models import User
-from .services.users import get_or_create_user
+from mahara_data.repositories.accounts import get_user_by_email
 
 AUDIENCE = "mahara-match-platform"
 ISSUER = "mahara-match"
@@ -74,4 +74,7 @@ def get_current_user(
     email = str(claims["email"]).strip().lower()
     if not email:
         raise unauthorized("token has no email")
-    return CurrentUser(user=get_or_create_user(db, email), name=display_name(claims))
+    user = get_user_by_email(db, email)
+    if user is None or not user.is_active:
+        raise unauthorized("account is inactive or unavailable")
+    return CurrentUser(user=user, name=display_name(claims))

@@ -10,6 +10,7 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
+from .auth_rate_limit import rate_limit_dependency
 from .config import Settings, get_settings
 from .database import get_db
 from .email_delivery import mail_configured, send_email
@@ -22,6 +23,26 @@ RESET = "password_reset"
 VERIFY_LIFETIME = timedelta(hours=24)
 RESET_LIFETIME = timedelta(minutes=30)
 RESEND_COOLDOWN = timedelta(seconds=60)
+email_rate_limit = rate_limit_dependency(
+    "email_verification_request",
+    "auth_email_rate_limit",
+    "auth_email_rate_window_seconds",
+)
+verification_confirm_rate_limit = rate_limit_dependency(
+    "email_verification_confirm",
+    "auth_email_rate_limit",
+    "auth_email_rate_window_seconds",
+)
+password_reset_request_rate_limit = rate_limit_dependency(
+    "password_reset_request",
+    "auth_email_rate_limit",
+    "auth_email_rate_window_seconds",
+)
+password_reset_confirm_rate_limit = rate_limit_dependency(
+    "password_reset_confirm",
+    "auth_email_rate_limit",
+    "auth_email_rate_window_seconds",
+)
 
 
 class EmailRequest(BaseModel):
@@ -131,7 +152,12 @@ def _user_for_token(db: Session, raw_token: str, purpose: str) -> tuple[AccountA
     return record, user
 
 
-@router.post("/verification/request", response_model=EmailActionResponse, status_code=status.HTTP_202_ACCEPTED)
+@router.post(
+    "/verification/request",
+    response_model=EmailActionResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    dependencies=[Depends(email_rate_limit)],
+)
 def request_verification(payload: EmailRequest, db: Session = Depends(get_db), settings: Settings = Depends(get_settings)) -> EmailActionResponse:
     email = normalize_email(str(payload.email))
     user = db.scalar(select(User).where(User.email == email))
@@ -143,7 +169,7 @@ def request_verification(payload: EmailRequest, db: Session = Depends(get_db), s
     )
 
 
-@router.post("/verification/confirm")
+@router.post("/verification/confirm", dependencies=[Depends(verification_confirm_rate_limit)])
 def confirm_verification(payload: TokenRequest, db: Session = Depends(get_db)) -> dict[str, str]:
     _, user = _user_for_token(db, payload.token, VERIFY)
     user.email_verified = True
@@ -152,7 +178,12 @@ def confirm_verification(payload: TokenRequest, db: Session = Depends(get_db)) -
     return {"message": "Your email address has been verified."}
 
 
-@router.post("/password-reset/request", response_model=EmailActionResponse, status_code=status.HTTP_202_ACCEPTED)
+@router.post(
+    "/password-reset/request",
+    response_model=EmailActionResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    dependencies=[Depends(password_reset_request_rate_limit)],
+)
 def request_password_reset(payload: EmailRequest, db: Session = Depends(get_db), settings: Settings = Depends(get_settings)) -> EmailActionResponse:
     email = normalize_email(str(payload.email))
     user = db.scalar(select(User).where(User.email == email))
@@ -168,7 +199,7 @@ def request_password_reset(payload: EmailRequest, db: Session = Depends(get_db),
     )
 
 
-@router.post("/password-reset/confirm")
+@router.post("/password-reset/confirm", dependencies=[Depends(password_reset_confirm_rate_limit)])
 def confirm_password_reset(payload: PasswordResetRequest, db: Session = Depends(get_db)) -> dict[str, str]:
     _, user = _user_for_token(db, payload.token, RESET)
     identity = db.scalar(

@@ -16,6 +16,18 @@ Requirements: Python 3.11+, Node.js 18+, and PostgreSQL. Configure `back/.env` f
 
 When `APP_ENV=development`, employer email verification is skipped so local offer workflows can be tested without SMTP. Verification remains required in other environments.
 
+Authentication endpoints use configurable, PostgreSQL-backed per-IP rate limits:
+`AUTH_LOGIN_RATE_LIMIT` / `AUTH_LOGIN_RATE_WINDOW_SECONDS`,
+`AUTH_SIGNUP_RATE_LIMIT` / `AUTH_SIGNUP_RATE_WINDOW_SECONDS`, and
+`AUTH_EMAIL_RATE_LIMIT` / `AUTH_EMAIL_RATE_WINDOW_SECONDS`. Limits apply to
+candidate and employer login/signup and to email verification/password-reset
+requests and confirmations. Configure trusted proxy forwarding at the ASGI
+server/reverse proxy so `request.client.host` identifies the real client IP;
+otherwise all clients behind a proxy may share one limit bucket.
+
+Candidate data export, deletion, retention, and backup/restore expectations are
+documented in [`docs/data-lifecycle-and-recovery.md`](docs/data-lifecycle-and-recovery.md).
+
 Apply ordered SQL migrations and start the API in one terminal:
 
 ```powershell

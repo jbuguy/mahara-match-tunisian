@@ -40,6 +40,7 @@ class User(Base):
     preferred_language: Mapped[str] = mapped_column(String(8), default="ar-TN", nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    deletion_requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     email_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     roles: Mapped[list[str]] = mapped_column(JSONType, default=list, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
@@ -137,6 +138,18 @@ class AccountActionToken(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class AuthRateLimitBucket(Base):
+    __tablename__ = "auth_rate_limit_buckets"
+    __table_args__ = (
+        Index("ix_auth_rate_limit_buckets_window_start", "window_start"),
+        CheckConstraint("request_count >= 1", name="auth_rate_limit_buckets_count_positive"),
+    )
+
+    bucket_key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    window_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), primary_key=True)
+    request_count: Mapped[int] = mapped_column(Integer, nullable=False)
 
 
 class Candidate(Base):

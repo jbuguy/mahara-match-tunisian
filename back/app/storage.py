@@ -45,3 +45,25 @@ def get_private(key: str) -> bytes:
 def delete_private(key: str) -> None:
     settings = get_settings()
     _client().delete_object(Bucket=settings.s3_bucket, Key=key)
+
+
+def purge_private(key: str) -> None:
+    """Permanently remove every version and delete marker for one private object."""
+    settings = get_settings()
+    client = _client()
+    paginator = client.get_paginator("list_object_versions")
+    for page in paginator.paginate(Bucket=settings.s3_bucket, Prefix=key):
+        versions = page.get("Versions", []) + page.get("DeleteMarkers", [])
+        objects = [
+            {"Key": item["Key"], "VersionId": item["VersionId"]}
+            for item in versions
+            if item["Key"] == key
+        ]
+        for offset in range(0, len(objects), 1000):
+            response = client.delete_objects(
+                Bucket=settings.s3_bucket,
+                Delete={"Objects": objects[offset : offset + 1000], "Quiet": True},
+            )
+            errors = response.get("Errors", [])
+            if errors:
+                raise RuntimeError(f"Object version purge failed for {len(errors)} version(s)")

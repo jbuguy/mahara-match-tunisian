@@ -23,6 +23,7 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     preferred_language: Mapped[str] = mapped_column(String(8), default="ar-TN", nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    deletion_requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     email_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     roles: Mapped[list[str]] = mapped_column(JSONType, default=list, nullable=False)
 
