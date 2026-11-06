@@ -54,6 +54,9 @@ class IngestionJob(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
     idempotency_key: Mapped[str | None] = mapped_column(String(128), unique=True)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    worker_id: Mapped[str | None] = mapped_column(String(64))
+    lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    attempt_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
 
 class NotificationOutbox(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):

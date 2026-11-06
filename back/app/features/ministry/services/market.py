@@ -1,3 +1,5 @@
+﻿import hashlib
+import json
 import uuid
 from datetime import datetime, timezone
 
@@ -31,6 +33,39 @@ _FIELDS = (
     ("sector", "sector_code", "sector_id"),
     ("governorate", "governorate_code", "governorate_code"),
 )
+
+
+def _normalize_value(value):
+    if isinstance(value, dict):
+        return {str(key): _normalize_value(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_normalize_value(item) for item in value]
+    if isinstance(value, tuple):
+        return [_normalize_value(item) for item in value]
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    return str(value)
+
+
+def _content_hash(payload: dict) -> str:
+    serialized = json.dumps(_normalize_value(payload), sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+
+def _identity_payload_for_record(record: MarketIndicatorRecord) -> dict:
+    return {
+        "indicator_type": record.indicator_type.value,
+        "occupation_code": record.occupation_code,
+        "skill_code": record.skill_code,
+        "sector_code": record.sector_code,
+        "governorate_code": record.governorate_code,
+        "period_start": record.period_start.isoformat(),
+        "period_end": record.period_end.isoformat(),
+    }
+
+
+def _external_id_for_record(record: MarketIndicatorRecord) -> str:
+    return _content_hash(_identity_payload_for_record(record))
 
 
 def _resolve_code(db: Session, cache: dict, kind: str, code: str):
@@ -69,7 +104,11 @@ def ingest(
     db: Session, submission: MarketDatasetSubmission, actor_user_id: uuid.UUID | None = None,
     existing_job: IngestionJob | None = None, *, commit: bool = True,
 ) -> tuple[MarketDataset, IngestionJob, list[dict]]:
-    """Record the deposit, keep every row that resolves, report the rest."""
+    """Record the deposit, keep every row that resolves, report the rest.
+
+    Rows are keyed by a deterministic external id and a content hash so repeated runs
+    remain idempotent while changed rows update in place instead of creating duplicates.
+    """
     job = existing_job or IngestionJob(
         source=IngestionSource.MINISTRY_MARKET,
         status=ProcessingStatus.PROCESSING,
@@ -83,7 +122,7 @@ def ingest(
     job.started_at = job.started_at or datetime.now(timezone.utc)
     if existing_job is None:
         db.add(job)
-    db.flush()  # the dataset needs the job's id
+    db.flush()
 
     dataset = MarketDataset(
         title=submission.dataset.title,
@@ -94,6 +133,28 @@ def ingest(
         document_id=submission.dataset.document_id,
         ingestion_job_id=job.id,
         uploaded_by=actor_user_id,
+        payload_hash=_content_hash({
+            "title": submission.dataset.title,
+            "publisher": submission.dataset.publisher,
+            "origin": submission.dataset.origin.value,
+            "period_start": submission.dataset.period_start.isoformat(),
+            "period_end": submission.dataset.period_end.isoformat(),
+            "records": [
+                {
+                    "indicator_type": record.indicator_type.value,
+                    "occupation_code": record.occupation_code,
+                    "skill_code": record.skill_code,
+                    "sector_code": record.sector_code,
+                    "governorate_code": record.governorate_code,
+                    "period_start": record.period_start.isoformat(),
+                    "period_end": record.period_end.isoformat(),
+                    "value": str(record.value),
+                    "unit": record.unit,
+                    "extra": record.extra,
+                }
+                for record in submission.records
+            ],
+        }),
     )
     db.add(dataset)
     db.flush()
@@ -106,6 +167,41 @@ def ingest(
         if reason is not None:
             rejections.append({"index": index, "reason": reason})
             continue
+
+        external_id = _external_id_for_record(record)
+        content_hash = _content_hash({
+            "indicator_type": record.indicator_type.value,
+            "occupation_code": record.occupation_code,
+            "skill_code": record.skill_code,
+            "sector_code": record.sector_code,
+            "governorate_code": record.governorate_code,
+            "period_start": record.period_start.isoformat(),
+            "period_end": record.period_end.isoformat(),
+            "value": str(record.value),
+            "unit": record.unit,
+            "extra": record.extra,
+            "links": links,
+        })
+        current = db.execute(
+            select(MarketIndicator).where(MarketIndicator.external_id == external_id)
+        ).scalar_one_or_none()
+        if current is not None:
+            if current.content_hash == content_hash:
+                continue
+            current.dataset_id = dataset.id
+            current.indicator_type = record.indicator_type
+            current.period_start = record.period_start
+            current.period_end = record.period_end
+            current.value = record.value
+            current.unit = record.unit
+            current.extra = record.extra
+            current.content_hash = content_hash
+            current.occupation_id = links.get("occupation_id")
+            current.skill_id = links.get("skill_id")
+            current.sector_id = links.get("sector_id")
+            current.governorate_code = links.get("governorate_code")
+            continue
+
         db.add(
             MarketIndicator(
                 dataset_id=dataset.id,
@@ -115,6 +211,8 @@ def ingest(
                 value=record.value,
                 unit=record.unit,
                 extra=record.extra,
+                external_id=external_id,
+                content_hash=content_hash,
                 **links,
             )
         )
@@ -122,7 +220,6 @@ def ingest(
     job.records_failed = len(rejections)
     job.records_ok = job.records_total - job.records_failed
     job.errors = rejections
-    # Failed only when nothing at all could be kept: a partial deposit is still a deposit.
     job.status = (
         ProcessingStatus.FAILED
         if job.records_total and job.records_ok == 0

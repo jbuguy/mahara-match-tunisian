@@ -34,7 +34,9 @@ class Settings(BaseSettings):
     ministry_market_feed_url: str | None = None
     ministry_market_feed_token: str | None = None
     ministry_market_worker_poll_seconds: float = 3.0
+    ministry_market_worker_lease_seconds: float = 120.0
     ministry_market_feed_timeout_seconds: float = 30.0
+    ministry_market_max_retries: int = 3
     s3_endpoint_url: str | None = None
     s3_region: str = "eu-central-1"
     s3_bucket: str | None = None
@@ -66,12 +68,20 @@ class Settings(BaseSettings):
     stt_max_audio_bytes: int = 25 * 1024 * 1024
 
     @property
+    def runtime_environment(self) -> str:
+        return (self.app_env or self.environment or "development").strip().lower()
+
+    @property
+    def is_production(self) -> bool:
+        return self.runtime_environment == "production"
+
+    @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
 
     @property
     def email_verification_required(self) -> bool:
-        return self.app_env.strip().lower() not in {"dev", "development", "test"}
+        return self.runtime_environment not in {"dev", "development", "test"}
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore", case_sensitive=False)
 

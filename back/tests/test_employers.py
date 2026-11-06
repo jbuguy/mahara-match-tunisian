@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 
 from app.database import Base, get_db
 from app.main import app, asgi_app
-from app.models import AuthIdentity, Employer, User
+from app.models import AuthIdentity, CompanySize, Employer, User
 from app.security import create_user_access_token, ensure_employer_email_verified
 
 
@@ -86,6 +86,37 @@ def test_production_signup_still_requires_employer_email_verification(monkeypatc
             ensure_employer_email_verified(db, employer)
 
     assert exc_info.value.status_code == 403
+
+
+def test_ensure_employer_email_verified_blocks_unverified_employer(monkeypatch):
+    monkeypatch.setattr("app.security.get_settings", lambda: type("Settings", (), {"email_verification_required": True})())
+
+    with TestSession() as db:
+        user = User(
+            email="verify-me@example.com",
+            password_hash="unused",
+            email_verified=False,
+            roles=["employer"],
+        )
+        db.add(user)
+        db.flush()
+
+        employer = Employer(
+            user_id=user.id,
+            company_name="Verify Me",
+            email="verify-me@example.com",
+            password_hash="unused",
+            sector="Technology",
+            company_size=CompanySize.SMALL,
+        )
+        db.add(employer)
+        db.flush()
+
+        with pytest.raises(HTTPException) as exc_info:
+            ensure_employer_email_verified(db, employer)
+
+    assert exc_info.value.status_code == 403
+    assert exc_info.value.detail == "Verify your email address before publishing offers or contacting candidates"
 
 
 def test_development_candidate_signup_skips_email_verification():

@@ -1,10 +1,10 @@
-"""Labour-market data injected by the Ministry (WP5), official or informal."""
+﻿"""Labour-market data injected by the Ministry (WP5), official or informal."""
 
 import uuid
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import CheckConstraint, Date, ForeignKey, Index, Numeric, String, Uuid
+from sqlalchemy import CheckConstraint, Date, ForeignKey, Index, Numeric, String, Uuid, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ... import enums as e
@@ -24,14 +24,19 @@ class MarketDataset(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
     document_id: Mapped[uuid.UUID | None] = mapped_column(Uuid(as_uuid=True), ForeignKey("documents.id"))
     ingestion_job_id: Mapped[uuid.UUID | None] = mapped_column(Uuid(as_uuid=True), ForeignKey("ingestion_jobs.id"))
     uploaded_by: Mapped[uuid.UUID | None] = mapped_column(Uuid(as_uuid=True), ForeignKey("users.id"))
+    payload_hash: Mapped[str | None] = mapped_column(String(64), index=True)
+    source_key: Mapped[str | None] = mapped_column(String(128), index=True)
 
 
 class MarketIndicator(UUIDPrimaryKeyMixin, Base):
     __tablename__ = "market_indicators"
     __table_args__ = (
         Index("market_indicators_lookup_idx", "indicator_type", "governorate_code", "period_start"),
+        UniqueConstraint("external_id", name="market_indicators_external_id_key"),
     )
 
+    external_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True, unique=True)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     dataset_id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("market_datasets.id", ondelete="CASCADE"), index=True, nullable=False
     )

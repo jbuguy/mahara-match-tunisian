@@ -73,7 +73,7 @@ def run_forever() -> None:
     settings = get_settings()
     if not mail_configured(settings):
         raise RuntimeError("Configure RESEND_API_KEY and RESEND_FROM_EMAIL, or SMTP_HOST and SMTP_FROM_EMAIL")
-    if settings.environment.lower() == "production" and settings.smtp_host and not settings.smtp_use_starttls and not settings.resend_api_key:
+    if settings.is_production and settings.smtp_host and not settings.smtp_use_starttls and not settings.resend_api_key:
         raise RuntimeError("SMTP_USE_STARTTLS must be enabled in production")
     logger.info("Starting transactional notification worker")
     while True:

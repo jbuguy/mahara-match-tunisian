@@ -228,6 +228,8 @@ def enqueue_refresh(
         request_data={
             "kind": "official_market_refresh",
             "since": request.since.isoformat() if request and request.since else None,
+            "attempts": 0,
+            "next_retry_at": None,
         },
         idempotency_key=key,
         triggered_by=admin.id,
