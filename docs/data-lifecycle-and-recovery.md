@@ -70,6 +70,8 @@ python -m app.migrate
 ```
 
 The lifecycle migration is `20261102000000_candidate_data_lifecycle.sql`.
+Saved roadmaps also require `20261105010000_roadmap_step_required_level.sql`
+to persist each step's target proficiency level.
 The account-purge loop starts with each API process. To avoid duplicate work,
 database row locks prevent concurrent workers from purging the same account.
 The hosting operator should still monitor the `Could not purge expired

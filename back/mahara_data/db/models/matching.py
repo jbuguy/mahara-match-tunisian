@@ -89,7 +89,10 @@ class Roadmap(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
 class RoadmapItem(UUIDPrimaryKeyMixin, Base):
     __tablename__ = "roadmap_items"
-    __table_args__ = (UniqueConstraint("roadmap_id", "position", name="roadmap_items_position_key"),)
+    __table_args__ = (
+        UniqueConstraint("roadmap_id", "position", name="roadmap_items_position_key"),
+        CheckConstraint("required_level between 1 and 4", name="roadmap_items_required_level_range"),
+    )
 
     roadmap_id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("roadmaps.id", ondelete="CASCADE"), nullable=False
@@ -99,6 +102,7 @@ class RoadmapItem(UUIDPrimaryKeyMixin, Base):
         Uuid(as_uuid=True), ForeignKey("training_courses.id", ondelete="SET NULL")
     )
     position: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    required_level: Mapped[int] = mapped_column(SmallInteger, default=2, nullable=False)
     status: Mapped[e.RoadmapItemStatus] = mapped_column(
         t.roadmap_item_status, default=e.RoadmapItemStatus.TODO, nullable=False
     )

@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field, field_validator
@@ -67,6 +67,22 @@ class ContactConsentUpdate(BaseModel):
     allow_contact: bool
 
 
+class EmployerApplicationsPage(BaseModel):
+    items: list[dict[str, Any]]
+    total: int
+    page: int
+    limit: int
+    next_page: int | None
+
+
+def _utc_datetime(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
 def create_application_router(get_db: Any, get_current_user: Any, get_current_employer: Any) -> APIRouter:
     router = APIRouter(tags=["applications"])
 
@@ -118,12 +134,41 @@ def create_application_router(get_db: Any, get_current_user: Any, get_current_em
         except ApplicationWorkflowError as error:
             raise HTTPException(status_code=error.status_code, detail=error.detail) from error
 
-    @router.get("/api/v1/employer/applications")
+    @router.get(
+        "/api/v1/employer/applications",
+        response_model=list[dict[str, Any]] | EmployerApplicationsPage,
+    )
     def list_employer_applications(
+        offer_id: uuid.UUID | None = None,
+        status_filter: list[ApplicationStatus] | None = Query(default=None, alias="status"),
+        min_score: float | None = Query(default=None, ge=0, le=100),
+        sort: Literal["applied_at", "score_global"] | None = None,
+        page: int | None = Query(default=None, ge=1),
+        limit: int | None = Query(default=None, ge=1, le=100),
         db: Session = Depends(get_db),
         employer: Employer = Depends(get_current_employer),
     ):
-        return get_employer_applications(db, employer=employer)
+        if all(value is None for value in (offer_id, status_filter, min_score, page, limit)):
+            return get_employer_applications(db, employer=employer)
+        current_page = page or 1
+        page_limit = limit or 25
+        items, total = get_employer_applications_page(
+            db,
+            employer=employer,
+            page=current_page,
+            page_size=page_limit,
+            statuses=status_filter,
+            job_offer_id=offer_id,
+            min_score=min_score,
+            sort=sort or "score_global",
+        )
+        return {
+            "items": items,
+            "total": total,
+            "page": current_page,
+            "limit": page_limit,
+            "next_page": current_page + 1 if current_page * page_limit < total else None,
+        }
 
     @router.get("/api/v1/employer/applications/page")
     def list_employer_applications_page(
@@ -272,7 +317,7 @@ def create_application_router(get_db: Any, get_current_user: Any, get_current_em
             skills=[{"skill_code": skill.code, "requirement": link.requirement, "min_level": link.min_level}
                     for link, skill in skills],
             languages_required=offer.languages_required, status=offer.status, source=offer.source,
-            published_at=offer.published_at, expires_at=offer.expires_at,
+            published_at=_utc_datetime(offer.published_at), expires_at=_utc_datetime(offer.expires_at),
         ).model_dump(mode="json")
 
     @router.get("/api/v1/employer/offers/{offer_id}/edit")
@@ -288,22 +333,43 @@ def create_application_router(get_db: Any, get_current_user: Any, get_current_em
     def edit_employer_offer(offer_id: uuid.UUID, payload: NormalizedJobOffer,
                             db: Session = Depends(get_db),
                             employer: Employer = Depends(get_current_employer)):
-        from .features.employer.workflow import persist_published_offer
+        from .features.employer.workflow import OfferPublishError, persist_published_offer
 
         offer = db.query(JobOffer).filter(JobOffer.id == offer_id, JobOffer.employer_id == employer.id).with_for_update().first()
         if offer is None or offer.archived_at is not None:
             raise HTTPException(status_code=404, detail="Offer not found")
         if offer.status is not OfferStatus.PUBLISHED:
             raise HTTPException(status_code=409, detail="Only published offers can be edited; reopen the offer first")
+        if payload.expires_at is not None and payload.expires_at.tzinfo is None:
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "code": "timezone_required",
+                    "message": "expires_at must be a timezone-aware ISO-8601 timestamp",
+                    "field": "expires_at",
+                },
+            )
         data = payload.model_dump()
+        data["expires_at"] = _utc_datetime(payload.expires_at)
         data.update({"offer_id": offer.id, "employer_id": employer.id, "status": OfferStatus.PUBLISHED,
                      "published_at": offer.published_at, "source": offer.source})
         try:
             normalized = NormalizedJobOffer.model_validate(data)
             persist_published_offer(db, normalized, employer.id)
+        except OfferPublishError as error:
+            db.rollback()
+            detail = {"code": error.code, "message": str(error)}
+            if error.field:
+                detail["field"] = error.field
+            if error.details:
+                detail["details"] = error.details
+            raise HTTPException(status_code=error.status_code, detail=detail) from error
         except ValueError as error:
             db.rollback()
-            raise HTTPException(status_code=422, detail=str(error)) from error
+            raise HTTPException(
+                status_code=422,
+                detail={"code": "invalid_offer", "message": str(error)},
+            ) from error
         db.add(AuditLog(actor_user_id=employer.user_id,
             actor_service=None if employer.user_id else "employer-workspace", action="employer.offer_edited",
             entity_type="job_offer", entity_id=str(offer.id), payload={"employer_id": str(employer.id)}))
@@ -365,7 +431,14 @@ def create_application_router(get_db: Any, get_current_user: Any, get_current_em
         if current_expiry is not None and current_expiry.tzinfo is None:
             current_expiry = current_expiry.replace(tzinfo=timezone.utc)
         if target is OfferStatus.PUBLISHED and current_expiry is not None and current_expiry <= now:
-            raise HTTPException(status_code=409, detail="The offer is expired; provide a future expires_at to reopen it")
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "expired_offer",
+                    "message": "The offer is expired; provide a future expires_at to reopen it",
+                    "field": "expires_at",
+                },
+            )
         offer.status = target
         db.add(AuditLog(
             actor_user_id=employer.user_id,
@@ -395,7 +468,13 @@ def create_application_router(get_db: Any, get_current_user: Any, get_current_em
         if application.status is not ApplicationStatus.SHORTLISTED:
             raise HTTPException(status_code=409, detail="Shortlist the candidate before sending an interview invitation")
         if application.employer_contact_consent_at is None:
-            raise HTTPException(status_code=409, detail="The candidate has not consented to employer contact")
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "employer_contact_consent_required",
+                    "message": "The candidate has not consented to employer contact",
+                },
+            )
         candidate_pii = db.get(CandidatePII, application.candidate_id)
         if candidate_pii is None or not candidate_pii.email:
             raise HTTPException(status_code=409, detail="The candidate has no email address on file")
@@ -408,7 +487,10 @@ def create_application_router(get_db: Any, get_current_user: Any, get_current_em
         if localized.astimezone(timezone.utc).astimezone(zone).replace(tzinfo=None) != payload.meeting_at_local:
             raise HTTPException(status_code=422, detail="The selected local time does not exist in this timezone")
         if meeting_at <= datetime.now(timezone.utc):
-            raise HTTPException(status_code=422, detail="Interview time must be in the future")
+            raise HTTPException(
+                status_code=422,
+                detail={"code": "meeting_time_in_past", "message": "Interview time must be in the future"},
+            )
         offer = db.get(JobOffer, application.job_offer_id)
         subject = f"Interview invitation: {offer.title if offer else 'job application'}"
         meeting_label = localized.strftime("%A, %d %B %Y at %H:%M %Z")

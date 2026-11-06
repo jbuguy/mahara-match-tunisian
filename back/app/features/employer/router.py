@@ -233,6 +233,7 @@ def create_employer_agent_router(
         db: Session = Depends(get_db),
     ) -> dict[str, Any]:
         session = _owned_session(db, session_model, session_id, current.id)
+        ensure_employer_email_verified(db, current)
         if session.draft is None:
             raise HTTPException(status_code=409, detail="This session does not have a generated draft")
         if session.draft.get("status") == "published":

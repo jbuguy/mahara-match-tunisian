@@ -46,8 +46,10 @@ def list_employer_applications_page(
     page: int,
     page_size: int,
     status: ApplicationStatus | None = None,
+    statuses: list[ApplicationStatus] | None = None,
     job_offer_id: UUID | None = None,
     min_score: float | None = None,
+    sort: str = "score_global",
 ):
     query = (
         db.query(Application, JobOffer, Candidate, CandidatePII, MatchResult)
@@ -57,19 +59,21 @@ def list_employer_applications_page(
         .outerjoin(MatchResult, MatchResult.id == Application.match_result_id)
         .filter(JobOffer.employer_id == employer_id, Candidate.deleted_at.is_(None))
     )
-    if status is not None:
+    if statuses:
+        query = query.filter(Application.status.in_(statuses))
+    elif status is not None:
         query = query.filter(Application.status == status)
     if job_offer_id is not None:
         query = query.filter(Application.job_offer_id == job_offer_id)
     if min_score is not None:
         query = query.filter(MatchResult.score_global >= min_score)
     total = query.with_entities(func.count(Application.id)).scalar() or 0
-    rows = (
-        query.order_by(MatchResult.score_global.desc().nullslast(), Application.applied_at.desc())
-        .limit(page_size)
-        .offset((page - 1) * page_size)
-        .all()
+    order = (
+        (Application.applied_at.desc(), Application.id.desc())
+        if sort == "applied_at"
+        else (MatchResult.score_global.desc().nullslast(), Application.applied_at.desc(), Application.id.desc())
     )
+    rows = query.order_by(*order).limit(page_size).offset((page - 1) * page_size).all()
     return rows, total
 
 

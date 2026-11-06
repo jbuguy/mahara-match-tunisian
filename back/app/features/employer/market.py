@@ -38,10 +38,22 @@ class SalaryBenchmarkOut(BaseModel):
     suppression_reason: str | None = None
 
 
-router = APIRouter(prefix="/api/v1/employer/market", tags=["employer-market"])
+router = APIRouter(tags=["employer-market"])
 
 
-@router.get("/salaries", response_model=SalaryBenchmarkOut)
+@router.get(
+    "/api/v1/employer/salaries",
+    response_model=SalaryBenchmarkOut,
+    description=(
+        "Returns an official salary benchmark as available, suppressed when the source sample "
+        "does not meet the privacy threshold, or unavailable when no matching official data exists."
+    ),
+)
+@router.get(
+    "/api/v1/employer/market/salaries",
+    response_model=SalaryBenchmarkOut,
+    deprecated=True,
+)
 def salary_benchmark(
     occupation_code: Annotated[str, Query(min_length=2, max_length=32)],
     db: Session = Depends(get_db),

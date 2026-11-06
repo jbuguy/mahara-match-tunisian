@@ -1,5 +1,126 @@
 {
   "$defs": {
+    "CourseModality": {
+      "enum": [
+        "in_person",
+        "online",
+        "blended"
+      ],
+      "title": "CourseModality",
+      "type": "string"
+    },
+    "GapType": {
+      "enum": [
+        "missing",
+        "insufficient_level"
+      ],
+      "title": "GapType",
+      "type": "string"
+    },
+    "RoadmapCourse": {
+      "additionalProperties": false,
+      "properties": {
+        "course_id": {
+          "format": "uuid",
+          "title": "Course Id",
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "provider_name": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Provider Name",
+          "type": "string"
+        },
+        "target_level": {
+          "maximum": 4,
+          "minimum": 1,
+          "title": "Target Level",
+          "type": "integer"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "modality": {
+          "$ref": "#/$defs/CourseModality"
+        },
+        "duration_hours": {
+          "anyOf": [
+            {
+              "maximum": 5000,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Duration Hours"
+        },
+        "cost_tnd": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cost Tnd"
+        },
+        "governorate_code": {
+          "anyOf": [
+            {
+              "maxLength": 8,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Governorate Code"
+        },
+        "language": {
+          "default": "fr",
+          "maxLength": 8,
+          "title": "Language",
+          "type": "string"
+        },
+        "catalog_status": {
+          "const": "active",
+          "default": "active",
+          "title": "Catalog Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "course_id",
+        "title",
+        "provider_name",
+        "target_level",
+        "modality"
+      ],
+      "title": "RoadmapCourse",
+      "type": "object"
+    },
     "RoadmapItemStatus": {
       "enum": [
         "todo",
@@ -9,6 +130,131 @@
       ],
       "title": "RoadmapItemStatus",
       "type": "string"
+    },
+    "RoadmapMarketSignal": {
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "enum": [
+            "increasing",
+            "stable_or_declining",
+            "insufficient_data"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "source": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Source",
+          "type": "string"
+        },
+        "current_period_start": {
+          "title": "Current Period Start",
+          "type": "string"
+        },
+        "current_period_end": {
+          "title": "Current Period End",
+          "type": "string"
+        },
+        "previous_period_start": {
+          "title": "Previous Period Start",
+          "type": "string"
+        },
+        "previous_period_end": {
+          "title": "Previous Period End",
+          "type": "string"
+        },
+        "current_positions": {
+          "minimum": 0,
+          "title": "Current Positions",
+          "type": "integer"
+        },
+        "previous_positions": {
+          "minimum": 0,
+          "title": "Previous Positions",
+          "type": "integer"
+        },
+        "change_percent": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Change Percent"
+        },
+        "latest_offer_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Latest Offer At"
+        },
+        "governorate_code": {
+          "anyOf": [
+            {
+              "maxLength": 8,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Governorate Code"
+        },
+        "minimum_positions_per_period": {
+          "minimum": 1,
+          "title": "Minimum Positions Per Period",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "status",
+        "source",
+        "current_period_start",
+        "current_period_end",
+        "previous_period_start",
+        "previous_period_end",
+        "current_positions",
+        "previous_positions",
+        "minimum_positions_per_period"
+      ],
+      "title": "RoadmapMarketSignal",
+      "type": "object"
+    },
+    "RoadmapSkillReference": {
+      "additionalProperties": false,
+      "properties": {
+        "skill_code": {
+          "maxLength": 32,
+          "minLength": 1,
+          "title": "Skill Code",
+          "type": "string"
+        },
+        "label": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        }
+      },
+      "required": [
+        "skill_code",
+        "label"
+      ],
+      "title": "RoadmapSkillReference",
+      "type": "object"
     },
     "RoadmapStatus": {
       "enum": [
@@ -33,6 +279,66 @@
           "title": "Skill Code",
           "type": "string"
         },
+        "skill_label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Skill Label"
+        },
+        "required_level": {
+          "default": 2,
+          "maximum": 4,
+          "minimum": 1,
+          "title": "Required Level",
+          "type": "integer"
+        },
+        "current_level": {
+          "anyOf": [
+            {
+              "maximum": 4,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Current Level"
+        },
+        "gap_type": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GapType"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "transferable_skill_codes": {
+          "items": {
+            "maxLength": 32,
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Transferable Skill Codes",
+          "type": "array"
+        },
+        "transferable_skills": {
+          "items": {
+            "$ref": "#/$defs/RoadmapSkillReference"
+          },
+          "title": "Transferable Skills",
+          "type": "array"
+        },
         "training_course_id": {
           "anyOf": [
             {
@@ -45,6 +351,20 @@
           ],
           "default": null,
           "title": "Training Course Id"
+        },
+        "courses": {
+          "items": {
+            "$ref": "#/$defs/RoadmapCourse"
+          },
+          "maxItems": 3,
+          "title": "Courses",
+          "type": "array"
+        },
+        "learning_action": {
+          "default": "Build practical evidence in this skill and ask an experienced person for feedback.",
+          "maxLength": 500,
+          "title": "Learning Action",
+          "type": "string"
         },
         "status": {
           "$ref": "#/$defs/RoadmapItemStatus",
@@ -92,6 +412,18 @@
       "default": null,
       "title": "Target Job Offer Id"
     },
+    "target_job_title": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Target Job Title"
+    },
     "target_occupation_code": {
       "anyOf": [
         {
@@ -105,6 +437,29 @@
       ],
       "default": null,
       "title": "Target Occupation Code"
+    },
+    "target_occupation_title": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Target Occupation Title"
+    },
+    "market_signal": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RoadmapMarketSignal"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "status": {
       "$ref": "#/$defs/RoadmapStatus",

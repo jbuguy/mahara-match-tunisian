@@ -109,6 +109,7 @@ export function DashboardPage({ health, modules }: { health: HealthResponse | nu
               {!account.hasProfile && <Link className="secondary-btn" to="/candidate/start">Set up my profile</Link>}
               <Link className="secondary-btn" to="/candidate">{account.hasProfile ? 'Review my profile' : 'Complete my profile'}</Link>
               {account.hasProfile && <Link className="secondary-btn" to="/matches">View job matches</Link>}
+              {account.hasProfile && <Link className="secondary-btn" to="/roadmaps">Explore career roadmaps</Link>}
               {account.hasProfile && <Link className="secondary-btn" to="/mock-interview">Practice an interview privately</Link>}
             </> : account?.kind === 'Employer' ? <Link className="secondary-btn" to="/employer">Create or manage offers</Link> : <>
               <Link className="secondary-btn" to="/signup">Choose how you will use Mahara</Link>

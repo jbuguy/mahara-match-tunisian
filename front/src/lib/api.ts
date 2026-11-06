@@ -42,13 +42,81 @@ export type Roadmap = {
   roadmap_id: string | null
   candidate_id: string
   target_job_offer_id: string | null
+  target_job_title: string | null
   target_occupation_code: string | null
+  target_occupation_title: string | null
+  market_signal: RoadmapMarketSignal | null
   status: string
   progress_pct: number
-  steps: { position: number; skill_code: string; status: string }[]
+  steps: RoadmapStep[]
   model_version: string
 }
 
+export type RoadmapCourse = {
+  course_id: string
+  title: string
+  provider_name: string
+  target_level: number
+  description: string | null
+  modality: 'in_person' | 'online' | 'blended'
+  duration_hours: number | null
+  cost_tnd: number | null
+  governorate_code: string | null
+  language: string
+  catalog_status: 'active'
+}
+
+export type RoadmapStep = {
+  position: number
+  skill_code: string
+  skill_label: string | null
+  required_level: number
+  current_level: number | null
+  gap_type: 'missing' | 'insufficient_level' | null
+  transferable_skill_codes: string[]
+  transferable_skills: { skill_code: string; label: string }[]
+  training_course_id: string | null
+  courses: RoadmapCourse[]
+  learning_action: string
+  status: 'todo' | 'in_progress' | 'done' | 'skipped'
+}
+
+export type RoadmapMarketSignal = {
+  status: 'increasing' | 'stable_or_declining' | 'insufficient_data'
+  source: string
+  current_period_start: string
+  current_period_end: string
+  previous_period_start: string
+  previous_period_end: string
+  current_positions: number
+  previous_positions: number
+  change_percent: number | null
+  latest_offer_at: string | null
+  governorate_code: string | null
+  minimum_positions_per_period: number
+}
+
+export type CareerOption = {
+  occupation_code: string
+  title: string
+  description: string | null
+  skill_count: number
+  matched_skill_codes: string[]
+  matched_skill_labels: string[]
+  transferable_skill_codes: string[]
+  transferable_skills: { skill_code: string; label: string }[]
+  gaps: {
+    skill_code: string
+    skill_label: string
+    current_level: number | null
+    required_level: number
+    requirement: 'required' | 'preferred'
+    transferable_skill_codes: string[]
+  }[]
+  market_signal: RoadmapMarketSignal
+}
+
+export type CareerOptions = { items: CareerOption[]; market_method: string }
 export type MatchRoadmap = Roadmap | { status: 'no_gap'; message: string }
 
 export type MatchAssistantMessage = { role: 'user' | 'assistant'; content: string }
@@ -252,6 +320,39 @@ export function getMyMatches(): Promise<RankedMatches> {
 
 export function getMyRoadmap(jobOfferId: string): Promise<MatchRoadmap> {
   return requestJson<MatchRoadmap>(`/api/v1/me/matches/${encodeURIComponent(jobOfferId)}/roadmap`)
+}
+
+export function getMyRoadmaps(): Promise<Roadmap[]> {
+  return requestJson<Roadmap[]>('/api/v1/me/roadmaps')
+}
+
+export function getCareerOptions(): Promise<CareerOptions> {
+  return requestJson<CareerOptions>('/api/v1/me/roadmaps/career-options')
+}
+
+export function createMyRoadmap(target: { target_job_offer_id: string } | { target_occupation_code: string }): Promise<MatchRoadmap> {
+  return requestJson<MatchRoadmap>('/api/v1/me/roadmaps', {
+    method: 'POST',
+    body: JSON.stringify(target),
+  })
+}
+
+export function updateRoadmapStep(
+  roadmapId: string,
+  position: number,
+  status: RoadmapStep['status'],
+): Promise<Roadmap> {
+  return requestJson<Roadmap>(`/api/v1/me/roadmaps/${encodeURIComponent(roadmapId)}/steps/${position}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  })
+}
+
+export function updateRoadmapStatus(roadmapId: string, status: 'active' | 'abandoned'): Promise<Roadmap> {
+  return requestJson<Roadmap>(`/api/v1/me/roadmaps/${encodeURIComponent(roadmapId)}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  })
 }
 
 export function askAboutMatch(

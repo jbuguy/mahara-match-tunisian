@@ -53,7 +53,7 @@ do not start a second WP6 database or apply `db/schema.sql`.
 
 ```bash
 cd backend
-python -m uvicorn app.main:app --reload --port 8000
+python -m uvicorn app.main:asgi_app --reload --port 8000
 ```
 
 The seed script only runs when `APP_ENV` is `dev` or `development`. Running it again is safe.

@@ -88,6 +88,7 @@ def test_default_migrations_include_the_active_analytics_schema():
     assert any(item.filename == "20261031000000_analytics_events.sql" for item in found)
     assert any(item.filename == "20261101010000_auth_rate_limit_buckets.sql" for item in found)
     assert any(item.filename == "20261102000000_candidate_data_lifecycle.sql" for item in found)
+    assert any(item.filename == "20261105010000_roadmap_step_required_level.sql" for item in found)
 
 
 def test_discover_rejects_invalid_and_duplicate_versions(tmp_path):

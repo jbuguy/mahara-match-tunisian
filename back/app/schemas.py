@@ -87,6 +87,10 @@ class CandidateProfile(BaseModel):
     updated_at: datetime
 
 
+class CandidateSignupResponse(CandidateProfile):
+    email_verified: bool
+
+
 class CandidateUpdate(BaseModel):
     onboarding_path: str | None = None
     preferred_language: str | None = None

@@ -357,6 +357,10 @@
         }
       ],
       "default": null,
+      "description": "Timezone-aware ISO-8601 expiry timestamp; employer offer updates normalize it to UTC.",
+      "examples": [
+        "2026-12-01T00:00:00Z"
+      ],
       "title": "Expires At"
     }
   },
