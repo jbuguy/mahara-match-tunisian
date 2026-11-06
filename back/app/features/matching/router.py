@@ -11,11 +11,12 @@ from mahara_data.db.models.employers import JobOffer, JobOfferSkill
 from mahara_data.db.models.matching import MatchResult as StoredMatchResult, SkillGap
 from mahara_data.db.models.taxonomy import Skill, SkillRelation
 from mahara_data.enums import GapType, OfferStatus, RequirementLevel, TaxonomyStatus
-from mahara_data.schemas.matching import RankedMatches, Roadmap
+from mahara_data.schemas.matching import RankedMatches
 from shared_llm import OpenAICompatibleClient
 
 from . import scoring as _scoring
 from .rag import RAGUnavailable, answer_match_question
+from .roadmaps import create_or_get_offer_roadmap
 
 
 class MatchAssistantMessage(BaseModel):
@@ -253,20 +254,6 @@ def create_matching_router(
             offer_uuid = UUID(job_offer_id)
         except ValueError:
             raise HTTPException(status_code=404, detail="Offer not found") from None
-        offer = db.get(JobOffer, offer_uuid)
-        if offer is None or offer.status is not OfferStatus.PUBLISHED:
-            raise HTTPException(status_code=404, detail="Offer not found")
-
-        scoring_offer = next(
-            (item for item in _published_offers(db) if item["job_offer_id"] == str(offer_uuid)),
-            None,
-        )
-        if scoring_offer is None:
-            raise HTTPException(status_code=404, detail="Offer not found")
-        roadmap = _scoring.generer_roadmap(profile, scoring_offer)
-        if roadmap is None:
-            return {"status": "no_gap", "message": "The candidate already meets this offer's skill requirements."}
-        return Roadmap.model_validate(roadmap).model_dump(mode="json")
+        return create_or_get_offer_roadmap(db, profile, offer_uuid)
 
     return router
-

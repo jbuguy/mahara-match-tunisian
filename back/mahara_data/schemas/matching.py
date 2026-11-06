@@ -3,10 +3,11 @@
 import math
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import Field, model_validator
 
-from ..enums import GapType, RequirementLevel, RoadmapItemStatus, RoadmapStatus
+from ..enums import CourseModality, GapType, RequirementLevel, RoadmapItemStatus, RoadmapStatus
 from ..reference import DEFAULT_SCORING_WEIGHTS
 from .common import Contract, ProficiencyLevel, Score, TaxonomyCode
 
@@ -94,18 +95,66 @@ class RankedMatches(Contract):
         return self
 
 
+class RoadmapCourse(Contract):
+    course_id: uuid.UUID
+    title: str = Field(min_length=1, max_length=200)
+    provider_name: str = Field(min_length=1, max_length=200)
+    target_level: ProficiencyLevel
+    description: str | None = None
+    modality: CourseModality
+    duration_hours: int | None = Field(default=None, ge=1, le=5000)
+    cost_tnd: float | None = Field(default=None, ge=0)
+    governorate_code: str | None = Field(default=None, max_length=8)
+    language: str = Field(default="fr", max_length=8)
+    catalog_status: Literal["active"] = "active"
+
+
+class RoadmapSkillReference(Contract):
+    skill_code: TaxonomyCode
+    label: str = Field(min_length=1, max_length=200)
+
+
 class RoadmapStep(Contract):
     position: int = Field(ge=1)
     skill_code: TaxonomyCode
+    skill_label: str | None = None
+    required_level: ProficiencyLevel = 2
+    current_level: ProficiencyLevel | None = None
+    gap_type: GapType | None = None
+    transferable_skill_codes: list[TaxonomyCode] = Field(default_factory=list)
+    transferable_skills: list[RoadmapSkillReference] = Field(default_factory=list)
     training_course_id: uuid.UUID | None = None
+    courses: list[RoadmapCourse] = Field(default_factory=list, max_length=3)
+    learning_action: str = Field(
+        default="Build practical evidence in this skill and ask an experienced person for feedback.",
+        max_length=500,
+    )
     status: RoadmapItemStatus = RoadmapItemStatus.TODO
+
+
+class RoadmapMarketSignal(Contract):
+    status: Literal["increasing", "stable_or_declining", "insufficient_data"]
+    source: str = Field(min_length=1, max_length=200)
+    current_period_start: str
+    current_period_end: str
+    previous_period_start: str
+    previous_period_end: str
+    current_positions: int = Field(ge=0)
+    previous_positions: int = Field(ge=0)
+    change_percent: float | None = None
+    latest_offer_at: datetime | None = None
+    governorate_code: str | None = Field(default=None, max_length=8)
+    minimum_positions_per_period: int = Field(ge=1)
 
 
 class Roadmap(Contract):
     roadmap_id: uuid.UUID | None = None
     candidate_id: uuid.UUID
     target_job_offer_id: uuid.UUID | None = None
+    target_job_title: str | None = None
     target_occupation_code: TaxonomyCode | None = None
+    target_occupation_title: str | None = None
+    market_signal: RoadmapMarketSignal | None = None
     status: RoadmapStatus = RoadmapStatus.ACTIVE
     progress_pct: int = Field(default=0, ge=0, le=100)
     steps: list[RoadmapStep] = Field(min_length=1)

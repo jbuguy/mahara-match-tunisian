@@ -4,17 +4,34 @@ Mahara Match is one React frontend and one FastAPI backend for candidate onboard
 
 ## Features
 
-- Candidate sign-in, profile editing, voice onboarding, CV import, assistant, job matches, roadmaps, and applications.
+- Candidate sign-in, profile editing, voice onboarding, CV import, assistant, job matches, saved learning roadmaps, and applications.
 - Match-specific RAG assistant that answers questions from published offers, validated skills, and active training courses.
 - Employer offer drafting, voice input, publishing, and applicant review.
 - Ministry skills and occupation governance, market data ingestion, analytics, and monitoring.
 - Shared PostgreSQL models/contracts, authentication, database sessions, error handling, LLM clients, and voice helpers.
 
+## Candidate learning roadmaps
+
+Candidates can save a learning roadmap for a published job offer or a validated occupation, then track each step from the candidate dashboard's **Explore career roadmaps** entry. Roadmap steps show the required skill level, relevant skills already in the profile, active catalog courses when available, and practical alternatives.
+
+The occupation taxonomy does not specify proficiency levels, so occupation roadmaps use level 2 of 4 as a transparent planning baseline. Job-offer roadmaps use the level supplied by the employer.
+
+The career-options API compares published platform job-offer positions across two consecutive 90-day periods. It shows an **increasing** signal only when each period has at least three positions; this is observed platform activity, not an official or predictive labor-market forecast. When available, the comparison is limited to the candidate's governorate. Course listings are active catalog records; the current catalog does not represent provider verification, so candidates are advised to confirm details with providers.
+
+Candidate endpoints:
+
+- `GET /api/v1/me/roadmaps` — list saved roadmaps.
+- `GET /api/v1/me/roadmaps/career-options` — find validated occupation goals, transferable skills, gaps, and demand evidence.
+- `POST /api/v1/me/roadmaps` — create or resume a roadmap with exactly one of `target_job_offer_id` or `target_occupation_code`.
+- `GET /api/v1/me/roadmaps/{roadmap_id}` — read a candidate-owned roadmap.
+- `PATCH /api/v1/me/roadmaps/{roadmap_id}/steps/{position}` — update a step to `todo`, `in_progress`, `done`, or `skipped`.
+- `PATCH /api/v1/me/roadmaps/{roadmap_id}/status` — archive (`abandoned`) or reactivate (`active`) a roadmap.
+
 ## Local setup
 
 Requirements: Python 3.11+, Node.js 18+, and PostgreSQL. Configure `back/.env` from `back/.env.example`; set `DATABASE_URL` and a strong `JWT_SECRET`. Optional Google OAuth, Groq, and OpenAI-compatible LLM settings are documented in that file. Email verification and password reset require SMTP settings (`SMTP_HOST`, `SMTP_FROM_EMAIL`, and, when required, SMTP credentials) before the API can deliver links.
 
-When `APP_ENV=development`, employer email verification is skipped so local offer workflows can be tested without SMTP. Verification remains required in other environments.
+When `APP_ENV=development` (or `dev`/`test`), candidate and employer email verification is skipped so local workflows can be tested without SMTP. Verification remains required in other environments.
 
 Authentication endpoints use configurable, PostgreSQL-backed per-IP rate limits:
 `AUTH_LOGIN_RATE_LIMIT` / `AUTH_LOGIN_RATE_WINDOW_SECONDS`,

@@ -61,9 +61,20 @@ class InterviewError(ValueError):
 
 
 class OfferPublishError(ValueError):
-    def __init__(self, message: str, *, status_code: int = 422) -> None:
+    def __init__(
+        self,
+        message: str,
+        *,
+        status_code: int = 422,
+        code: str = "invalid_offer",
+        field: str | None = None,
+        details: dict[str, Any] | None = None,
+    ) -> None:
         super().__init__(message)
         self.status_code = status_code
+        self.code = code
+        self.field = field
+        self.details = details or {}
 
 
 def first_question() -> str:
@@ -208,7 +219,12 @@ def persist_published_offer(db: Session, offer: NormalizedJobOffer, employer_id:
     skills_by_code = {skill.code: skill for skill in skills}
     missing_skills = sorted(set(skill_codes) - skills_by_code.keys())
     if missing_skills:
-        raise OfferPublishError(f"Unknown or unvalidated skill codes: {', '.join(missing_skills)}")
+        raise OfferPublishError(
+            "Unknown or unvalidated skill codes",
+            code="invalid_skills",
+            field="skills",
+            details={"invalid_skill_codes": missing_skills},
+        )
 
     occupation = None
     if offer.occupation_code:

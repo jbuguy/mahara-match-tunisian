@@ -47,7 +47,11 @@ class NormalizedJobOffer(Contract):
     status: OfferStatus = OfferStatus.DRAFT
     source: OfferSource = OfferSource.EMPLOYER_FORM
     published_at: datetime | None = None
-    expires_at: datetime | None = None
+    expires_at: datetime | None = Field(
+        default=None,
+        description="Timezone-aware ISO-8601 expiry timestamp; employer offer updates normalize it to UTC.",
+        examples=["2026-12-01T00:00:00Z"],
+    )
 
     @model_validator(mode="after")
     def _consistency(self) -> "NormalizedJobOffer":

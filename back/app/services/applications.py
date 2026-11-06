@@ -17,10 +17,9 @@ from mahara_data.db.models.employers import (
     HiringFeedback,
     JobOffer,
 )
-from mahara_data.db.models.matching import MatchResult
-from mahara_data.db.models.matching import SkillGap
-from mahara_data.db.models.taxonomy import Occupation, Skill
 from mahara_data.db.models.reference import Governorate
+from mahara_data.db.models.matching import MatchResult, SkillGap
+from mahara_data.db.models.taxonomy import Occupation, Skill
 from mahara_data.enums import ApplicationStatus, HiringDecision, OfferStatus
 from mahara_data.schemas.application import (
     ApplicationCreate,
@@ -143,12 +142,14 @@ def list_employer_applications_page(
     page: int,
     page_size: int,
     status: ApplicationStatus | None = None,
+    statuses: list[ApplicationStatus] | None = None,
     job_offer_id: uuid.UUID | None = None,
     min_score: float | None = None,
+    sort: str = "score_global",
 ) -> tuple[list[dict], int]:
     rows, total = repository.list_employer_applications_page(
         db, employer.id, page=page, page_size=page_size, status=status,
-        job_offer_id=job_offer_id, min_score=min_score,
+        statuses=statuses, job_offer_id=job_offer_id, min_score=min_score, sort=sort,
     )
     repository.audit_candidate_identity_reads(
         db,
@@ -156,7 +157,23 @@ def list_employer_applications_page(
         employer_id=employer.id,
         applications=rows,
     )
-    return [_employer_application_payload(row) for row in rows], total
+    items = [_employer_application_payload(row) for row in rows]
+    match_ids = [row[0].match_result_id for row in rows if row[0].match_result_id]
+    gaps_by_match: dict[uuid.UUID, list[str]] = {}
+    if match_ids:
+        gap_rows = (
+            db.query(SkillGap.match_result_id, Skill.label_fr)
+            .join(Skill, Skill.id == SkillGap.skill_id)
+            .filter(SkillGap.match_result_id.in_(match_ids))
+            .order_by(Skill.label_fr)
+            .all()
+        )
+        for match_id, label in gap_rows:
+            gaps_by_match.setdefault(match_id, []).append(label)
+    for row, item in zip(rows, items):
+        item["offer_title"] = item["title"]
+        item["gaps_summary"] = gaps_by_match.get(row[0].match_result_id, [])
+    return items, total
 
 
 def _employer_application_payload(row) -> dict:
@@ -288,6 +305,23 @@ def record_employer_decision(
     application = repository.get_application_for_employer(db, application_id, employer.id)
     if application is None:
         raise ApplicationWorkflowError(404, "Application not found")
+    target_status = {
+        HiringDecision.HIRED: ApplicationStatus.HIRED,
+        HiringDecision.SHORTLISTED: ApplicationStatus.SHORTLISTED,
+        HiringDecision.REJECTED: ApplicationStatus.REJECTED,
+        HiringDecision.NO_SHOW: ApplicationStatus.REJECTED,
+    }[decision]
+    identical_decision = (
+        db.query(HiringFeedback.id)
+        .filter(
+            HiringFeedback.application_id == application.id,
+            HiringFeedback.employer_id == employer.id,
+            HiringFeedback.decision == decision,
+        )
+        .first()
+    )
+    if application.status is target_status and identical_decision is not None:
+        return application
     if application.status in {ApplicationStatus.HIRED, ApplicationStatus.REJECTED}:
         raise ApplicationWorkflowError(409, "This application already has a final decision")
 
@@ -299,12 +333,7 @@ def record_employer_decision(
         match_quality=match_quality,
         comment=comment,
     )
-    application.status = {
-        HiringDecision.HIRED: ApplicationStatus.HIRED,
-        HiringDecision.SHORTLISTED: ApplicationStatus.SHORTLISTED,
-        HiringDecision.REJECTED: ApplicationStatus.REJECTED,
-        HiringDecision.NO_SHOW: ApplicationStatus.REJECTED,
-    }[feedback.decision]
+    application.status = target_status
     repository.insert_hiring_feedback(
         db,
         HiringFeedback(

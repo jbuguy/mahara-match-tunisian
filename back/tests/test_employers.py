@@ -88,6 +88,46 @@ def test_production_signup_still_requires_employer_email_verification(monkeypatc
     assert exc_info.value.status_code == 403
 
 
+def test_development_candidate_signup_skips_email_verification():
+    response = client.post(
+        "/candidates/signup",
+        json={
+            "full_name": "Candidate Test",
+            "email": "candidate@example.com",
+            "password": "StrongPass123!",
+        },
+    )
+
+    assert response.status_code == 201
+    assert response.json()["email_verified"] is True
+    with TestSession() as db:
+        user = db.query(User).filter_by(email="candidate@example.com").one()
+        identity = db.query(AuthIdentity).filter_by(user_id=user.id).one()
+        assert user.email_verified is True
+        assert identity.email_verified is True
+
+
+def test_production_candidate_signup_still_requires_email_verification(monkeypatch):
+    monkeypatch.setattr("app.main.settings.app_env", "production")
+
+    response = client.post(
+        "/candidates/signup",
+        json={
+            "full_name": "Candidate Test",
+            "email": "candidate@example.com",
+            "password": "StrongPass123!",
+        },
+    )
+
+    assert response.status_code == 201
+    assert response.json()["email_verified"] is False
+    with TestSession() as db:
+        user = db.query(User).filter_by(email="candidate@example.com").one()
+        identity = db.query(AuthIdentity).filter_by(user_id=user.id).one()
+        assert user.email_verified is False
+        assert identity.email_verified is False
+
+
 def test_duplicate_email_is_rejected():
     client.post("/employers/signup", json=valid_payload)
 

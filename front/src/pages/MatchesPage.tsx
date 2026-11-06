@@ -182,8 +182,14 @@ export function MatchesPage() {
           })()}
           {roadmap?.offerId === match.job_offer_id && <div className="roadmap-result" aria-live="polite">
             {'steps' in roadmap.result ? <>
-              <h4>Roadmap</h4>
-              <ol>{roadmap.result.steps.map((step) => <li key={step.position}>{formatSkillCode(step.skill_code)} <small>{step.status}</small></li>)}</ol>
+              <h4>Saved learning roadmap</h4>
+              <ol>{roadmap.result.steps.map((step) => <li key={step.position}>
+                {step.skill_label ?? formatSkillCode(step.skill_code)}
+                <small>{step.status.replace('_', ' ')} · target level {step.required_level}</small>
+                <p>{step.learning_action}</p>
+                {step.courses[0] && <small>Suggested course: {step.courses[0].title} · {step.courses[0].provider_name}</small>}
+              </li>)}</ol>
+              <Link className="secondary-btn" to="/roadmaps">Track roadmap progress</Link>
             </> : <p>{roadmap.result.message}</p>}
           </div>}
         </article>)}

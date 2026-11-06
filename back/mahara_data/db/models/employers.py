@@ -60,6 +60,7 @@ class JobOffer(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             name="job_offers_salary_range",
         ),
         Index("job_offers_status_governorate_idx", "status", "governorate_code"),
+        Index("job_offers_occupation_published_idx", "occupation_id", "published_at"),
     )
 
     employer_id: Mapped[uuid.UUID | None] = mapped_column(

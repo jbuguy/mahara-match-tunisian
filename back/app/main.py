@@ -24,8 +24,10 @@ from .database import get_db
 from .google_auth import router as google_auth_router
 from .features.onboarding.router import create_onboarding_router
 from .features.matching.router import create_matching_router
+from .features.matching.roadmaps import create_roadmap_router
 from .features.employer.voice import create_employer_voice_router
 from .features.employer.market import router as employer_market_router
+from .features.employer.dashboard import create_employer_dashboard_router
 from .features.mock_interviews import create_mock_interview_router
 from .features.mock_interview_retention import run_retention_loop
 from .features.employee.data_lifecycle import run_candidate_deletion_retention_loop
@@ -55,6 +57,7 @@ from .schemas import (
     CandidateLogin,
     CandidateProfile,
     CandidateSignup,
+    CandidateSignupResponse,
     CandidateUpdate,
     EmployerLogin,
     EmployerProfile,
@@ -150,6 +153,7 @@ app.include_router(google_auth_router, prefix="/api/v1", include_in_schema=False
 app.include_router(email_auth_router)
 app.include_router(create_training_provider_router(get_db, get_current_user))
 app.include_router(create_application_router(get_db, get_current_user, get_current_employer))
+app.include_router(create_employer_dashboard_router(get_db, get_current_employer))
 app.include_router(create_mock_interview_router(get_db, require_roles("candidate"), llm_client))
 app.include_router(employer_market_router)
 app.include_router(create_offer_router(get_db, get_current_user))
@@ -158,6 +162,7 @@ read_candidate_profile = register_employee_routes(app, settings, get_db)
 app.include_router(create_employer_voice_router())
 app.include_router(create_speech_router())
 app.include_router(create_matching_router(get_db, get_current_user, read_candidate_profile, llm_client=llm_client))
+app.include_router(create_roadmap_router(get_db, get_current_user, read_candidate_profile))
 for ministry_router in (
     ministry_taxonomy.router,
     ministry_suggestions.router,
@@ -442,13 +447,14 @@ def login(payload: EmployerLogin, db: Session = Depends(get_db)) -> Token:
 
 @app.post(
     "/candidates/signup",
-    response_model=CandidateProfile,
+    response_model=CandidateSignupResponse,
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(signup_rate_limit)],
 )
-def candidate_signup(payload: CandidateSignup, db: Session = Depends(get_db)) -> Candidate:
+def candidate_signup(payload: CandidateSignup, db: Session = Depends(get_db)) -> CandidateSignupResponse:
     email = payload.email.lower()
-    user = get_or_create_user(db, email, roles=["candidate"], email_verified=False)
+    email_verified = not settings.email_verification_required
+    user = get_or_create_user(db, email, roles=["candidate"], email_verified=email_verified)
     password_hash = hash_password(payload.password)
     AuthIdentity.link_user(
         db,
@@ -456,7 +462,7 @@ def candidate_signup(payload: CandidateSignup, db: Session = Depends(get_db)) ->
         provider=AuthProvider.PASSWORD,
         provider_user_id=f"email:{email}",
         email=email,
-        email_verified=False,
+        email_verified=email_verified,
         password_hash=password_hash,
     )
 
@@ -474,7 +480,10 @@ def candidate_signup(payload: CandidateSignup, db: Session = Depends(get_db)) ->
     )
     db.commit()
     db.refresh(candidate)
-    return candidate
+    return CandidateSignupResponse(
+        **CandidateProfile.model_validate(candidate).model_dump(),
+        email_verified=email_verified,
+    )
 
 
 @app.post("/candidates/login", response_model=Token, dependencies=[Depends(login_rate_limit)])

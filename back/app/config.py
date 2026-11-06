@@ -71,7 +71,7 @@ class Settings(BaseSettings):
 
     @property
     def email_verification_required(self) -> bool:
-        return self.app_env.strip().lower() != "development"
+        return self.app_env.strip().lower() not in {"dev", "development", "test"}
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore", case_sensitive=False)
 

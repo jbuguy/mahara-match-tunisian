@@ -48,7 +48,7 @@ Start LM Studio's local server with the model loaded, then run the backend:
 
 ```powershell
 cd backend
-python -m uvicorn app.main:app --reload
+python -m uvicorn app.main:asgi_app --reload
 ```
 
 Sign in through the existing employer API and open `http://127.0.0.1:8000/employer-agent/`. The conversational routes are under `/employer-agent/sessions`. Draft sessions are stored in `employer_draft_sessions`; apply the PostgreSQL SQL migrations before using a production database.
