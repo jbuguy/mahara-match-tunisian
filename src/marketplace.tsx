@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { ArrowUpRight, BriefcaseBusiness } from "lucide-react";
+import { ArrowUpRight, BriefcaseBusiness, ChartNoAxesCombined } from "lucide-react";
 import { Badge, Button, Card, ChartFrame, DataTable, EmptyState } from "./components/ui";
 import {
   ApiError,
@@ -135,8 +135,7 @@ export function AdminDashboardPage({ token }: { token: string }) {
           <p>Les chiffres et graphiques ci-dessous reflètent les données agrégées de la période sélectionnée.</p>
         </div>
         <div className="admin-overview-banner__visual" aria-hidden="true">
-          <span /><span /><span /><span /><span /><span /><span />
-          <i className="admin-overview-banner__line" />
+          <ChartNoAxesCombined size={44} strokeWidth={1.6} />
         </div>
       </div>
 
@@ -359,7 +358,16 @@ function valuesFromCourse(course: TrainingCourse): CourseFormValues {
   };
 }
 
-export function TrainingProviderDashboardPage({ token }: { token: string }) {
+export function TrainingProviderDashboardPage({
+  token,
+  view = "catalogue",
+  onNavigate,
+}: {
+  token: string;
+  view?: "overview" | "catalogue";
+  onNavigate?: (page: string) => void;
+}) {
+  const isOverview = view === "overview";
   const [courses, setCourses] = useState<TrainingCourse[]>([]);
   const [form, setForm] = useState<CourseFormValues>(emptyCourseForm);
   const [editingCourseId, setEditingCourseId] = useState<string | null>(null);
@@ -467,18 +475,28 @@ export function TrainingProviderDashboardPage({ token }: { token: string }) {
   return (
     <section className="market-page">
       <div className="eyebrow">ORGANISME DE FORMATION</div>
-      <h1>Votre catalogue de formations</h1>
+      <h1>{isOverview ? "Votre catalogue de formations" : "Gérer vos formations"}</h1>
       <p className="market-page__intro">
-        Publiez des formations reliées aux compétences et suivez les inscriptions ainsi que les
-        achèvements de vos cours.
+        {isOverview
+          ? "Suivez vos formations, leurs inscriptions et les achèvements de vos participants."
+          : "Publiez des formations reliées aux compétences et suivez les inscriptions ainsi que les achèvements de vos cours."}
       </p>
+      {isOverview && onNavigate && (
+        <Card className="market-cta">
+          <div>
+            <h2>Gérer votre catalogue</h2>
+            <p>Créez, modifiez et publiez vos formations depuis le catalogue.</p>
+          </div>
+          <Button onClick={() => onNavigate("Catalogue de formations")}>Ouvrir le catalogue</Button>
+        </Card>
+      )}
       <div className="market-metrics market-metrics--three">
         <MetricCard label="Formations" value={courses.length} detail="Brouillons, publiées et archivées" />
         <MetricCard label="Inscriptions actives" value={activeEnrollments} detail="Participants actuellement inscrits" />
         <MetricCard label="Achèvements" value={completions} detail="Formations marquées terminées" />
       </div>
 
-      <Card className="market-panel">
+      {!isOverview && <Card className="market-panel">
         <div className="market-panel__heading">
           <div>
             <h2>{editingCourseId ? "Modifier la formation" : "Créer une formation"}</h2>
@@ -569,7 +587,7 @@ export function TrainingProviderDashboardPage({ token }: { token: string }) {
             </Button>
           </div>
         </form>
-      </Card>
+      </Card>}
 
       <div className="market-section-heading">
         <h2>Vos formations</h2>
@@ -594,7 +612,7 @@ export function TrainingProviderDashboardPage({ token }: { token: string }) {
                 </Badge>
                 <h3>{course.title}</h3>
               </div>
-              <Button variant="secondary" onClick={() => editCourse(course)}>Modifier</Button>
+              {!isOverview && <Button variant="secondary" onClick={() => editCourse(course)}>Modifier</Button>}
             </div>
             <p>{course.summary}</p>
             <ul className="market-course-meta">

@@ -17,3 +17,5 @@ backend/data/
 
 .DS_Store
 Thumbs.db
+
+.playwright-mcp/

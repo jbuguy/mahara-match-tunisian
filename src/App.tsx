@@ -3,7 +3,6 @@ import {
   ArrowUpRight,
   BriefcaseBusiness,
   Building2,
-  ChevronDown,
   ClipboardList,
   Compass,
   ClipboardCheck,
@@ -226,6 +225,7 @@ export default function App() {
 
   const configuration = roleConfiguration[user.role];
   const isCandidate = user.role === "candidate";
+  const initial = user.email.slice(0, 1).toLocaleUpperCase("fr-FR");
 
   return (
     <div className="app-shell" data-theme={theme}>
@@ -270,9 +270,6 @@ export default function App() {
             >
               <Icon size={19} strokeWidth={1.8} aria-hidden="true" />
               <span>{label}</span>
-              {isCandidate && label === "Assistant" && (
-                <span className="nav-item__new">Nouveau</span>
-              )}
             </button>
           ))}
         </nav>
@@ -296,13 +293,12 @@ export default function App() {
 
         <div className="account-switcher">
           <span className="avatar" aria-hidden="true">
-            {configuration.label.slice(0, 1)}
+            {initial}
           </span>
           <span className="account-switcher__text">
-            <strong>{user.email}</strong>
+            <strong title={user.email}>{user.email}</strong>
             <small>{configuration.label}</small>
           </span>
-          <ChevronDown size={16} aria-hidden="true" />
         </div>
       </aside>
 
@@ -341,9 +337,12 @@ export default function App() {
             </button>
             <span className="topbar__divider" />
             <span className="avatar avatar--small" aria-hidden="true">
-              {configuration.label.slice(0, 1)}
+              {initial}
             </span>
-            <span className="topbar__account">{configuration.label}</span>
+            <span className="topbar__account">
+              <strong title={user.email}>{user.email}</strong>
+              <small>{configuration.label}</small>
+            </span>
             <button className="icon-button" type="button" aria-label="Se déconnecter" onClick={handleLogout}>
               <LogOut size={18} />
             </button>
@@ -357,7 +356,7 @@ export default function App() {
             ) : user.role === "ministry_admin" ? (
               <AdminDashboardPage token={accessToken} />
             ) : user.role === "training_provider" ? (
-              <TrainingProviderDashboardPage token={accessToken} />
+              <TrainingProviderDashboardPage token={accessToken} view="overview" onNavigate={setActivePage} />
             ) : user.role === "employer" ? (
               <EmployerDashboardPage token={accessToken} onNavigate={setActivePage} />
             ) : (

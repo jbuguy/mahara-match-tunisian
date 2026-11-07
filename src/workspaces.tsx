@@ -587,6 +587,7 @@ export function CandidateProfilePage({ token }: { token: string }) {
                   <p
                     className={`profile-assistant__message profile-assistant__message--${message.role}`}
                     key={`${message.role}-${index}`}
+                    dir="auto"
                   >
                     {message.content}
                   </p>
@@ -604,6 +605,7 @@ export function CandidateProfilePage({ token }: { token: string }) {
                     id="candidate-assistant-message"
                     className="input"
                     aria-label="Votre message"
+                  dir="auto"
                   value={chatText}
                   onChange={(event) => setChatText(event.target.value)}
                   placeholder="Écrivez en Derja, en arabe ou en français…"
@@ -1071,13 +1073,14 @@ export function CandidateAssistantPage({
                 <p
                   className={`profile-assistant__message profile-assistant__message--${message.role}`}
                   key={`${message.role}-${index}`}
+                  dir="auto"
                 >
                   {message.content}
                 </p>
               ))
             ) : (
-              <p className="profile-assistant__message profile-assistant__message--assistant">
-                Aslema ! NØ¬Ù… Ù†Ø­ÙƒÙŠÙˆ Ø¹Ù„Ù‰ Ù…Ù‡Ø§Ø±Ø§ØªÙƒØŒ Ø§Ù„Ø®Ø¯Ù…Ø©ØŒ ÙˆÙ„Ø§ Ø§Ù„ØªÙƒÙˆÙŠÙ†. Ø´Ù†ÙˆØ© ØªØ­Ø¨ ØªØ¹Ø±ÙØŸ
+              <p className="profile-assistant__message profile-assistant__message--assistant" dir="auto">
+                Aslema ! نجم نحكيو على مهاراتك، الخدمة، ولا التكوين. شنوة تحب تعرف؟
               </p>
             )}
             {isSending && <p className="profile-assistant__pending">L’assistant prépare sa réponse…</p>}
@@ -1102,6 +1105,7 @@ export function CandidateAssistantPage({
             <input
               className="input"
               aria-label="Votre message"
+              dir="auto"
               value={chatText}
               onChange={(event) => setChatText(event.target.value)}
               placeholder="Écrivez en Derja, en arabe ou en français…"
@@ -1132,6 +1136,8 @@ export function CandidateAssistantPage({
   );
 }
 
+const ROADMAP_INITIAL_STEPS = 8;
+
 export function CandidateRoadmapPage({
   token,
   onNavigate,
@@ -1140,6 +1146,7 @@ export function CandidateRoadmapPage({
   onNavigate: (page: string) => void;
 }) {
   const [roadmap, setRoadmap] = useState<CandidateRoadmap | null>(null);
+  const [showAllSteps, setShowAllSteps] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [savingSkill, setSavingSkill] = useState("");
   const [error, setError] = useState("");
@@ -1179,7 +1186,8 @@ export function CandidateRoadmapPage({
       <h1>Mon parcours professionnel</h1>
       <p className="workspace-page__intro">
         Un plan d’étapes déterministe basé sur les compétences demandées dans les offres et celles
-        déjà renseignées dans votre profil.
+        déjà renseignées dans votre profil. Travaillez chaque compétence, marquez l’étape comme
+        terminée, puis mettez à jour votre profil pour actualiser vos correspondances.
       </p>
       {isLoading && <p aria-live="polite">Préparation de votre parcours…</p>}
       {error && <p className="workspace-error" role="alert">{error}</p>}
@@ -1206,7 +1214,7 @@ export function CandidateRoadmapPage({
             </div>
           </Card>
           <ol className="roadmap-steps">
-            {roadmap.steps.map((step, index) => (
+            {roadmap.steps.slice(0, showAllSteps ? undefined : ROADMAP_INITIAL_STEPS).map((step, index) => (
               <li className={`roadmap-step ${step.completed ? "roadmap-step--completed" : ""}`} key={step.skill_key}>
                 <span className="roadmap-step__marker" aria-hidden="true">
                   {step.completed ? <Check size={17} /> : index + 1}
@@ -1221,12 +1229,9 @@ export function CandidateRoadmapPage({
                       {step.completed ? "Terminée" : "À développer"}
                     </Badge>
                   </div>
-                  <p className="roadmap-step__evidence">
+                  <p className="roadmap-step__evidence" title={step.required_by.join(", ")}>
                     Demandée dans {step.offer_count} offre{step.offer_count === 1 ? "" : "s"}
                     {step.required_by.length > 0 && <> : {step.required_by.join(", ")}</>}.
-                  </p>
-                  <p className="roadmap-step__action">
-                    Travaillez cette compétence et suivez votre progression. Mettez ensuite à jour votre profil pour actualiser vos correspondances.
                   </p>
                   <Button
                     variant={step.completed ? "secondary" : "primary"}
@@ -1244,6 +1249,18 @@ export function CandidateRoadmapPage({
               </li>
             ))}
           </ol>
+          {roadmap.steps.length > ROADMAP_INITIAL_STEPS && (
+            <Button
+              variant="secondary"
+              className="roadmap-more"
+              aria-expanded={showAllSteps}
+              onClick={() => setShowAllSteps(!showAllSteps)}
+            >
+              {showAllSteps
+                ? "Afficher moins d’étapes"
+                : `Afficher les ${roadmap.steps.length - ROADMAP_INITIAL_STEPS} autres étapes`}
+            </Button>
+          )}
         </>
       )}
       {!isLoading && roadmap?.steps.length === 0 && (
@@ -2268,6 +2285,7 @@ export function CandidateMatchesPage({
   onNavigate: (page: string) => void;
 }) {
   const [matches, setMatches] = useState<JobMatch[]>([]);
+  const [query, setQuery] = useState("");
   const [appliedOfferIds, setAppliedOfferIds] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -2292,15 +2310,66 @@ export function CandidateMatchesPage({
     };
   }, [token]);
 
+  const normalizedQuery = query.trim().toLocaleLowerCase("fr-FR");
+  const visibleMatches = normalizedQuery
+    ? matches.filter((match) =>
+        [match.title, match.location, ...match.required_skills]
+          .join(" ")
+          .toLocaleLowerCase("fr-FR")
+          .includes(normalizedQuery),
+      )
+    : matches;
+  const hasNoMatchedSkills =
+    matches.length > 0 && matches.every((match) => match.matched_skills.length === 0);
+
   return (
     <section className="workspace-page">
       <div className="eyebrow">OPPORTUNITÉS POUR VOUS</div>
       <h1>Offres compatibles avec vos compétences</h1>
       <p className="workspace-page__intro">
-        Le score compare uniquement les compétences renseignées aux compétences demandées.
+        Le score compare uniquement les compétences renseignées aux compétences demandées. Il ne
+        prédit pas la décision de recrutement.
       </p>
       {isLoading && <p aria-live="polite">Recherche des offres…</p>}
       {error && <p className="workspace-error" role="alert">{error}</p>}
+      {!isLoading && hasNoMatchedSkills && (
+        <Card className="workspace-notice">
+          <span className="workspace-notice__icon" aria-hidden="true"><Target size={20} /></span>
+          <div>
+            <h2>Ajoutez vos compétences pour voir vos correspondances</h2>
+            <p>Aucune compétence de votre profil ne correspond encore à ces offres. Complétez votre profil pour obtenir un score utile.</p>
+          </div>
+          <Button variant="secondary" onClick={() => onNavigate("Mon profil")}>
+            Compléter mon profil
+          </Button>
+        </Card>
+      )}
+      {!isLoading && matches.length > 0 && (
+        <div className="workspace-toolbar">
+          <label className="workspace-search">
+            <Search size={17} aria-hidden="true" />
+            <span className="visually-hidden">Rechercher une offre</span>
+            <input
+              className="input"
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Poste, ville ou compétence"
+            />
+          </label>
+          <p className="workspace-toolbar__count" aria-live="polite">
+            {visibleMatches.length} offre{visibleMatches.length === 1 ? "" : "s"}
+          </p>
+        </div>
+      )}
+      {!isLoading && matches.length > 0 && visibleMatches.length === 0 && (
+        <Card className="workspace-empty">
+          <Search size={24} aria-hidden="true" />
+          <h2>Aucune offre ne correspond à votre recherche</h2>
+          <p>Essayez un autre poste, une autre ville ou une autre compétence.</p>
+          <Button variant="secondary" onClick={() => setQuery("")}>Effacer la recherche</Button>
+        </Card>
+      )}
       {!isLoading && !error && matches.length === 0 && (
         <Card className="workspace-empty">
           <BriefcaseBusiness size={24} aria-hidden="true" />
@@ -2311,8 +2380,8 @@ export function CandidateMatchesPage({
           </Button>
         </Card>
       )}
-      <div className="workspace-list">
-        {matches.map((match) => (
+      <div className="workspace-list workspace-list--grid">
+        {visibleMatches.map((match) => (
           <MatchCard
             key={match.id}
             match={match}
@@ -2356,40 +2425,36 @@ function MatchCard({
   }
 
   return (
-    <Card className="offer-card">
+    <Card className="offer-card offer-card--match">
       <div className="offer-card__top">
         <div>
           <h2>{match.title}</h2>
-          <p className="offer-card__location"><MapPin size={15} aria-hidden="true" />{match.location}</p>
+          <p className="offer-card__location">
+            <MapPin size={15} aria-hidden="true" />
+            <span>{match.location}</span>
+            <span aria-hidden="true">·</span>
+            <span>Publiée le {new Date(match.created_at).toLocaleDateString("fr-FR")}</span>
+          </p>
         </div>
-        <Badge tone={match.match_score >= 60 ? "success" : "neutral"}>
+        <Badge tone={match.match_score >= 60 ? "success" : match.match_score > 0 ? "accent" : "neutral"}>
           {match.match_score}% de correspondance
         </Badge>
       </div>
       <p className="offer-card__description">{match.description}</p>
-      <div className="job-match-summary" aria-label="Résumé de la correspondance">
-        <span><strong>{match.matched_skills.length}</strong> compétence{match.matched_skills.length === 1 ? "" : "s"} correspondante{match.matched_skills.length === 1 ? "" : "s"}</span>
-        <span><strong>{match.missing_skills.length}</strong> à développer</span>
+      <div className="offer-card__skills">
+        <SkillList label="Compétences correspondantes" skills={match.matched_skills} tone="matched" />
+        <SkillList label="À développer" skills={match.missing_skills} tone="missing" />
       </div>
-      <details className="job-detail">
-        <summary>Voir le détail de l’offre et des compétences</summary>
-        <div className="job-detail__content">
-          <p><strong>Lieu :</strong> {match.location}</p>
-          <p><strong>Publiée le :</strong> {new Date(match.created_at).toLocaleDateString("fr-FR")}</p>
-          <SkillList label="Compétences requises" skills={match.required_skills} tone="matched" />
-          <p className="market-footnote">Le score compare les compétences indiquées dans votre profil à celles de l’offre. Il ne prédit pas la décision de recrutement.</p>
-        </div>
-      </details>
-      <SkillList label="Compétences correspondantes" skills={match.matched_skills} tone="matched" />
-      <SkillList label="À développer" skills={match.missing_skills} tone="missing" />
       {error && <p className="workspace-error" role="alert">{error}</p>}
-      <Button disabled={isApplied || isApplying} onClick={() => void apply()}>
-        {isApplying
-          ? "Envoi de la candidature…"
-          : isApplied
-            ? "Candidature envoyée"
-            : "Candidater"}
-      </Button>
+      <div className="offer-card__actions">
+        <Button disabled={isApplied || isApplying} onClick={() => void apply()}>
+          {isApplying
+            ? "Envoi de la candidature…"
+            : isApplied
+              ? "Candidature envoyée"
+              : "Candidater"}
+        </Button>
+      </div>
     </Card>
   );
 }
@@ -2495,6 +2560,28 @@ export function EmployerOffersPage({ token }: { token: string }) {
     }
   }
 
+  const hasOffers = offers.length > 0;
+  const offerList = (
+    <>
+      <div className="workspace-list-heading">
+        <h2>Offres publiées</h2>
+        <Badge>{offers.length}</Badge>
+      </div>
+      {isLoading && <p aria-live="polite">Chargement de vos offres…</p>}
+      {error && isLoading && <p className="workspace-error" role="alert">{error}</p>}
+      {!isLoading && !hasOffers && (
+        <Card className="workspace-empty">
+          <BriefcaseBusiness size={24} aria-hidden="true" />
+          <h2>Vous n’avez pas encore publié d’offre</h2>
+          <p>Votre première offre apparaîtra ici après sa publication.</p>
+        </Card>
+      )}
+      <div className="workspace-list workspace-list--grid">
+        {offers.map((offer) => <OfferCard key={offer.id} offer={offer} />)}
+      </div>
+    </>
+  );
+
   return (
     <section className="workspace-page">
       <div className="eyebrow">ESPACE EMPLOYEUR</div>
@@ -2502,6 +2589,8 @@ export function EmployerOffersPage({ token }: { token: string }) {
       <p className="workspace-page__intro">
         Décrivez le poste et ses compétences clés pour aider les candidats à trouver les offres pertinentes.
       </p>
+      {hasOffers && offerList}
+      {hasOffers && <h2 className="workspace-section-title">Publier une nouvelle offre</h2>}
       <Card className="workspace-panel employer-ai-draft">
         <h2>Créer votre offre avec l’assistant</h2>
         <p>Décrivez la personne recherchée. L’assistant prépare un brouillon modifiable avant publication.</p>
@@ -2565,22 +2654,7 @@ export function EmployerOffersPage({ token }: { token: string }) {
           </Button>
         </form>
       </Card>
-      <div className="workspace-list-heading">
-        <h2>Offres publiées</h2>
-        <Badge>{offers.length}</Badge>
-      </div>
-      {isLoading && <p aria-live="polite">Chargement de vos offres…</p>}
-      {error && isLoading && <p className="workspace-error" role="alert">{error}</p>}
-      {!isLoading && offers.length === 0 && (
-        <Card className="workspace-empty">
-          <BriefcaseBusiness size={24} aria-hidden="true" />
-          <h2>Vous n’avez pas encore publié d’offre</h2>
-          <p>Votre première offre apparaîtra ici après sa publication.</p>
-        </Card>
-      )}
-      <div className="workspace-list">
-        {offers.map((offer) => <OfferCard key={offer.id} offer={offer} />)}
-      </div>
+      {!hasOffers && offerList}
     </section>
   );
 }
