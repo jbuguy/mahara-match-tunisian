@@ -145,6 +145,7 @@ available when browser recording or the transcription service is unavailable.
 The `{assessment_type}` path value is `technical` or `behavioral`. Jobs use
 FastAPI's in-process background tasks, so a process restart before processing
 finishes can leave a job queued; the candidate can retry the recording.
+Employers can create and resume organisation-scoped workforce planning sessions at `POST|GET /employer/planning-sessions`, read a session at `GET /employer/planning-sessions/{session_id}`, rename or update its status at `PATCH /employer/planning-sessions/{session_id}`, and delete it at `DELETE /employer/planning-sessions/{session_id}`. These routes require an employer account linked to an organisation and return only sessions belonging to that organisation. Session statuses are `draft`, `in_progress`, `analysis_ready`, `completed`, and `archived`.
 Employers can publish offers at `POST /employer/offers` and list their own
 offers at `GET /employer/offers`.
 Candidates submit and view applications at

@@ -48,6 +48,51 @@ export type CandidateAssistantSession = {
 };
 export type CandidateAssistantSessionSummary = Omit<CandidateAssistantSession, "messages">;
 
+export type EmployerPlanningSessionStatus = "draft" | "in_progress" | "analysis_ready" | "completed" | "archived";
+export type EmployerPlanningSession = {
+  id: string;
+  organisation_id: string;
+  created_by_user_id: string | null;
+  title: string;
+  description: string | null;
+  project_type: "new_project" | "department" | "expansion" | "organisational_need" | "other";
+  status: EmployerPlanningSessionStatus;
+  project_summary: Record<string, unknown>;
+  recommendation_count: number;
+  job_draft_count: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export function fetchEmployerPlanningSessions(token: string): Promise<EmployerPlanningSession[]> {
+  return authenticatedRequest(token, "/employer/planning-sessions");
+}
+
+export function createEmployerPlanningSession(
+  token: string,
+  request: Pick<EmployerPlanningSession, "title" | "description" | "project_type">,
+): Promise<EmployerPlanningSession> {
+  return authenticatedRequest(token, "/employer/planning-sessions", {
+    method: "POST", body: JSON.stringify(request),
+  });
+}
+
+export function updateEmployerPlanningSession(
+  token: string,
+  sessionId: string,
+  changes: Partial<Pick<EmployerPlanningSession, "title" | "description" | "project_type" | "status">>,
+): Promise<EmployerPlanningSession> {
+  return authenticatedRequest(token, `/employer/planning-sessions/${encodeURIComponent(sessionId)}`, {
+    method: "PATCH", body: JSON.stringify(changes),
+  });
+}
+
+export function deleteEmployerPlanningSession(token: string, sessionId: string): Promise<void> {
+  return authenticatedRequest(token, `/employer/planning-sessions/${encodeURIComponent(sessionId)}`, {
+    method: "DELETE",
+  });
+}
+
 export type JobOffer = {
   id: string;
   title: string;

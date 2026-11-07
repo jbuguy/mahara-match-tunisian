@@ -43,6 +43,7 @@ def test_sqlite_migration_enforces_append_only_audit_log(
         "employer_notifications",
         "organisation_verification_requests",
         "employer_notification_preferences",
+        "employer_planning_sessions",
     } <= tables
     profile_columns = {column["name"] for column in inspect(engine).get_columns("candidate_profiles")}
     assert {

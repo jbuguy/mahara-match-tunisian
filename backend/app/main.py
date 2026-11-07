@@ -53,6 +53,7 @@ from app.employer import router as employer_router
 from app.professional import router as professional_router
 from app.missions import router as missions_router
 from app.service_requests import router as service_requests_router
+from app.planning import router as planning_router
 from app.models import (
     AuditEvent,
     CandidateAssistantSession,
@@ -149,6 +150,7 @@ app.include_router(employer_router)
 app.include_router(professional_router)
 app.include_router(missions_router)
 app.include_router(service_requests_router)
+app.include_router(planning_router)
 
 
 @app.get("/public/jobs", response_model=PublicJobOfferPage, tags=["public discovery"])

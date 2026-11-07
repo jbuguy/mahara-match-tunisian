@@ -2885,6 +2885,14 @@ p {
   padding: 20px;
 }
 
+.planning-list-heading { margin-top: 2rem; }
+.planning-session-detail { display: grid; gap: 1.25rem; }
+.planning-context-empty { display: grid; justify-items: start; gap: .5rem; padding: 1.5rem; border: 1px dashed var(--border-color, #d8dce5); border-radius: 1rem; color: var(--text-muted, #667085); }
+.planning-context-empty h3,.planning-context-empty p { margin: 0; }
+.planning-session-actions,.planning-rename { display: flex; flex-wrap: wrap; align-items: center; gap: .65rem; }
+.planning-rename .input { max-width: 20rem; }
+@media (max-width: 600px) { .planning-session-actions > button { flex: 1 1 auto; } .planning-rename .input { max-width: none; width: 100%; } }
+
 .market-panel__heading,
 .market-section-heading,
 .market-list-card,

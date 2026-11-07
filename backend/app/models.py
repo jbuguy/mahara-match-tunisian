@@ -55,6 +55,14 @@ class JobOfferStatus(str, Enum):
     ARCHIVED = "archived"
 
 
+class PlanningSessionStatus(str, Enum):
+    DRAFT = "draft"
+    IN_PROGRESS = "in_progress"
+    ANALYSIS_READY = "analysis_ready"
+    COMPLETED = "completed"
+    ARCHIVED = "archived"
+
+
 class OrganisationVerificationStatus(str, Enum):
     UNVERIFIED = "unverified"
     PENDING = "pending"
@@ -265,6 +273,45 @@ class OrganisationMembership(Base):
 
     user: Mapped[User] = relationship(back_populates="memberships")
     organisation: Mapped[Organisation] = relationship(back_populates="memberships")
+
+
+class EmployerPlanningSession(Base):
+    __tablename__ = "employer_planning_sessions"
+    __table_args__ = (
+        Index("ix_planning_sessions_organisation_updated", "organisation_id", "updated_at"),
+        Index("ix_planning_sessions_created_by", "created_by_user_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    organisation_id: Mapped[str] = mapped_column(
+        ForeignKey("organisations.id", ondelete="CASCADE"), nullable=False
+    )
+    created_by_user_id: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    title: Mapped[str] = mapped_column(String(160), nullable=False)
+    description: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+    project_type: Mapped[str] = mapped_column(String(40), default="other", nullable=False)
+    status: Mapped[PlanningSessionStatus] = mapped_column(
+        SqlEnum(
+            PlanningSessionStatus,
+            name="planning_session_status",
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=lambda values: [member.value for member in values],
+        ),
+        default=PlanningSessionStatus.DRAFT,
+        nullable=False,
+    )
+    project_summary: Mapped[dict[str, object]] = mapped_column(JSON, default=dict, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc), nullable=False
+    )
 
 
 class OrganisationVerificationRequest(Base):

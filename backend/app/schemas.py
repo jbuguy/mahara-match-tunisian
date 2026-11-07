@@ -11,6 +11,7 @@ from app.models import (
     CourseStatus,
     JobApplicationStatus,
     JobOfferStatus,
+    PlanningSessionStatus,
     ProfessionalProfileVisibility,
     Role,
     ServiceListingStatus,
@@ -686,6 +687,64 @@ class CandidateAssistantSessionRenameRequest(BaseModel):
         if not clean:
             raise ValueError("Conversation title cannot be blank.")
         return clean
+
+
+class PlanningSessionCreateRequest(BaseModel):
+    title: str = Field(min_length=2, max_length=160)
+    description: str | None = Field(default=None, max_length=2000)
+    project_type: Literal["new_project", "department", "expansion", "organisational_need", "other"] = "other"
+
+    @field_validator("title")
+    @classmethod
+    def clean_title(cls, value: str) -> str:
+        value = value.strip()
+        if len(value) < 2:
+            raise ValueError("Project title must contain at least two characters.")
+        return value
+
+    @field_validator("description")
+    @classmethod
+    def clean_description(cls, value: str | None) -> str | None:
+        return value.strip() or None if value is not None else None
+
+
+class PlanningSessionUpdateRequest(BaseModel):
+    title: str | None = Field(default=None, min_length=2, max_length=160)
+    description: str | None = Field(default=None, max_length=2000)
+    project_type: Literal["new_project", "department", "expansion", "organisational_need", "other"] | None = None
+    status: PlanningSessionStatus | None = None
+
+    @field_validator("title")
+    @classmethod
+    def clean_update_title(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip()
+        if len(value) < 2:
+            raise ValueError("Project title must contain at least two characters.")
+        return value
+
+    @field_validator("description")
+    @classmethod
+    def clean_update_description(cls, value: str | None) -> str | None:
+        return value.strip() or None if value is not None else None
+
+
+class PlanningSessionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    organisation_id: str
+    created_by_user_id: str | None
+    title: str
+    description: str | None
+    project_type: str
+    status: PlanningSessionStatus
+    project_summary: dict[str, object]
+    recommendation_count: int = 0
+    job_draft_count: int = 0
+    created_at: datetime
+    updated_at: datetime
 
 
 class JobOfferCreate(BaseModel):

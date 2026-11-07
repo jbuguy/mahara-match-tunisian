@@ -65,6 +65,7 @@ import { GuestDiscovery } from "./GuestDiscovery";
 import { ProfessionalServicesPage } from "./ProfessionalServices";
 import { MissionsWorkspace } from "./MissionsWorkspace";
 import { ServiceRequestsWorkspace } from "./ServiceRequestsWorkspace";
+import { EmployerPlanningWorkspace } from "./EmployerPlanningWorkspace";
 
 const roleConfiguration: Record<
   Role,
@@ -103,6 +104,7 @@ const roleConfiguration: Record<
       { label: "Entretiens", icon: CalendarClock },
       { label: "Notifications", icon: Bell },
       { label: "Statistiques", icon: ChartNoAxesCombined },
+      { label: "Planification RH avec l\u2019IA", icon: Sparkles },
       { label: "Assistant", icon: MessageCircle },
       { label: "Mon organisation", icon: Building2 },
     ],
@@ -450,6 +452,8 @@ export default function App() {
             <EmployerApplicationsPage token={accessToken} onNavigate={setActivePage} />
           ) : user.role === "employer" && activePage === "Mon organisation" ? (
             <EmployerOrganisationPage token={accessToken} />
+          ) : user.role === "employer" && activePage === "Planification RH avec l\u2019IA" ? (
+            <EmployerPlanningWorkspace token={accessToken} />
           ) : user.role === "employer" && activePage === "Trouver des candidats" ? (
             <EmployerCandidatesPage token={accessToken} />
           ) : user.role === "employer" && activePage === "Talents sauvegardés" ? (

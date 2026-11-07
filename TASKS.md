@@ -7,6 +7,11 @@ checks pass.
 Status: `[ ]` todo · `[/]` in progress · `[x]` completed · `[!]` blocked
 
 ## Current focus
+- [/] Workforce planning Phase 1 - Persistent employer planning sessions.
+  - [x] Add organisation-scoped session model, lifecycle status, and migration.
+  - [x] Add employer-authenticated CRUD routes with membership isolation and audit events.
+  - [x] Add employer planning list/detail UI with create, rename, archive, and delete.
+  - [x] Verify SQLite migration, API ownership/state transitions, and frontend production build. Backend suite: 125 passed; frontend tests: 41 passed.
 
 - [/] Production Pilot Phase 5 - Release gates.
   - [x] Add a database readiness endpoint and cover available/unavailable states.
