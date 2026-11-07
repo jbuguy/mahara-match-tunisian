@@ -1,31 +1,19 @@
-# Python
-venv/
-.venv/
-__pycache__/
-*.py[cod]
-*.egg-info/
-.pytest_cache/
-
-# Secrets and local config
-.env
-.env*
-!.env.example
-!**/.env.example
-
-# Node / build output
 node_modules/
 dist/
-**/build/
+coverage/
+.vite/
+
+.venv/
+venv/
+__pycache__/
+.pytest_cache/
+*.py[cod]
 *.tsbuildinfo
+backend/data/
 
-# Generated data and local databases
-sessions.csv
-*.sqlite3
-back/data/
-back/audio_test_reponse/
+.env
+.env.*
+!.env.example
 
-# Tooling
-supabase/.branches/
-supabase/.temp/
-back/app/features/employer/static/
-back/.mahara-match.pids.json
+.DS_Store
+Thumbs.db

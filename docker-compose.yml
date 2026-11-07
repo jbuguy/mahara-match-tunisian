@@ -1,0 +1,42 @@
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg17-trixie
+    container_name: mahara_match_db
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: mahara_match
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d mahara_match"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  embeddings:
+    image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.7
+    container_name: mahara_match_embeddings
+    restart: unless-stopped
+    profiles: ["rag"]
+    command:
+      - --model-id
+      - sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+    ports:
+      - "8080:80"
+    volumes:
+      - huggingface_cache:/data
+    environment:
+      HF_HOME: /data
+
+volumes:
+  postgres_data:
+  huggingface_cache:
