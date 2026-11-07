@@ -63,6 +63,8 @@ import {
 } from "./auth";
 import { GuestDiscovery } from "./GuestDiscovery";
 import { ProfessionalServicesPage } from "./ProfessionalServices";
+import { MissionsWorkspace } from "./MissionsWorkspace";
+import { ServiceRequestsWorkspace } from "./ServiceRequestsWorkspace";
 
 const roleConfiguration: Record<
   Role,
@@ -218,6 +220,7 @@ export default function App() {
       } else if (pendingOfferId && result.user.role !== "candidate") {
         setAuthError("Sign in with a candidate account to apply for this job.");
       }
+      if (sessionStorage.getItem("mahara-match-return-service")) destination = "Mes demandes";
       setActivePage(destination);
     } catch (error: unknown) {
       setAuthError(
@@ -252,6 +255,10 @@ export default function App() {
         <GuestDiscovery
           onApply={(offer) => {
             sessionStorage.setItem("mahara-match-return-job", offer.id);
+            document.getElementById("guest-auth")?.scrollIntoView({ behavior: "smooth" });
+          }}
+          onRequestService={(service) => {
+            sessionStorage.setItem("mahara-match-return-service", service.id);
             document.getElementById("guest-auth")?.scrollIntoView({ behavior: "smooth" });
           }}
         />
@@ -372,7 +379,9 @@ export default function App() {
             <strong>{activePage}</strong>
           </div>
           <div className="topbar__actions">
-            <button className="professional-profile-link" type="button" onClick={() => setActivePage("Profil professionnel")}>Profil professionnel</button>
+            {user.role !== "candidate" && <button className="professional-profile-link" type="button" onClick={() => setActivePage("Profil professionnel")}>Profil professionnel</button>}
+            <button className="professional-profile-link" type="button" onClick={() => setActivePage("Missions")}>Missions</button>
+            <button className="professional-profile-link" type="button" onClick={() => setActivePage("Mes demandes")}>Mes demandes</button>
             <button
               className="icon-button"
               type="button"
@@ -410,10 +419,17 @@ export default function App() {
                 onNavigate={setActivePage}
               />
             )
-          ) : activePage === "Profil professionnel" ? (
+          ) : user.role !== "candidate" && activePage === "Profil professionnel" ? (
             <ProfessionalServicesPage token={accessToken} />
+          ) : activePage === "Missions" ? (
+            <MissionsWorkspace token={accessToken} />
+          ) : activePage === "Mes demandes" ? (
+            <ServiceRequestsWorkspace token={accessToken} userId={user.id} />
           ) : isCandidate && activePage === "Mon profil" ? (
-            <CandidateProfilePage token={accessToken} />
+            <>
+              <CandidateProfilePage token={accessToken} />
+              <ProfessionalServicesPage token={accessToken} />
+            </>
           ) : isCandidate && activePage === "Mes opportunités" ? (
             <CandidateMatchesPage token={accessToken} onNavigate={setActivePage} />
           ) : isCandidate && activePage === "Mon parcours" ? (

@@ -586,7 +586,7 @@ export function CandidateProfilePage({ token }: { token: string }) {
   return (
     <section className="workspace-page">
       <div className="eyebrow">VOTRE PROFIL</div>
-      <h1>Mon profil professionnel</h1>
+      <h1>Mon profil candidat</h1>
       <p className="workspace-page__intro">
         Vérifiez vos informations et complétez les détails de votre parcours à votre rythme.
       </p>

@@ -51,6 +51,8 @@ from app.dependencies import get_current_user, require_permission, require_role
 from app.marketplace import router as marketplace_router
 from app.employer import router as employer_router
 from app.professional import router as professional_router
+from app.missions import router as missions_router
+from app.service_requests import router as service_requests_router
 from app.models import (
     AuditEvent,
     CandidateAssistantSession,
@@ -145,6 +147,8 @@ app = FastAPI(
 app.include_router(marketplace_router)
 app.include_router(employer_router)
 app.include_router(professional_router)
+app.include_router(missions_router)
+app.include_router(service_requests_router)
 
 
 @app.get("/public/jobs", response_model=PublicJobOfferPage, tags=["public discovery"])

@@ -8,6 +8,29 @@ Status: `[ ]` todo · `[/]` in progress · `[x]` completed · `[!]` blocked
 
 ## Current focus
 
+- [x] Marketplace Phase 4 — Service requests and eligible reviews.
+  - [x] Add requester-owned service requests linked directly to User; no
+    customer role or customer profile is required.
+  - [x] Add provider accept/decline, agreed scope, in-progress, completion
+    request, requester confirmation, cancellation, and issue reporting.
+  - [x] Notify providers and restrict request details to the two participants.
+  - [x] Allow one requester review only after confirmed completion; expose
+    reviews only on public professional profiles.
+  - [x] Add authenticated request management and preserve a guest service
+    request intent through sign-in.
+  - [x] Verify frontend production build and workspace diagnostics.
+- [x] Marketplace Phase 3 — Missions and proposals.
+  - [x] Add individual and employer-organisation mission publishing, public
+    discovery, search filters, and pagination.
+  - [x] Keep mission status and status history separate from job applications;
+    support publish, start, completion, cancellation, expiry, and archive paths.
+  - [x] Add private provider proposals with duplicate prevention, withdrawal,
+    publisher review, acceptance, and rejection.
+  - [x] Restrict proposal reads and updates to the provider and authorized
+    mission publisher; expose only public mission fields to guests.
+  - [x] Add authenticated mission publishing/proposal workspace and guest
+    mission discovery.
+  - [x] Verify frontend production build and workspace diagnostics.
 - [x] Task 13 — Employer recruitment lifecycle foundations.
   - [x] Extend job offers with draft/publication lifecycle fields and expose
     employer status transitions; prevent candidates from applying to or

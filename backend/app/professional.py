@@ -56,6 +56,8 @@ def _public_profile(
         available=profile.available,
         accepting_requests=profile.accepting_requests,
         availability=profile.availability,
+        service_area=profile.service_area,
+        portfolio_items=profile.portfolio_items,
         services=[_public_service(item) for item in services],
     )
 
@@ -224,6 +226,12 @@ def search_public_services(
         base_query.order_by(ServiceListing.created_at.desc(), ServiceListing.id)
         .offset(offset).limit(limit)
     )
+    return PublicServiceSearchPage(
+        items=[_public_service(item) for item in listings],
+        total=total,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.get("/public/services/{listing_id}", response_model=PublicServiceListingResponse, tags=["public discovery"])
@@ -243,12 +251,6 @@ def get_public_service(
     if listing is None:
         raise HTTPException(status_code=404, detail="Service listing not found.")
     return _public_service(listing)
-    return PublicServiceSearchPage(
-        items=[_public_service(item) for item in listings],
-        total=total,
-        limit=limit,
-        offset=offset,
-    )
 
 
 @router.get("/public/professionals", response_model=PublicProfessionalSearchPage, tags=["public discovery"])
@@ -297,6 +299,8 @@ def search_public_professionals(
                 available=item.available,
                 accepting_requests=item.accepting_requests,
                 availability=item.availability,
+                service_area=item.service_area,
+                portfolio_items=item.portfolio_items,
                 services=[],
             )
             for item in profiles

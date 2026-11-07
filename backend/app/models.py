@@ -115,6 +115,35 @@ class ServiceListingStatus(str, Enum):
     ARCHIVED = "archived"
 
 
+class MissionStatus(str, Enum):
+    DRAFT = "draft"
+    PUBLISHED = "published"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
+    EXPIRED = "expired"
+    ARCHIVED = "archived"
+
+
+class MissionProposalStatus(str, Enum):
+    SUBMITTED = "submitted"
+    UNDER_REVIEW = "under_review"
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
+    WITHDRAWN = "withdrawn"
+
+
+class ServiceRequestStatus(str, Enum):
+    REQUESTED = "requested"
+    ACCEPTED = "accepted"
+    DECLINED = "declined"
+    IN_PROGRESS = "in_progress"
+    COMPLETION_REQUESTED = "completion_requested"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
+    DISPUTED = "disputed"
+
+
 class TechnicalAssessmentStatus(str, Enum):
     IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
@@ -309,6 +338,8 @@ class ProfessionalProfile(Base):
     available: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     accepting_requests: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     availability: Mapped[dict[str, object]] = mapped_column(JSON, default=dict, nullable=False)
+    service_area: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    portfolio_items: Mapped[list[dict[str, str]]] = mapped_column(JSON, default=list, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
     )
@@ -339,6 +370,7 @@ class ServiceListing(Base):
     description: Mapped[str] = mapped_column(String(5000), nullable=False)
     category: Mapped[str] = mapped_column(String(120), nullable=False)
     skills: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    portfolio_items: Mapped[list[dict[str, str]]] = mapped_column(JSON, default=list, nullable=False)
     location: Mapped[str | None] = mapped_column(String(120), nullable=True)
     service_mode: Mapped[str] = mapped_column(String(30), nullable=False)
     price_type: Mapped[str] = mapped_column(String(30), nullable=False)
@@ -362,6 +394,115 @@ class ServiceListing(Base):
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc), nullable=False,
     )
+
+
+class ServiceRequest(Base):
+    __tablename__ = "service_requests"
+    __table_args__ = (
+        Index("ix_service_requests_requester_created", "requester_user_id", "created_at"),
+        Index("ix_service_requests_provider_status", "provider_user_id", "status"),
+        Index("ix_service_requests_service_status", "service_id", "status"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    service_id: Mapped[str] = mapped_column(ForeignKey("service_listings.id", ondelete="CASCADE"), nullable=False)
+    requester_user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    provider_user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    description: Mapped[str] = mapped_column(String(5000), nullable=False)
+    location: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    preferred_date: Mapped[date | None] = mapped_column(nullable=True)
+    budget: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    attachments: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    agreed_scope: Mapped[str | None] = mapped_column(String(5000), nullable=True)
+    report_reason: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+    status: Mapped[ServiceRequestStatus] = mapped_column(SqlEnum(ServiceRequestStatus, name="service_request_status", native_enum=False, create_constraint=True, values_callable=lambda values: [member.value for member in values]), default=ServiceRequestStatus.REQUESTED, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
+
+
+class ServiceReview(Base):
+    __tablename__ = "service_reviews"
+    __table_args__ = (
+        UniqueConstraint("service_request_id", name="uq_service_review_request"),
+        Index("ix_service_reviews_provider_created", "provider_user_id", "created_at"),
+        CheckConstraint("rating BETWEEN 1 AND 5", name="ck_service_reviews_rating_range"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    service_request_id: Mapped[str] = mapped_column(ForeignKey("service_requests.id", ondelete="CASCADE"), nullable=False)
+    reviewer_user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    provider_user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    rating: Mapped[int] = mapped_column(nullable=False)
+    comment: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+
+
+class Mission(Base):
+    __tablename__ = "missions"
+    __table_args__ = (
+        Index("ix_missions_status_created", "status", "created_at"),
+        Index("ix_missions_publisher_created", "publisher_user_id", "created_at"),
+        Index("ix_missions_organisation_status", "organisation_id", "status"),
+        CheckConstraint("budget_min IS NULL OR budget_min >= 0", name="ck_missions_budget_min_nonnegative"),
+        CheckConstraint("budget_max IS NULL OR budget_max >= 0", name="ck_missions_budget_max_nonnegative"),
+        CheckConstraint("budget_min IS NULL OR budget_max IS NULL OR budget_max >= budget_min", name="ck_missions_budget_range"),
+        CheckConstraint("work_mode IN ('remote', 'on_site', 'hybrid', 'flexible')", name="ck_missions_work_mode"),
+        CheckConstraint("budget_type IN ('fixed', 'hourly', 'starting_at', 'quote', 'negotiable')", name="ck_missions_budget_type"),
+        CheckConstraint("workers_needed >= 1", name="ck_missions_workers_positive"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    publisher_user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    organisation_id: Mapped[str | None] = mapped_column(ForeignKey("organisations.id", ondelete="CASCADE"), nullable=True)
+    title: Mapped[str] = mapped_column(String(160), nullable=False)
+    description: Mapped[str] = mapped_column(String(5000), nullable=False)
+    category: Mapped[str] = mapped_column(String(120), nullable=False)
+    required_skills: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    location: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    work_mode: Mapped[str] = mapped_column(String(30), nullable=False)
+    budget_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    budget_min: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    budget_max: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    expected_start_date: Mapped[date | None] = mapped_column(nullable=True)
+    deadline: Mapped[date | None] = mapped_column(nullable=True)
+    duration: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    workers_needed: Mapped[int] = mapped_column(default=1, nullable=False)
+    status: Mapped[MissionStatus] = mapped_column(SqlEnum(MissionStatus, name="mission_status", native_enum=False, create_constraint=True, values_callable=lambda values: [member.value for member in values]), default=MissionStatus.DRAFT, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
+
+
+class MissionProposal(Base):
+    __tablename__ = "mission_proposals"
+    __table_args__ = (
+        UniqueConstraint("mission_id", "provider_user_id", name="uq_mission_proposal_provider"),
+        Index("ix_mission_proposals_mission_status", "mission_id", "status"),
+        Index("ix_mission_proposals_provider_created", "provider_user_id", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    mission_id: Mapped[str] = mapped_column(ForeignKey("missions.id", ondelete="CASCADE"), nullable=False)
+    provider_user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    message: Mapped[str] = mapped_column(String(5000), nullable=False)
+    proposed_price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    estimated_duration: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    portfolio_references: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    availability: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    status: Mapped[MissionProposalStatus] = mapped_column(SqlEnum(MissionProposalStatus, name="mission_proposal_status", native_enum=False, create_constraint=True, values_callable=lambda values: [member.value for member in values]), default=MissionProposalStatus.SUBMITTED, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
+
+
+class MissionStatusHistory(Base):
+    __tablename__ = "mission_status_history"
+    __table_args__ = (Index("ix_mission_status_history_mission_created", "mission_id", "created_at"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    mission_id: Mapped[str] = mapped_column(ForeignKey("missions.id", ondelete="CASCADE"), nullable=False)
+    changed_by_user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    previous_status: Mapped[MissionStatus | None] = mapped_column(SqlEnum(MissionStatus, name="mission_history_previous_status", native_enum=False, create_constraint=False, values_callable=lambda values: [member.value for member in values]), nullable=True)
+    new_status: Mapped[MissionStatus] = mapped_column(SqlEnum(MissionStatus, name="mission_history_new_status", native_enum=False, create_constraint=False, values_callable=lambda values: [member.value for member in values]), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 class CandidateRoadmapStep(Base):
     __tablename__ = "candidate_roadmap_steps"
     __table_args__ = (

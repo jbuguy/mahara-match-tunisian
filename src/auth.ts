@@ -74,6 +74,7 @@ export type ServiceListing = {
   description: string;
   category: string;
   skills: string[];
+  portfolio_items: PortfolioItem[];
   location: string | null;
   service_mode: "remote" | "provider_location" | "customer_location" | "flexible";
   price_type: "fixed" | "hourly" | "starting_at" | "quote" | "negotiable";
@@ -98,9 +99,13 @@ export type ProfessionalProfile = {
   available: boolean;
   accepting_requests: boolean;
   availability: Record<string, unknown>;
+  service_area: string[];
+  portfolio_items: PortfolioItem[];
   created_at: string;
   updated_at: string;
 };
+
+export type PortfolioItem = { title: string; url: string; description: string };
 
 export type PublicProfessional = Omit<ProfessionalProfile, "user_id" | "visibility" | "created_at" | "updated_at"> & {
   id: string;
@@ -108,7 +113,22 @@ export type PublicProfessional = Omit<ProfessionalProfile, "user_id" | "visibili
 };
 
 export type PublicService = Omit<ServiceListing, "status" | "updated_at">;
+export type ServiceRequestStatus = "requested" | "accepted" | "declined" | "in_progress" | "completion_requested" | "completed" | "cancelled" | "disputed";
+export type ServiceRequest = { id: string; service_id: string; service_title: string; requester_user_id: string; provider_user_id: string; description: string; location: string | null; preferred_date: string | null; budget: string | null; attachments: string[]; agreed_scope: string | null; report_reason: string | null; status: ServiceRequestStatus; created_at: string; updated_at: string };
+export type ServiceReview = { id: string; provider_user_id: string; rating: number; comment: string | null; created_at: string };
 export type PublicCourse = Pick<TrainingCourse, "id" | "title" | "summary" | "skills" | "delivery_mode" | "location" | "starts_on" | "ends_on" | "duration_hours" | "price_tnd">;
+
+export type MissionStatus = "draft" | "published" | "in_progress" | "completed" | "cancelled" | "expired" | "archived";
+export type MissionProposalStatus = "submitted" | "under_review" | "accepted" | "rejected" | "withdrawn";
+export type Mission = {
+  id: string; publisher_user_id: string; organisation_id: string | null; title: string; description: string;
+  category: string; required_skills: string[]; location: string | null; work_mode: "remote" | "on_site" | "hybrid" | "flexible";
+  budget_type: "fixed" | "hourly" | "starting_at" | "quote" | "negotiable"; budget_min: string | null; budget_max: string | null;
+  expected_start_date: string | null; deadline: string | null; duration: string | null; workers_needed: number;
+  status: MissionStatus; created_at: string; updated_at: string;
+};
+export type PublicMission = Omit<Mission, "publisher_user_id" | "organisation_id" | "status" | "updated_at">;
+export type MissionProposal = { id: string; mission_id: string; provider_user_id: string; message: string; proposed_price: string | null; estimated_duration: string | null; portfolio_references: string[]; availability: string | null; status: MissionProposalStatus; created_at: string; updated_at: string };
 
 export type PublicJobSearchPage = {
   items: JobOffer[];
@@ -526,6 +546,36 @@ export async function fetchPublicService(serviceId: string): Promise<PublicServi
   return (await response.json()) as PublicService;
 }
 
+export async function createServiceRequest(token: string, serviceId: string, request: { description: string; location: string | null; preferred_date: string | null; budget: string | null; attachments: string[] }): Promise<ServiceRequest> {
+  return authenticatedRequest(token, `/services/${encodeURIComponent(serviceId)}/requests`, { method: "POST", body: JSON.stringify(request) });
+}
+export function fetchMyServiceRequests(token: string): Promise<ServiceRequest[]> { return authenticatedRequest(token, "/service-requests/me"); }
+export function updateServiceRequestStatus(token: string, id: string, status: ServiceRequestStatus, extra: { agreed_scope?: string | null; report_reason?: string | null } = {}): Promise<ServiceRequest> {
+  return authenticatedRequest(token, `/service-requests/${encodeURIComponent(id)}/status`, { method: "PATCH", body: JSON.stringify({ status, ...extra }) });
+}
+export function createServiceReview(token: string, id: string, review: { rating: number; comment: string | null }): Promise<ServiceReview> {
+  return authenticatedRequest(token, `/service-requests/${encodeURIComponent(id)}/review`, { method: "POST", body: JSON.stringify(review) });
+}
+export async function fetchProfessionalReviews(providerId: string): Promise<{ items: ServiceReview[]; average_rating: number | null; total: number }> {
+  const response = await fetch(`${API_BASE_URL}/professionals/${encodeURIComponent(providerId)}/reviews`);
+  if (!response.ok) throw await errorFromResponse(response);
+  return (await response.json()) as { items: ServiceReview[]; average_rating: number | null; total: number };
+}
+
+export async function fetchPublicMissions(filters: { q?: string; location?: string; category?: string; skill?: string; work_mode?: string; limit?: number; offset?: number } = {}): Promise<{ items: PublicMission[]; total: number; limit: number; offset: number }> {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) if (value !== undefined && value !== "") params.set(key, String(value));
+  const response = await fetch(`${API_BASE_URL}/public/missions?${params.toString()}`);
+  if (!response.ok) throw await errorFromResponse(response);
+  return (await response.json()) as { items: PublicMission[]; total: number; limit: number; offset: number };
+}
+
+export async function fetchPublicMission(missionId: string): Promise<PublicMission> {
+  const response = await fetch(`${API_BASE_URL}/public/missions/${encodeURIComponent(missionId)}`);
+  if (!response.ok) throw await errorFromResponse(response);
+  return (await response.json()) as PublicMission;
+}
+
 export async function fetchPublicProfessional(profileId: string): Promise<PublicProfessional> {
   const response = await fetch(`${API_BASE_URL}/public/professionals/${encodeURIComponent(profileId)}`);
   if (!response.ok) throw await errorFromResponse(response);
@@ -592,8 +642,30 @@ export function createMyService(token: string, service: Pick<ServiceListing, "ti
   return authenticatedRequest(token, "/me/services", { method: "POST", body: JSON.stringify(service) });
 }
 
+export function updateMyService(token: string, serviceId: string, service: Pick<ServiceListing, "title" | "description" | "category" | "skills" | "location" | "service_mode" | "price_type" | "price_min" | "price_max">): Promise<ServiceListing> {
+  return authenticatedRequest(token, `/me/services/${encodeURIComponent(serviceId)}`, { method: "PUT", body: JSON.stringify(service) });
+}
+
 export function updateMyServiceStatus(token: string, serviceId: string, status: ServiceListingStatus): Promise<ServiceListing> {
   return authenticatedRequest(token, `/me/services/${encodeURIComponent(serviceId)}/status`, { method: "PATCH", body: JSON.stringify({ status }) });
+}
+
+export function createMission(token: string, mission: Omit<Mission, "id" | "publisher_user_id" | "status" | "created_at" | "updated_at">): Promise<Mission> {
+  return authenticatedRequest(token, "/missions", { method: "POST", body: JSON.stringify(mission) });
+}
+export function fetchMyMissions(token: string): Promise<Mission[]> { return authenticatedRequest(token, "/missions/me"); }
+export function updateMissionStatus(token: string, id: string, status: MissionStatus): Promise<Mission> {
+  return authenticatedRequest(token, `/missions/${encodeURIComponent(id)}/status`, { method: "PATCH", body: JSON.stringify({ status }) });
+}
+export function fetchMissionProposals(token: string, id: string): Promise<MissionProposal[]> {
+  return authenticatedRequest(token, `/missions/${encodeURIComponent(id)}/proposals`);
+}
+export function fetchMyMissionProposals(token: string): Promise<MissionProposal[]> { return authenticatedRequest(token, "/mission-proposals/me"); }
+export function submitMissionProposal(token: string, id: string, proposal: Pick<MissionProposal, "message" | "proposed_price" | "estimated_duration" | "portfolio_references" | "availability">): Promise<MissionProposal> {
+  return authenticatedRequest(token, `/missions/${encodeURIComponent(id)}/proposals`, { method: "POST", body: JSON.stringify(proposal) });
+}
+export function updateMissionProposalStatus(token: string, missionId: string, proposalId: string, status: MissionProposalStatus): Promise<MissionProposal> {
+  return authenticatedRequest(token, `/missions/${encodeURIComponent(missionId)}/proposals/${encodeURIComponent(proposalId)}`, { method: "PATCH", body: JSON.stringify({ status }) });
 }
 
 export function fetchCandidateProfile(token: string): Promise<CandidateProfile> {

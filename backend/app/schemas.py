@@ -212,6 +212,20 @@ class CandidateProfileResponse(BaseModel):
     updated_at: datetime | None = None
 
 
+class PortfolioItem(BaseModel):
+    title: str = Field(min_length=1, max_length=120)
+    url: str = Field(min_length=8, max_length=1000)
+    description: str = Field(default="", max_length=500)
+
+    @field_validator("url")
+    @classmethod
+    def validate_portfolio_url(cls, value: str) -> str:
+        clean = value.strip()
+        if not clean.startswith(("https://", "http://")):
+            raise ValueError("Portfolio URL must start with http:// or https://.")
+        return clean
+
+
 class ProfessionalProfileFields(BaseModel):
     display_name: str = Field(min_length=1, max_length=120)
     headline: str = Field(min_length=2, max_length=200)
@@ -225,6 +239,8 @@ class ProfessionalProfileFields(BaseModel):
     available: bool = True
     accepting_requests: bool = True
     availability: dict[str, object] = Field(default_factory=dict)
+    service_area: list[str] = Field(default_factory=list, max_length=30)
+    portfolio_items: list[PortfolioItem] = Field(default_factory=list, max_length=12)
 
     @field_validator("display_name", "headline", "introduction")
     @classmethod
@@ -236,6 +252,16 @@ class ProfessionalProfileFields(BaseModel):
     def trim_professional_location(cls, value: str | None) -> str | None:
         return value.strip() or None if value is not None else None
 
+    @field_validator("photo_url")
+    @classmethod
+    def validate_photo_url(cls, value: str | None) -> str | None:
+        if value is None or not value.strip():
+            return None
+        clean = value.strip()
+        if not clean.startswith(("https://", "http://")):
+            raise ValueError("Photo URL must start with http:// or https://.")
+        return clean
+
     @field_validator("skills")
     @classmethod
     def normalize_professional_skills(cls, value: list[str]) -> list[str]:
@@ -245,6 +271,12 @@ class ProfessionalProfileFields(BaseModel):
     @classmethod
     def normalize_languages(cls, value: list[str]) -> list[str]:
         return list(dict.fromkeys(item.strip() for item in value if item.strip()))
+
+    @model_validator(mode="after")
+    def validate_professional_profile(self) -> "ProfessionalProfileFields":
+        if not self.display_name or not self.headline:
+            raise ValueError("Display name and professional headline cannot be blank.")
+        return self
 
 
 class ProfessionalProfileResponse(ProfessionalProfileFields):
@@ -264,6 +296,7 @@ class PublicServiceListingResponse(BaseModel):
     description: str
     category: str
     skills: list[str]
+    portfolio_items: list[PortfolioItem]
     location: str | None
     service_mode: str
     price_type: str
@@ -277,6 +310,7 @@ class ServiceListingFields(BaseModel):
     description: str = Field(min_length=10, max_length=5000)
     category: str = Field(min_length=2, max_length=120)
     skills: list[str] = Field(default_factory=list, max_length=30)
+    portfolio_items: list[PortfolioItem] = Field(default_factory=list, max_length=12)
     location: str | None = Field(default=None, max_length=120)
     service_mode: Literal["remote", "provider_location", "customer_location", "flexible"]
     price_type: Literal["fixed", "hourly", "starting_at", "quote", "negotiable"] = "quote"
@@ -293,8 +327,15 @@ class ServiceListingFields(BaseModel):
     def normalize_service_skills(cls, value: list[str]) -> list[str]:
         return normalize_skills(value)
 
+    @field_validator("location")
+    @classmethod
+    def trim_service_location(cls, value: str | None) -> str | None:
+        return value.strip() or None if value is not None else None
+
     @model_validator(mode="after")
     def validate_service_listing(self) -> "ServiceListingFields":
+        if not self.title or not self.category or len(self.description) < 10:
+            raise ValueError("Service title, category, and description are required.")
         if self.price_min is not None and self.price_max is not None and self.price_max < self.price_min:
             raise ValueError("Maximum price must be greater than or equal to minimum price.")
         if self.service_mode != "remote" and not self.location:
@@ -333,6 +374,8 @@ class PublicProfessionalProfileResponse(BaseModel):
     available: bool
     accepting_requests: bool
     availability: dict[str, object]
+    service_area: list[str]
+    portfolio_items: list[PortfolioItem]
     services: list[PublicServiceListingResponse]
 
 
@@ -348,6 +391,200 @@ class PublicServiceSearchPage(BaseModel):
     total: int
     limit: int
     offset: int
+
+
+class MissionFields(BaseModel):
+    title: str = Field(min_length=3, max_length=160)
+    description: str = Field(min_length=10, max_length=5000)
+    category: str = Field(min_length=2, max_length=120)
+    required_skills: list[str] = Field(default_factory=list, max_length=30)
+    location: str | None = Field(default=None, max_length=120)
+    work_mode: Literal["remote", "on_site", "hybrid", "flexible"] = "flexible"
+    budget_type: Literal["fixed", "hourly", "starting_at", "quote", "negotiable"] = "quote"
+    budget_min: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
+    budget_max: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
+    expected_start_date: date | None = None
+    deadline: date | None = None
+    duration: str | None = Field(default=None, max_length=120)
+    workers_needed: int = Field(default=1, ge=1, le=1000)
+
+    @field_validator("title", "description", "category")
+    @classmethod
+    def trim_mission_text(cls, value: str) -> str:
+        return value.strip()
+
+    @field_validator("required_skills")
+    @classmethod
+    def normalize_mission_skills(cls, value: list[str]) -> list[str]:
+        return normalize_skills(value)
+
+    @model_validator(mode="after")
+    def validate_mission(self) -> "MissionFields":
+        if self.budget_min is not None and self.budget_max is not None and self.budget_max < self.budget_min:
+            raise ValueError("Maximum budget must be greater than or equal to minimum budget.")
+        if self.deadline is not None and self.expected_start_date is not None and self.deadline < self.expected_start_date:
+            raise ValueError("Deadline cannot be before the expected start date.")
+        if self.work_mode != "remote" and not self.location:
+            raise ValueError("A location is required for on-site, hybrid, or flexible missions.")
+        return self
+
+
+class MissionCreate(MissionFields):
+    organisation_id: str | None = Field(default=None, max_length=36)
+
+
+class MissionResponse(MissionFields):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    publisher_user_id: str
+    organisation_id: str | None
+    status: Literal["draft", "published", "in_progress", "completed", "cancelled", "expired", "archived"]
+    created_at: datetime
+    updated_at: datetime
+
+
+class PublicMissionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    title: str
+    description: str
+    category: str
+    required_skills: list[str]
+    location: str | None
+    work_mode: str
+    budget_type: str
+    budget_min: Decimal | None
+    budget_max: Decimal | None
+    expected_start_date: date | None
+    deadline: date | None
+    duration: str | None
+    workers_needed: int
+    created_at: datetime
+
+
+class MissionSearchPage(BaseModel):
+    items: list[PublicMissionResponse]
+    total: int
+    limit: int
+    offset: int
+
+
+class MissionProposalCreate(BaseModel):
+    message: str = Field(min_length=10, max_length=5000)
+    proposed_price: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
+    estimated_duration: str | None = Field(default=None, max_length=120)
+    portfolio_references: list[str] = Field(default_factory=list, max_length=12)
+    availability: str | None = Field(default=None, max_length=1000)
+
+    @field_validator("message")
+    @classmethod
+    def trim_proposal_message(cls, value: str) -> str:
+        return value.strip()
+
+
+class MissionProposalStatusUpdate(BaseModel):
+    status: Literal["under_review", "accepted", "rejected", "withdrawn"]
+
+
+class MissionProposalResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    mission_id: str
+    provider_user_id: str
+    message: str
+    proposed_price: Decimal | None
+    estimated_duration: str | None
+    portfolio_references: list[str]
+    availability: str | None
+    status: Literal["submitted", "under_review", "accepted", "rejected", "withdrawn"]
+    created_at: datetime
+    updated_at: datetime
+
+
+class MissionStatusUpdate(BaseModel):
+    status: Literal["published", "in_progress", "completed", "cancelled", "archived"]
+
+
+class MissionStatusHistoryResponse(BaseModel):
+    previous_status: str | None
+    new_status: str
+    created_at: datetime
+
+
+class ServiceRequestCreate(BaseModel):
+    description: str = Field(min_length=10, max_length=5000)
+    location: str | None = Field(default=None, max_length=120)
+    preferred_date: date | None = None
+    budget: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
+    attachments: list[str] = Field(default_factory=list, max_length=8)
+
+    @field_validator("description")
+    @classmethod
+    def trim_request_description(cls, value: str) -> str:
+        return value.strip()
+
+    @field_validator("attachments")
+    @classmethod
+    def validate_request_attachments(cls, values: list[str]) -> list[str]:
+        cleaned: list[str] = []
+        for item in values:
+            url = item.strip()
+            if not url.startswith(("https://", "http://")):
+                raise ValueError("Attachment references must use http:// or https:// URLs.")
+            cleaned.append(url)
+        return cleaned
+
+
+class ServiceRequestStatusUpdate(BaseModel):
+    status: Literal["accepted", "declined", "in_progress", "completion_requested", "completed", "cancelled", "disputed"]
+    agreed_scope: str | None = Field(default=None, max_length=5000)
+    report_reason: str | None = Field(default=None, max_length=2000)
+
+    @model_validator(mode="after")
+    def validate_report_reason(self) -> "ServiceRequestStatusUpdate":
+        if self.status == "disputed" and not (self.report_reason and self.report_reason.strip()):
+            raise ValueError("A short explanation is required when reporting a problem.")
+        return self
+
+
+class ServiceRequestResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    service_id: str
+    service_title: str
+    requester_user_id: str
+    provider_user_id: str
+    description: str
+    location: str | None
+    preferred_date: date | None
+    budget: Decimal | None
+    attachments: list[str]
+    agreed_scope: str | None
+    report_reason: str | None
+    status: Literal["requested", "accepted", "declined", "in_progress", "completion_requested", "completed", "cancelled", "disputed"]
+    created_at: datetime
+    updated_at: datetime
+
+
+class ServiceReviewCreate(BaseModel):
+    rating: int = Field(ge=1, le=5)
+    comment: str | None = Field(default=None, max_length=2000)
+
+
+class ServiceReviewResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    provider_user_id: str
+    rating: int
+    comment: str | None
+    created_at: datetime
+
+
+class PublicServiceReviewsResponse(BaseModel):
+    items: list[ServiceReviewResponse]
+    average_rating: float | None
+    total: int
 
 
 class AssistantMessage(BaseModel):
