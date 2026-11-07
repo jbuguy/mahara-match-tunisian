@@ -2,7 +2,7 @@ from collections import Counter
 from datetime import date, datetime, time, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, select
+from sqlalchemy import String, cast, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from sqlalchemy.sql.elements import ColumnElement
@@ -16,6 +16,7 @@ from app.models import (
     EmployerNotificationPreference,
     CourseEnrollment,
     CourseEnrollmentStatus,
+    CourseDeliveryMode,
     CourseStatus,
     JobApplication,
     JobApplicationStatusHistory,
@@ -41,6 +42,8 @@ from app.schemas import (
     SkillDemandIndicator,
     TrainingCourseCreate,
     TrainingCourseResponse,
+    PublicTrainingCourseResponse,
+    PublicTrainingSearchPage,
 )
 
 router = APIRouter()
@@ -678,6 +681,60 @@ def published_courses(
     )
     counts = _enrollment_counts(session, [course.id for course in courses])
     return [_course_response(course, counts.get(course.id, (0, 0))) for course in courses]
+
+
+@router.get("/public/training", response_model=PublicTrainingSearchPage, tags=["public discovery"])
+def public_training_search(
+    q: str | None = Query(default=None, min_length=1, max_length=160),
+    location: str | None = Query(default=None, min_length=1, max_length=120),
+    delivery_mode: CourseDeliveryMode | None = None,
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    session: Session = Depends(get_session),
+) -> PublicTrainingSearchPage:
+    filters = [TrainingCourse.status == CourseStatus.PUBLISHED]
+    if q:
+        pattern = f"%{q.strip()}%"
+        filters.append(
+            TrainingCourse.title.ilike(pattern)
+            | TrainingCourse.summary.ilike(pattern)
+            | TrainingCourse.location.ilike(pattern)
+            | cast(TrainingCourse.skills, String).ilike(pattern)
+        )
+    if location:
+        filters.append(TrainingCourse.location.ilike(f"%{location.strip()}%"))
+    if delivery_mode is not None:
+        filters.append(TrainingCourse.delivery_mode == delivery_mode)
+    total = session.scalar(select(func.count()).select_from(TrainingCourse).where(*filters)) or 0
+    courses = session.scalars(
+        select(TrainingCourse)
+        .where(*filters)
+        .order_by(TrainingCourse.starts_on, TrainingCourse.created_at.desc(), TrainingCourse.id)
+        .offset(offset)
+        .limit(limit)
+    )
+    return PublicTrainingSearchPage(
+        items=[PublicTrainingCourseResponse.model_validate(course) for course in courses],
+        total=total,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@router.get("/public/training/{course_id}", response_model=PublicTrainingCourseResponse, tags=["public discovery"])
+def public_training_detail(
+    course_id: str,
+    session: Session = Depends(get_session),
+) -> PublicTrainingCourseResponse:
+    course = session.scalar(
+        select(TrainingCourse).where(
+            TrainingCourse.id == course_id,
+            TrainingCourse.status == CourseStatus.PUBLISHED,
+        )
+    )
+    if course is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found.")
+    return PublicTrainingCourseResponse.model_validate(course)
 
 
 @router.post(

@@ -6,6 +6,7 @@ from uuid import uuid4
 from sqlalchemy import (
     JSON,
     Boolean,
+    CheckConstraint,
     DateTime,
     Enum as SqlEnum,
     ForeignKey,
@@ -100,6 +101,18 @@ class CourseEnrollmentStatus(str, Enum):
     ENROLLED = "enrolled"
     COMPLETED = "completed"
     WITHDRAWN = "withdrawn"
+
+
+class ProfessionalProfileVisibility(str, Enum):
+    PRIVATE = "private"
+    PUBLIC = "public"
+
+
+class ServiceListingStatus(str, Enum):
+    DRAFT = "draft"
+    PUBLISHED = "published"
+    PAUSED = "paused"
+    ARCHIVED = "archived"
 
 
 class TechnicalAssessmentStatus(str, Enum):
@@ -267,6 +280,88 @@ class CandidateProfile(Base):
     )
 
 
+class ProfessionalProfile(Base):
+    __tablename__ = "professional_profiles"
+    __table_args__ = (Index("ix_professional_profiles_visibility_location", "visibility", "location"),)
+
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    display_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    headline: Mapped[str] = mapped_column(String(200), nullable=False)
+    introduction: Mapped[str] = mapped_column(String(5000), default="", nullable=False)
+    photo_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    location: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    languages: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    skills: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    years_experience: Mapped[int | None] = mapped_column(nullable=True)
+    visibility: Mapped[ProfessionalProfileVisibility] = mapped_column(
+        SqlEnum(
+            ProfessionalProfileVisibility,
+            name="professional_profile_visibility",
+            native_enum=False,
+            create_constraint=True,
+            values_callable=lambda values: [member.value for member in values],
+        ),
+        default=ProfessionalProfileVisibility.PRIVATE,
+        nullable=False,
+    )
+    available: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    accepting_requests: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    availability: Mapped[dict[str, object]] = mapped_column(JSON, default=dict, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc), nullable=False,
+    )
+
+
+class ServiceListing(Base):
+    __tablename__ = "service_listings"
+    __table_args__ = (
+        Index("ix_service_listings_status_created", "status", "created_at"),
+        Index("ix_service_listings_owner_created", "owner_user_id", "created_at"),
+        Index("ix_service_listings_category_status", "category", "status"),
+        CheckConstraint("service_mode IN ('remote', 'provider_location', 'customer_location', 'flexible')", name="ck_service_listings_mode"),
+        CheckConstraint("price_type IN ('fixed', 'hourly', 'starting_at', 'quote', 'negotiable')", name="ck_service_listings_price_type"),
+        CheckConstraint("price_min IS NULL OR price_min >= 0", name="ck_service_listings_price_min_nonnegative"),
+        CheckConstraint("price_max IS NULL OR price_max >= 0", name="ck_service_listings_price_max_nonnegative"),
+        CheckConstraint("price_min IS NULL OR price_max IS NULL OR price_max >= price_min", name="ck_service_listings_price_range"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    owner_user_id: Mapped[str] = mapped_column(
+        ForeignKey("professional_profiles.user_id", ondelete="CASCADE"), nullable=False
+    )
+    title: Mapped[str] = mapped_column(String(160), nullable=False)
+    description: Mapped[str] = mapped_column(String(5000), nullable=False)
+    category: Mapped[str] = mapped_column(String(120), nullable=False)
+    skills: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    location: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    service_mode: Mapped[str] = mapped_column(String(30), nullable=False)
+    price_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    price_min: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    price_max: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    status: Mapped[ServiceListingStatus] = mapped_column(
+        SqlEnum(
+            ServiceListingStatus,
+            name="service_listing_status",
+            native_enum=False,
+            create_constraint=True,
+            values_callable=lambda values: [member.value for member in values],
+        ),
+        default=ServiceListingStatus.DRAFT,
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc), nullable=False,
+    )
 class CandidateRoadmapStep(Base):
     __tablename__ = "candidate_roadmap_steps"
     __table_args__ = (

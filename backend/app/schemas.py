@@ -11,7 +11,9 @@ from app.models import (
     CourseStatus,
     JobApplicationStatus,
     JobOfferStatus,
+    ProfessionalProfileVisibility,
     Role,
+    ServiceListingStatus,
 )
 
 
@@ -210,6 +212,144 @@ class CandidateProfileResponse(BaseModel):
     updated_at: datetime | None = None
 
 
+class ProfessionalProfileFields(BaseModel):
+    display_name: str = Field(min_length=1, max_length=120)
+    headline: str = Field(min_length=2, max_length=200)
+    introduction: str = Field(default="", max_length=5000)
+    photo_url: str | None = Field(default=None, max_length=1000)
+    location: str | None = Field(default=None, max_length=120)
+    languages: list[str] = Field(default_factory=list, max_length=12)
+    skills: list[str] = Field(default_factory=list, max_length=30)
+    years_experience: int | None = Field(default=None, ge=0, le=80)
+    visibility: ProfessionalProfileVisibility = ProfessionalProfileVisibility.PRIVATE
+    available: bool = True
+    accepting_requests: bool = True
+    availability: dict[str, object] = Field(default_factory=dict)
+
+    @field_validator("display_name", "headline", "introduction")
+    @classmethod
+    def trim_professional_text(cls, value: str) -> str:
+        return value.strip()
+
+    @field_validator("location")
+    @classmethod
+    def trim_professional_location(cls, value: str | None) -> str | None:
+        return value.strip() or None if value is not None else None
+
+    @field_validator("skills")
+    @classmethod
+    def normalize_professional_skills(cls, value: list[str]) -> list[str]:
+        return normalize_skills(value)
+
+    @field_validator("languages")
+    @classmethod
+    def normalize_languages(cls, value: list[str]) -> list[str]:
+        return list(dict.fromkeys(item.strip() for item in value if item.strip()))
+
+
+class ProfessionalProfileResponse(ProfessionalProfileFields):
+    model_config = ConfigDict(from_attributes=True)
+
+    user_id: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class PublicServiceListingResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    owner_user_id: str
+    title: str
+    description: str
+    category: str
+    skills: list[str]
+    location: str | None
+    service_mode: str
+    price_type: str
+    price_min: Decimal | None
+    price_max: Decimal | None
+    created_at: datetime
+
+
+class ServiceListingFields(BaseModel):
+    title: str = Field(min_length=2, max_length=160)
+    description: str = Field(min_length=10, max_length=5000)
+    category: str = Field(min_length=2, max_length=120)
+    skills: list[str] = Field(default_factory=list, max_length=30)
+    location: str | None = Field(default=None, max_length=120)
+    service_mode: Literal["remote", "provider_location", "customer_location", "flexible"]
+    price_type: Literal["fixed", "hourly", "starting_at", "quote", "negotiable"] = "quote"
+    price_min: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
+    price_max: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
+
+    @field_validator("title", "description", "category")
+    @classmethod
+    def trim_service_text(cls, value: str) -> str:
+        return value.strip()
+
+    @field_validator("skills")
+    @classmethod
+    def normalize_service_skills(cls, value: list[str]) -> list[str]:
+        return normalize_skills(value)
+
+    @model_validator(mode="after")
+    def validate_service_listing(self) -> "ServiceListingFields":
+        if self.price_min is not None and self.price_max is not None and self.price_max < self.price_min:
+            raise ValueError("Maximum price must be greater than or equal to minimum price.")
+        if self.service_mode != "remote" and not self.location:
+            raise ValueError("A location is required for in-person service modes.")
+        return self
+
+
+class ServiceListingCreate(ServiceListingFields):
+    pass
+
+
+class ServiceListingResponse(ServiceListingFields):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    owner_user_id: str
+    status: ServiceListingStatus
+    created_at: datetime
+    updated_at: datetime
+
+
+class ServiceListingStatusUpdate(BaseModel):
+    status: ServiceListingStatus
+
+
+class PublicProfessionalProfileResponse(BaseModel):
+    id: str
+    display_name: str
+    headline: str
+    introduction: str
+    photo_url: str | None
+    location: str | None
+    languages: list[str]
+    skills: list[str]
+    years_experience: int | None
+    available: bool
+    accepting_requests: bool
+    availability: dict[str, object]
+    services: list[PublicServiceListingResponse]
+
+
+class PublicProfessionalSearchPage(BaseModel):
+    items: list[PublicProfessionalProfileResponse]
+    total: int
+    limit: int
+    offset: int
+
+
+class PublicServiceSearchPage(BaseModel):
+    items: list[PublicServiceListingResponse]
+    total: int
+    limit: int
+    offset: int
+
+
 class AssistantMessage(BaseModel):
     role: str
     content: str = Field(min_length=1, max_length=3000)
@@ -384,6 +524,13 @@ class JobOfferResponse(BaseModel):
     application_deadline: date | None = None
     published_at: datetime | None = None
     created_at: datetime
+
+
+class PublicJobOfferPage(BaseModel):
+    items: list[JobOfferResponse]
+    total: int
+    limit: int
+    offset: int
 
 
 class JobOfferStatusUpdate(BaseModel):
@@ -736,6 +883,28 @@ class TrainingCourseResponse(BaseModel):
     updated_at: datetime
     enrollment_count: int = 0
     completed_count: int = 0
+
+
+class PublicTrainingCourseResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    title: str
+    summary: str
+    skills: list[str]
+    delivery_mode: CourseDeliveryMode
+    location: str | None
+    starts_on: date | None
+    ends_on: date | None
+    duration_hours: int
+    price_tnd: Decimal | None
+
+
+class PublicTrainingSearchPage(BaseModel):
+    items: list[PublicTrainingCourseResponse]
+    total: int
+    limit: int
+    offset: int
 
 
 class CourseEnrollmentResponse(BaseModel):

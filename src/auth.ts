@@ -66,6 +66,57 @@ export type JobOffer = {
   created_at: string;
 };
 
+export type ServiceListingStatus = "draft" | "published" | "paused" | "archived";
+export type ServiceListing = {
+  id: string;
+  owner_user_id: string;
+  title: string;
+  description: string;
+  category: string;
+  skills: string[];
+  location: string | null;
+  service_mode: "remote" | "provider_location" | "customer_location" | "flexible";
+  price_type: "fixed" | "hourly" | "starting_at" | "quote" | "negotiable";
+  price_min: string | null;
+  price_max: string | null;
+  status: ServiceListingStatus;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ProfessionalProfile = {
+  user_id: string;
+  display_name: string;
+  headline: string;
+  introduction: string;
+  photo_url: string | null;
+  location: string | null;
+  languages: string[];
+  skills: string[];
+  years_experience: number | null;
+  visibility: "private" | "public";
+  available: boolean;
+  accepting_requests: boolean;
+  availability: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PublicProfessional = Omit<ProfessionalProfile, "user_id" | "visibility" | "created_at" | "updated_at"> & {
+  id: string;
+  services: PublicService[];
+};
+
+export type PublicService = Omit<ServiceListing, "status" | "updated_at">;
+export type PublicCourse = Pick<TrainingCourse, "id" | "title" | "summary" | "skills" | "delivery_mode" | "location" | "starts_on" | "ends_on" | "duration_hours" | "price_tnd">;
+
+export type PublicJobSearchPage = {
+  items: JobOffer[];
+  total: number;
+  limit: number;
+  offset: number;
+};
+
 export type OrganisationProfile = {
   id: string;
   organisation_type: string;
@@ -442,6 +493,45 @@ export async function fetchCurrentUser(token: string): Promise<AuthUser> {
   return (await response.json()) as AuthUser;
 }
 
+export async function fetchPublicJobs(filters: {
+  q?: string;
+  location?: string;
+  limit?: number;
+  offset?: number;
+} = {}): Promise<PublicJobSearchPage> {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    if (value !== undefined && value !== "") params.set(key, String(value));
+  }
+  const response = await fetch(`${API_BASE_URL}/public/jobs?${params.toString()}`);
+  if (!response.ok) throw await errorFromResponse(response);
+  return (await response.json()) as PublicJobSearchPage;
+}
+
+export async function fetchPublicJob(offerId: string): Promise<JobOffer> {
+  const response = await fetch(`${API_BASE_URL}/public/jobs/${encodeURIComponent(offerId)}`);
+  if (!response.ok) throw await errorFromResponse(response);
+  return (await response.json()) as JobOffer;
+}
+
+export async function fetchPublicCourse(courseId: string): Promise<PublicCourse> {
+  const response = await fetch(`${API_BASE_URL}/public/training/${encodeURIComponent(courseId)}`);
+  if (!response.ok) throw await errorFromResponse(response);
+  return (await response.json()) as PublicCourse;
+}
+
+export async function fetchPublicService(serviceId: string): Promise<PublicService> {
+  const response = await fetch(`${API_BASE_URL}/public/services/${encodeURIComponent(serviceId)}`);
+  if (!response.ok) throw await errorFromResponse(response);
+  return (await response.json()) as PublicService;
+}
+
+export async function fetchPublicProfessional(profileId: string): Promise<PublicProfessional> {
+  const response = await fetch(`${API_BASE_URL}/public/professionals/${encodeURIComponent(profileId)}`);
+  if (!response.ok) throw await errorFromResponse(response);
+  return (await response.json()) as PublicProfessional;
+}
+
 async function authenticatedRequest<T>(
   token: string,
   path: string,
@@ -460,6 +550,50 @@ async function authenticatedRequest<T>(
     throw await errorFromResponse(response);
   }
   return (await response.json()) as T;
+}
+
+export async function fetchPublicTraining(filters: { q?: string; location?: string; limit?: number; offset?: number } = {}): Promise<{ items: PublicCourse[]; total: number; limit: number; offset: number }> {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) if (value !== undefined && value !== "") params.set(key, String(value));
+  const response = await fetch(`${API_BASE_URL}/public/training?${params.toString()}`);
+  if (!response.ok) throw await errorFromResponse(response);
+  return (await response.json()) as { items: PublicCourse[]; total: number; limit: number; offset: number };
+}
+
+export async function fetchPublicServices(filters: { q?: string; location?: string; category?: string; limit?: number; offset?: number } = {}): Promise<{ items: PublicService[]; total: number; limit: number; offset: number }> {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) if (value !== undefined && value !== "") params.set(key, String(value));
+  const response = await fetch(`${API_BASE_URL}/public/services?${params.toString()}`);
+  if (!response.ok) throw await errorFromResponse(response);
+  return (await response.json()) as { items: PublicService[]; total: number; limit: number; offset: number };
+}
+
+export async function fetchPublicProfessionals(filters: { q?: string; location?: string; skill?: string; available?: boolean; limit?: number; offset?: number } = {}): Promise<{ items: PublicProfessional[]; total: number; limit: number; offset: number }> {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) if (value !== undefined && value !== "") params.set(key, String(value));
+  const response = await fetch(`${API_BASE_URL}/public/professionals?${params.toString()}`);
+  if (!response.ok) throw await errorFromResponse(response);
+  return (await response.json()) as { items: PublicProfessional[]; total: number; limit: number; offset: number };
+}
+
+export function fetchMyProfessionalProfile(token: string): Promise<ProfessionalProfile> {
+  return authenticatedRequest(token, "/me/professional-profile");
+}
+
+export function saveMyProfessionalProfile(token: string, profile: Omit<ProfessionalProfile, "user_id" | "created_at" | "updated_at">): Promise<ProfessionalProfile> {
+  return authenticatedRequest(token, "/me/professional-profile", { method: "PUT", body: JSON.stringify(profile) });
+}
+
+export function fetchMyServices(token: string): Promise<ServiceListing[]> {
+  return authenticatedRequest(token, "/me/services");
+}
+
+export function createMyService(token: string, service: Pick<ServiceListing, "title" | "description" | "category" | "skills" | "location" | "service_mode" | "price_type" | "price_min" | "price_max">): Promise<ServiceListing> {
+  return authenticatedRequest(token, "/me/services", { method: "POST", body: JSON.stringify(service) });
+}
+
+export function updateMyServiceStatus(token: string, serviceId: string, status: ServiceListingStatus): Promise<ServiceListing> {
+  return authenticatedRequest(token, `/me/services/${encodeURIComponent(serviceId)}/status`, { method: "PATCH", body: JSON.stringify({ status }) });
 }
 
 export function fetchCandidateProfile(token: string): Promise<CandidateProfile> {

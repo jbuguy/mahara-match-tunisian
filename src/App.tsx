@@ -55,11 +55,14 @@ import {
   ApiError,
   demoAccounts,
   fetchCurrentUser,
+  applyToJob,
   login,
   registerCandidate,
   type AuthUser,
   type Role,
 } from "./auth";
+import { GuestDiscovery } from "./GuestDiscovery";
+import { ProfessionalServicesPage } from "./ProfessionalServices";
 
 const roleConfiguration: Record<
   Role,
@@ -199,11 +202,23 @@ export default function App() {
       sessionStorage.setItem("mahara-match-token", result.access_token);
       setAccessToken(result.access_token);
       setUser(result.user);
-      setActivePage(
-        isRegistration
-          ? "Mon profil"
-          : roleConfiguration[result.user.role].navigation[0].label,
-      );
+      let destination = isRegistration
+        ? "Mon profil"
+        : roleConfiguration[result.user.role].navigation[0].label;
+      const pendingOfferId = sessionStorage.getItem("mahara-match-return-job");
+      if (pendingOfferId && result.user.role === "candidate") {
+        try {
+          await applyToJob(result.access_token, pendingOfferId);
+          sessionStorage.removeItem("mahara-match-return-job");
+          destination = "Mes candidatures";
+        } catch (error: unknown) {
+          setAuthError(error instanceof ApiError ? error.message : "Could not resume your application.");
+          destination = "Mes opportunités";
+        }
+      } else if (pendingOfferId && result.user.role !== "candidate") {
+        setAuthError("Sign in with a candidate account to apply for this job.");
+      }
+      setActivePage(destination);
     } catch (error: unknown) {
       setAuthError(
         error instanceof ApiError
@@ -234,6 +249,12 @@ export default function App() {
   if (!user || !accessToken) {
     return (
       <div className="app-shell" data-theme={theme}>
+        <GuestDiscovery
+          onApply={(offer) => {
+            sessionStorage.setItem("mahara-match-return-job", offer.id);
+            document.getElementById("guest-auth")?.scrollIntoView({ behavior: "smooth" });
+          }}
+        />
         <LoginPage
           error={authError}
           theme={theme}
@@ -351,6 +372,7 @@ export default function App() {
             <strong>{activePage}</strong>
           </div>
           <div className="topbar__actions">
+            <button className="professional-profile-link" type="button" onClick={() => setActivePage("Profil professionnel")}>Profil professionnel</button>
             <button
               className="icon-button"
               type="button"
@@ -388,6 +410,8 @@ export default function App() {
                 onNavigate={setActivePage}
               />
             )
+          ) : activePage === "Profil professionnel" ? (
+            <ProfessionalServicesPage token={accessToken} />
           ) : isCandidate && activePage === "Mon profil" ? (
             <CandidateProfilePage token={accessToken} />
           ) : isCandidate && activePage === "Mes opportunités" ? (
@@ -483,7 +507,7 @@ function LoginPage({
           {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
         </button>
       </div>
-      <section className="auth-card" aria-labelledby="login-title">
+      <section className="auth-card" id="guest-auth" aria-labelledby="login-title">
         <Badge tone="accent">Mahara Match</Badge>
         <h1 id="login-title">
           {isRegistering ? "Créez votre espace candidat" : "Connectez-vous à votre espace"}

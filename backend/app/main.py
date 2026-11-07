@@ -16,7 +16,7 @@ from fastapi import (
 )
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import ValidationError
-from sqlalchemy import delete, select
+from sqlalchemy import String, cast, delete, func, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -50,6 +50,7 @@ from app.database import get_session
 from app.dependencies import get_current_user, require_permission, require_role
 from app.marketplace import router as marketplace_router
 from app.employer import router as employer_router
+from app.professional import router as professional_router
 from app.models import (
     AuditEvent,
     CandidateAssistantSession,
@@ -104,6 +105,7 @@ from app.schemas import (
     JobMatchResponse,
     JobOfferCreate,
     JobOfferResponse,
+    PublicJobOfferPage,
     JobOfferStatusUpdate,
     LoginRequest,
     LoginResponse,
@@ -142,6 +144,71 @@ app = FastAPI(
 )
 app.include_router(marketplace_router)
 app.include_router(employer_router)
+app.include_router(professional_router)
+
+
+@app.get("/public/jobs", response_model=PublicJobOfferPage, tags=["public discovery"])
+def search_public_jobs(
+    q: str | None = Query(default=None, min_length=1, max_length=160),
+    location: str | None = Query(default=None, min_length=1, max_length=120),
+    employment_type: str | None = Query(default=None, min_length=1, max_length=40),
+    workplace_arrangement: str | None = Query(default=None, min_length=1, max_length=20),
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    session: Session = Depends(get_session),
+) -> PublicJobOfferPage:
+    """Search explicitly published jobs without exposing employer or applicant records."""
+    now = datetime.now(timezone.utc)
+    filters = [JobOffer.status == JobOfferStatus.PUBLISHED]
+    filters.append(
+        (JobOffer.application_deadline.is_(None))
+        | (JobOffer.application_deadline >= now.date())
+    )
+    if q:
+        pattern = f"%{q.strip()}%"
+        filters.append(
+            JobOffer.title.ilike(pattern)
+            | JobOffer.description.ilike(pattern)
+            | JobOffer.location.ilike(pattern)
+            | cast(JobOffer.required_skills, String).ilike(pattern)
+            | cast(JobOffer.preferred_skills, String).ilike(pattern)
+        )
+    if location:
+        filters.append(JobOffer.location.ilike(f"%{location.strip()}%"))
+    if employment_type:
+        filters.append(JobOffer.employment_type == employment_type.strip())
+    if workplace_arrangement:
+        filters.append(JobOffer.workplace_arrangement == workplace_arrangement.strip())
+
+    total = session.scalar(select(func.count()).select_from(JobOffer).where(*filters)) or 0
+    offers = session.scalars(
+        select(JobOffer)
+        .where(*filters)
+        .order_by(JobOffer.published_at.desc(), JobOffer.created_at.desc(), JobOffer.id)
+        .offset(offset)
+        .limit(limit)
+    )
+    return PublicJobOfferPage(
+        items=[JobOfferResponse.model_validate(offer) for offer in offers],
+        total=total,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@app.get("/public/jobs/{offer_id}", response_model=JobOfferResponse, tags=["public discovery"])
+def get_public_job(offer_id: str, session: Session = Depends(get_session)) -> JobOfferResponse:
+    offer = session.scalar(
+        select(JobOffer).where(
+            JobOffer.id == offer_id,
+            JobOffer.status == JobOfferStatus.PUBLISHED,
+            (JobOffer.application_deadline.is_(None))
+            | (JobOffer.application_deadline >= datetime.now(timezone.utc).date()),
+        )
+    )
+    if offer is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job offer not found.")
+    return JobOfferResponse.model_validate(offer)
 
 allowed_origins = [
     origin.strip()
