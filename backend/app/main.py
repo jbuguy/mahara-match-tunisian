@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+from datetime import datetime, timezone
 
 from fastapi import (
     BackgroundTasks,
@@ -15,7 +16,7 @@ from fastapi import (
 )
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import ValidationError
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -48,6 +49,7 @@ from app.cv_parser import normalize_candidate_profile_from_cv
 from app.database import get_session
 from app.dependencies import get_current_user, require_permission, require_role
 from app.marketplace import router as marketplace_router
+from app.employer import router as employer_router
 from app.models import (
     AuditEvent,
     CandidateAssistantSession,
@@ -62,11 +64,13 @@ from app.models import (
     BehavioralAssessmentStatus,
     InterviewTranscriptionStatus,
     JobOffer,
+    JobOfferStatus,
     Organisation,
     OrganisationMembership,
     OrganisationType,
     Role,
     TechnicalAssessmentStatus,
+    TalentPoolMember,
     TrainingCourse,
     User,
 )
@@ -100,6 +104,7 @@ from app.schemas import (
     JobMatchResponse,
     JobOfferCreate,
     JobOfferResponse,
+    JobOfferStatusUpdate,
     LoginRequest,
     LoginResponse,
     OrganisationProfileResponse,
@@ -136,6 +141,7 @@ app = FastAPI(
     version="0.1.0",
 )
 app.include_router(marketplace_router)
+app.include_router(employer_router)
 
 allowed_origins = [
     origin.strip()
@@ -185,6 +191,7 @@ def get_employer_organisation(
         **{field: getattr(organisation, field) for field in OrganisationProfileUpdate.model_fields},
         "id": organisation.id,
         "organisation_type": organisation.organisation_type.value,
+        "verification_status": organisation.verification_status.value,
     })
 
 
@@ -228,6 +235,7 @@ def create_employer_organisation(
         **{field: getattr(organisation, field) for field in OrganisationProfileUpdate.model_fields},
         "id": organisation.id,
         "organisation_type": organisation.organisation_type.value,
+        "verification_status": organisation.verification_status.value,
     })
 
 
@@ -308,6 +316,7 @@ def update_employer_organisation(
         **{field: getattr(organisation, field) for field in OrganisationProfileUpdate.model_fields},
         "id": organisation.id,
         "organisation_type": organisation.organisation_type.value,
+        "verification_status": organisation.verification_status.value,
     })
 
 
@@ -450,6 +459,8 @@ def candidate_profile(
         experience=profile.experience if profile else None,
         education_entries=profile.education_entries if profile else [],
         experience_entries=profile.experience_entries if profile else [],
+        professional_headline=profile.professional_headline if profile else None,
+        employer_discoverable=profile.employer_discoverable if profile else False,
         updated_at=profile.updated_at if profile else None,
     )
 
@@ -473,6 +484,8 @@ def update_candidate_profile(
         if field in {"education_entries", "experience_entries"}:
             value = [entry.model_dump() if hasattr(entry, "model_dump") else entry for entry in value]
         setattr(profile, field, value)
+    if updates.get("employer_discoverable") is False:
+        session.execute(delete(TalentPoolMember).where(TalentPoolMember.candidate_id == user.id))
     if "education_entries" in updates:
         profile.education = "\n".join(
             " — ".join(part for part in (entry.get("degree"), entry.get("institution"), entry.get("field_of_study")) if part)
@@ -503,6 +516,8 @@ def update_candidate_profile(
         experience=profile.experience,
         education_entries=profile.education_entries,
         experience_entries=profile.experience_entries,
+        professional_headline=profile.professional_headline,
+        employer_discoverable=profile.employer_discoverable,
         updated_at=profile.updated_at,
     )
 
@@ -1009,7 +1024,11 @@ def candidate_matches(
     candidate_skills = {
         skill.casefold(): skill for skill in (profile.skills if profile else [])
     }
-    offers = session.scalars(select(JobOffer).order_by(JobOffer.created_at.desc()))
+    offers = session.scalars(
+        select(JobOffer)
+        .where(JobOffer.status == JobOfferStatus.PUBLISHED)
+        .order_by(JobOffer.created_at.desc())
+    )
     matches: list[JobMatchResponse] = []
     for offer in offers:
         matched = [
@@ -1039,7 +1058,9 @@ def candidate_roadmap(
     session: Session = Depends(get_session),
 ) -> CandidateRoadmapResponse:
     profile = session.get(CandidateProfile, user.id)
-    offers = list(session.scalars(select(JobOffer)))
+    offers = list(
+        session.scalars(select(JobOffer).where(JobOffer.status == JobOfferStatus.PUBLISHED))
+    )
     saved_steps = session.scalars(
         select(CandidateRoadmapStep).where(CandidateRoadmapStep.user_id == user.id)
     )
@@ -1070,7 +1091,9 @@ def update_candidate_roadmap_step(
     session: Session = Depends(get_session),
 ) -> CandidateRoadmapResponse:
     profile = session.get(CandidateProfile, user.id)
-    offers = list(session.scalars(select(JobOffer)))
+    offers = list(
+        session.scalars(select(JobOffer).where(JobOffer.status == JobOfferStatus.PUBLISHED))
+    )
     saved_steps = list(
         session.scalars(
             select(CandidateRoadmapStep).where(CandidateRoadmapStep.user_id == user.id)
@@ -1157,7 +1180,9 @@ def candidate_interview_prep_roles(
     session: Session = Depends(get_session),
 ) -> list[CandidateInterviewRoleResponse]:
     offers = session.scalars(
-        select(JobOffer).order_by(JobOffer.title, JobOffer.id)
+        select(JobOffer)
+        .where(JobOffer.status == JobOfferStatus.PUBLISHED)
+        .order_by(JobOffer.title, JobOffer.id)
     )
     return [
         CandidateInterviewRoleResponse(
@@ -1182,7 +1207,7 @@ def candidate_interview_preparation_profile(
     session: Session = Depends(get_session),
 ) -> CandidateInterviewPreparationProfileResponse:
     offer = session.get(JobOffer, offer_id)
-    if offer is None:
+    if offer is None or offer.status != JobOfferStatus.PUBLISHED:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="This job offer could not be found.",
@@ -1200,6 +1225,8 @@ def candidate_interview_preparation_profile(
             experience=profile.experience,
             education_entries=profile.education_entries,
             experience_entries=profile.experience_entries,
+            professional_headline=profile.professional_headline,
+            employer_discoverable=profile.employer_discoverable,
             updated_at=profile.updated_at,
         )
         if profile else None
@@ -1249,7 +1276,7 @@ def start_candidate_technical_assessment(
     session: Session = Depends(get_session),
 ) -> CandidateTechnicalAssessmentResponse:
     offer = session.get(JobOffer, request.offer_id)
-    if offer is None:
+    if offer is None or offer.status != JobOfferStatus.PUBLISHED:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="This job offer could not be found.",
@@ -1505,7 +1532,7 @@ def start_candidate_behavioral_assessment(
     session: Session = Depends(get_session),
 ) -> CandidateBehavioralAssessmentResponse:
     offer = session.get(JobOffer, request.offer_id)
-    if offer is None:
+    if offer is None or offer.status != JobOfferStatus.PUBLISHED:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="This job offer could not be found.",
@@ -1894,6 +1921,9 @@ def create_employer_offer(
         description=request.description,
         location=request.location,
         required_skills=request.required_skills,
+        preferred_skills=request.preferred_skills,
+        status=request.status,
+        published_at=datetime.now(timezone.utc) if request.status == JobOfferStatus.PUBLISHED else None,
     )
     session.add(offer)
     session.flush()
@@ -1904,6 +1934,52 @@ def create_employer_offer(
         resource_type="job_offer",
         resource_id=offer.id,
         details={"required_skill_count": len(request.required_skills)},
+    )
+    session.commit()
+    session.refresh(offer)
+    return JobOfferResponse.model_validate(offer)
+
+
+@app.patch(
+    "/employer/offers/{offer_id}/status",
+    response_model=JobOfferResponse,
+    tags=["employer"],
+)
+def update_employer_offer_status(
+    offer_id: str,
+    request: JobOfferStatusUpdate,
+    user: User = Depends(require_permission(Permission.OFFER_MANAGE_ORGANISATION)),
+    session: Session = Depends(get_session),
+) -> JobOfferResponse:
+    offer = session.scalar(
+        select(JobOffer).where(JobOffer.id == offer_id, JobOffer.employer_id == user.id)
+    )
+    if offer is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job offer not found.")
+    transitions = {
+        JobOfferStatus.DRAFT: {JobOfferStatus.PUBLISHED, JobOfferStatus.ARCHIVED},
+        JobOfferStatus.PUBLISHED: {JobOfferStatus.PAUSED, JobOfferStatus.CLOSED},
+        JobOfferStatus.PAUSED: {JobOfferStatus.PUBLISHED, JobOfferStatus.CLOSED, JobOfferStatus.ARCHIVED},
+        JobOfferStatus.CLOSED: {JobOfferStatus.ARCHIVED},
+        JobOfferStatus.EXPIRED: {JobOfferStatus.ARCHIVED},
+        JobOfferStatus.ARCHIVED: set(),
+    }
+    previous = offer.status
+    if request.status not in transitions[previous]:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Cannot change an offer from {previous.value} to {request.status.value}.",
+        )
+    offer.status = request.status
+    if request.status == JobOfferStatus.PUBLISHED:
+        offer.published_at = datetime.now(timezone.utc)
+    record_audit_event(
+        session,
+        action="employer.job_offer.status_updated",
+        actor=user,
+        resource_type="job_offer",
+        resource_id=offer.id,
+        details={"from": previous.value, "to": request.status.value},
     )
     session.commit()
     session.refresh(offer)

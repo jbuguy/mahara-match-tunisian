@@ -8,6 +8,11 @@ import {
   Compass,
   ClipboardCheck,
   GraduationCap,
+  Search,
+  Bookmark,
+  CalendarClock,
+  Bell,
+  ChartNoAxesCombined,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -28,6 +33,14 @@ import {
   EmployerApplicationsPage,
   EmployerDashboardPage,
   EmployerOrganisationPage,
+  EmployerCandidatesPage,
+  EmployerTalentPoolsPage,
+  EmployerMessagesPage,
+  EmployerInterviewsPage,
+  EmployerNotificationsPage,
+  EmployerAnalyticsPage,
+  AdminOrganisationVerificationPage,
+  CandidateInterviewsPage,
   TrainingProviderDashboardPage,
 } from "./marketplace";
 import {
@@ -66,6 +79,7 @@ const roleConfiguration: Record<
       { label: "Préparer un entretien", icon: ClipboardCheck },
       { label: "Formations", icon: GraduationCap },
       { label: "Mes candidatures", icon: ClipboardList },
+      { label: "Mes entretiens", icon: CalendarClock },
       { label: "Assistant", icon: MessageCircle },
       { label: "Mon profil", icon: UserRound },
     ],
@@ -78,6 +92,12 @@ const roleConfiguration: Record<
       { label: "Vue d’ensemble", icon: LayoutDashboard },
       { label: "Mes offres", icon: BriefcaseBusiness },
       { label: "Candidatures", icon: UserRound },
+      { label: "Trouver des candidats", icon: Search },
+      { label: "Talents sauvegardés", icon: Bookmark },
+      { label: "Messages", icon: MessageCircle },
+      { label: "Entretiens", icon: CalendarClock },
+      { label: "Notifications", icon: Bell },
+      { label: "Statistiques", icon: ChartNoAxesCombined },
       { label: "Assistant", icon: MessageCircle },
       { label: "Mon organisation", icon: Building2 },
     ],
@@ -86,8 +106,8 @@ const roleConfiguration: Record<
   },
   ministry_admin: {
     label: "Administration",
-    navigation: [
-      { label: "Vue d’ensemble", icon: LayoutDashboard },
+    navigation: [{ label: "Vue d’ensemble", icon: LayoutDashboard },
+      { label: "V�rifications organisations", icon: Building2 },
       { label: "Assistant", icon: MessageCircle },
     ],
     dashboardTitle: "Espace administration",
@@ -382,12 +402,28 @@ export default function App() {
             <CandidateCoursesPage token={accessToken} />
           ) : isCandidate && activePage === "Mes candidatures" ? (
             <CandidateApplicationsPage token={accessToken} />
+          ) : isCandidate && activePage === "Mes entretiens" ? (
+            <CandidateInterviewsPage token={accessToken} />
           ) : user.role === "employer" && activePage === "Mes offres" ? (
             <EmployerOffersPage token={accessToken} />
           ) : user.role === "employer" && activePage === "Candidatures" ? (
-            <EmployerApplicationsPage token={accessToken} />
+            <EmployerApplicationsPage token={accessToken} onNavigate={setActivePage} />
           ) : user.role === "employer" && activePage === "Mon organisation" ? (
             <EmployerOrganisationPage token={accessToken} />
+          ) : user.role === "employer" && activePage === "Trouver des candidats" ? (
+            <EmployerCandidatesPage token={accessToken} />
+          ) : user.role === "employer" && activePage === "Talents sauvegardés" ? (
+            <EmployerTalentPoolsPage token={accessToken} />
+          ) : user.role === "employer" && activePage === "Messages" ? (
+            <EmployerMessagesPage token={accessToken} />
+          ) : user.role === "employer" && activePage === "Entretiens" ? (
+            <EmployerInterviewsPage token={accessToken} />
+          ) : user.role === "employer" && activePage === "Notifications" ? (
+            <EmployerNotificationsPage token={accessToken} />
+          ) : user.role === "employer" && activePage === "Statistiques" ? (
+            <EmployerAnalyticsPage token={accessToken} />
+          ) : user.role === "ministry_admin" && activePage === "Vérifications organisations" ? (
+            <AdminOrganisationVerificationPage token={accessToken} />
           ) : user.role === "training_provider" && activePage === "Catalogue de formations" ? (
             <TrainingProviderDashboardPage token={accessToken} />
           ) : (

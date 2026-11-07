@@ -12,10 +12,14 @@ from app.database import get_session
 from app.dependencies import require_permission
 from app.models import (
     CandidateProfile,
+    EmployerNotification,
+    EmployerNotificationPreference,
     CourseEnrollment,
     CourseEnrollmentStatus,
     CourseStatus,
     JobApplication,
+    JobApplicationStatusHistory,
+    JobOfferStatus,
     JobApplicationStatus,
     JobOffer,
     Organisation,
@@ -32,6 +36,7 @@ from app.schemas import (
     EmployerApplicationResponse,
     JobApplicationResponse,
     JobApplicationStatusUpdate,
+    ApplicationStatusHistoryResponse,
     ProviderCourseEnrollmentResponse,
     SkillDemandIndicator,
     TrainingCourseCreate,
@@ -43,6 +48,44 @@ router = APIRouter()
 _CLOSED_APPLICATION_STATUSES = {
     JobApplicationStatus.HIRED,
     JobApplicationStatus.REJECTED,
+    JobApplicationStatus.WITHDRAWN,
+}
+
+_EMPLOYER_APPLICATION_TRANSITIONS = {
+    JobApplicationStatus.SUBMITTED: {
+        JobApplicationStatus.REVIEWING,
+        JobApplicationStatus.SHORTLISTED,
+        JobApplicationStatus.INTERVIEW,
+        JobApplicationStatus.HIRED,
+        JobApplicationStatus.REJECTED,
+    },
+    JobApplicationStatus.REVIEWING: {
+        JobApplicationStatus.SHORTLISTED,
+        JobApplicationStatus.INTERVIEW,
+        JobApplicationStatus.HIRED,
+        JobApplicationStatus.REJECTED,
+    },
+    JobApplicationStatus.SHORTLISTED: {
+        JobApplicationStatus.REVIEWING,
+        JobApplicationStatus.INTERVIEW,
+        JobApplicationStatus.HIRED,
+        JobApplicationStatus.REJECTED,
+    },
+    JobApplicationStatus.INTERVIEW: {
+        JobApplicationStatus.INTERVIEW_COMPLETED,
+        JobApplicationStatus.OFFER_MADE,
+        JobApplicationStatus.HIRED,
+        JobApplicationStatus.REJECTED,
+    },
+    JobApplicationStatus.INTERVIEW_COMPLETED: {
+        JobApplicationStatus.OFFER_MADE,
+        JobApplicationStatus.HIRED,
+        JobApplicationStatus.REJECTED,
+    },
+    JobApplicationStatus.OFFER_MADE: {
+        JobApplicationStatus.HIRED,
+        JobApplicationStatus.REJECTED,
+    },
 }
 
 
@@ -131,6 +174,11 @@ def apply_to_job(
     offer = session.get(JobOffer, offer_id)
     if offer is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job offer not found.")
+    if offer.status != JobOfferStatus.PUBLISHED:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This job offer is not accepting applications.",
+        )
     application = JobApplication(
         candidate_id=user.id,
         job_offer_id=offer.id,
@@ -160,9 +208,62 @@ def apply_to_job(
         resource_type="job_application",
         resource_id=application.id,
     )
+    session.add(
+        JobApplicationStatusHistory(
+            application_id=application.id,
+            actor_id=user.id,
+            from_status=None,
+            to_status=JobApplicationStatus.SUBMITTED,
+        )
+    )
+    preference = session.get(EmployerNotificationPreference, (offer.employer_id, "application"))
+    if preference is None or preference.enabled:
+        session.add(
+            EmployerNotification(
+                user_id=offer.employer_id,
+                notification_type="application",
+                title="Nouvelle candidature",
+                body=f"Une nouvelle candidature a été reçue pour {offer.title}.",
+                resource_type="application",
+                resource_id=application.id,
+            )
+        )
     session.commit()
     session.refresh(application)
     return _candidate_application_response(application, offer)
+
+
+@router.get(
+    "/employer/applications/{application_id}/history",
+    response_model=list[ApplicationStatusHistoryResponse],
+    tags=["employer applications"],
+)
+def employer_application_status_history(
+    application_id: str,
+    user: User = Depends(require_permission(Permission.APPLICANT_READ_BY_APPLICATION)),
+    session: Session = Depends(get_session),
+) -> list[ApplicationStatusHistoryResponse]:
+    owns_application = session.scalar(
+        select(JobApplication.id)
+        .join(JobOffer, JobOffer.id == JobApplication.job_offer_id)
+        .where(JobApplication.id == application_id, JobOffer.employer_id == user.id)
+    )
+    if owns_application is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Application not found.")
+    rows = session.scalars(
+        select(JobApplicationStatusHistory)
+        .where(JobApplicationStatusHistory.application_id == application_id)
+        .order_by(JobApplicationStatusHistory.created_at, JobApplicationStatusHistory.id)
+    )
+    return [
+        ApplicationStatusHistoryResponse(
+            id=row.id,
+            from_status=row.from_status,
+            to_status=row.to_status,
+            created_at=row.created_at,
+        )
+        for row in rows
+    ]
 
 
 @router.get(
@@ -184,6 +285,53 @@ def candidate_applications(
         _candidate_application_response(application, offer)
         for application, offer in rows
     ]
+
+
+@router.post(
+    "/candidate/applications/{application_id}/withdraw",
+    response_model=JobApplicationResponse,
+    tags=["candidate applications"],
+)
+def withdraw_candidate_application(
+    application_id: str,
+    user: User = Depends(require_permission(Permission.APPLICATION_MANAGE_OWN)),
+    session: Session = Depends(get_session),
+) -> JobApplicationResponse:
+    row = session.execute(
+        select(JobApplication, JobOffer)
+        .join(JobOffer, JobOffer.id == JobApplication.job_offer_id)
+        .where(JobApplication.id == application_id, JobApplication.candidate_id == user.id)
+        .with_for_update()
+    ).first()
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Application not found.")
+    application, offer = row
+    if application.status in _CLOSED_APPLICATION_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This application already has a final outcome.",
+        )
+    previous_status = application.status
+    application.status = JobApplicationStatus.WITHDRAWN
+    session.add(
+        JobApplicationStatusHistory(
+            application_id=application.id,
+            actor_id=user.id,
+            from_status=previous_status,
+            to_status=JobApplicationStatus.WITHDRAWN,
+        )
+    )
+    record_audit_event(
+        session,
+        action="candidate.job_application.withdrawn",
+        actor=user,
+        resource_type="job_application",
+        resource_id=application.id,
+        details={"from": previous_status.value, "to": JobApplicationStatus.WITHDRAWN.value},
+    )
+    session.commit()
+    session.refresh(application)
+    return _candidate_application_response(application, offer)
 
 
 @router.get(
@@ -258,13 +406,26 @@ def update_application_status(
             status_code=status.HTTP_409_CONFLICT,
             detail="A closed application outcome cannot be changed.",
         )
-    if request.status == JobApplicationStatus.SUBMITTED:
+    if request.status == JobApplicationStatus.WITHDRAWN:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail="An employer cannot reset an application to submitted.",
+            detail="Only the candidate can withdraw an application.",
         )
     previous_status = application.status
+    if request.status not in _EMPLOYER_APPLICATION_TRANSITIONS.get(previous_status, set()):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Cannot change an application from {previous_status.value} to {request.status.value}.",
+        )
     application.status = request.status
+    session.add(
+        JobApplicationStatusHistory(
+            application_id=application.id,
+            actor_id=user.id,
+            from_status=previous_status,
+            to_status=request.status,
+        )
+    )
     record_audit_event(
         session,
         action="employer.job_application.status_updated",
@@ -646,7 +807,10 @@ def admin_indicators(
     ) or 0
     offers = list(
         session.scalars(
-            select(JobOffer).where(*_date_window(JobOffer.created_at, start_date, end_date))
+            select(JobOffer).where(
+                JobOffer.status == JobOfferStatus.PUBLISHED,
+                *_date_window(JobOffer.created_at, start_date, end_date),
+            )
         )
     )
     application_rows = session.execute(
@@ -657,7 +821,11 @@ def admin_indicators(
     counts_by_status = {app_status: count for app_status, count in application_rows}
     applications_total = sum(counts_by_status.values())
     hired = counts_by_status.get(JobApplicationStatus.HIRED, 0)
-    closed = hired + counts_by_status.get(JobApplicationStatus.REJECTED, 0)
+    closed = (
+        hired
+        + counts_by_status.get(JobApplicationStatus.REJECTED, 0)
+        + counts_by_status.get(JobApplicationStatus.WITHDRAWN, 0)
+    )
     skills_by_key: dict[str, str] = {}
     skill_counts: Counter[str] = Counter()
     for offer in offers:

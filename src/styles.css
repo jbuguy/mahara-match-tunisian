@@ -3104,6 +3104,8 @@ p {
 .employer-create-cta p { margin:.25rem 0; color:var(--color-muted); }
 .employer-create-cta .eyebrow { margin:0; }
 .employer-create-cta button { white-space:nowrap; }
+.employer-dashboard-offer-badges { display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:.5rem; }
+.employer-dashboard-attention { display:grid; gap:1rem; }
 .market-page > .workspace-form { display:grid; gap:1rem; }
 .market-page > .workspace-form .market-panel { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem; }
 .market-page > .workspace-form .market-panel > h2,.market-page > .workspace-form .market-section-heading,.market-page > .workspace-form .organisation-form__wide { grid-column:1/-1; }

@@ -21,13 +21,16 @@ export type CandidateProfile = {
   experience: string | null;
   education_entries: EducationEntry[];
   experience_entries: ExperienceEntry[];
+  professional_headline: string | null;
+  employer_discoverable: boolean;
   updated_at: string | null;
 };
 
 export type EducationEntry = { degree: string; institution: string; field_of_study: string; start_date: string; end_date: string; currently_studying: boolean };
 export type ExperienceEntry = { job_title: string; company: string; employment_type: string; location: string; start_date: string; end_date: string; currently_working: boolean; responsibilities: string };
 
-export type CandidateProfileDraft = Omit<CandidateProfile, "user_id" | "updated_at">;
+export type CandidateProfileDraft = Omit<CandidateProfile, "user_id" | "updated_at" | "professional_headline" | "employer_discoverable">
+  & Partial<Pick<CandidateProfile, "professional_headline" | "employer_discoverable">>;
 export type CandidateAssistantMessage = {
   role: "user" | "assistant";
   content: string;
@@ -51,12 +54,22 @@ export type JobOffer = {
   description: string;
   location: string;
   required_skills: string[];
+  preferred_skills?: string[];
+  status?: "draft" | "published" | "paused" | "closed" | "expired" | "archived";
+  employment_type?: string | null;
+  workplace_arrangement?: string | null;
+  positions_count?: number;
+  salary_min?: number | null;
+  salary_max?: number | null;
+  application_deadline?: string | null;
+  published_at?: string | null;
   created_at: string;
 };
 
 export type OrganisationProfile = {
   id: string;
   organisation_type: string;
+  verification_status?: string;
   name: string;
   website: string | null;
   sector: string | null;
@@ -77,9 +90,13 @@ export type JobMatch = JobOffer & {
 export type JobApplicationStatus =
   | "submitted"
   | "reviewing"
+  | "shortlisted"
   | "interview"
+  | "interview_completed"
+  | "offer_made"
   | "hired"
-  | "rejected";
+  | "rejected"
+  | "withdrawn";
 
 export type JobApplication = {
   id: string;
@@ -95,6 +112,50 @@ export type EmployerApplication = JobApplication & {
   candidate_name: string | null;
   candidate_location: string | null;
   candidate_skills: string[];
+};
+
+export type CandidateDiscovery = {
+  candidate_id: string;
+  professional_headline: string | null;
+  skills: string[];
+  location: string | null;
+  experience_summary: Record<string, unknown>[];
+  education_summary: Record<string, unknown>[];
+  matched_skills: string[];
+  missing_skills: string[];
+};
+
+export type TalentPool = { id: string; name: string; created_at: string; candidate_count: number };
+export type TalentPoolMember = { candidate_id: string; professional_headline: string | null; skills: string[]; location: string | null; private_note: string | null; created_at: string };
+export type ApplicationStatusHistory = { id: string; from_status: JobApplicationStatus | null; to_status: JobApplicationStatus; created_at: string };
+export type EmployerApplicationDetail = EmployerApplication & {
+  professional_headline: string | null;
+  education_entries: Record<string, unknown>[];
+  experience_entries: Record<string, unknown>[];
+  status_history: ApplicationStatusHistory[];
+};
+export type ApplicationNote = { id: string; content: string; created_at: string };
+export type ApplicationEvaluation = { id: string; criteria: Record<string, unknown>[]; strengths: string | null; concerns: string | null; updated_at: string };
+export type JobOfferDecision = { id: string; application_id: string; job_title: string; status: "pending" | "accepted" | "declined" | "expired" | "withdrawn"; offered_at: string; response_deadline: string | null; proposed_conditions: Record<string, unknown>; responded_at: string | null };
+export type Conversation = { id: string; application_id: string; candidate_name: string | null; job_title: string; updated_at: string; unread_count: number };
+export type ConversationMessage = { id: string; sender_id: string; content: string; created_at: string; read_at: string | null };
+export type EmployerInterview = { id: string; application_id: string; job_title: string; candidate_name: string | null; starts_at: string; duration_minutes: number; format: "online" | "in_person"; meeting_details: string | null; status: string };
+export type EmployerNotification = { id: string; notification_type: string; title: string; body: string; resource_type: string | null; resource_id: string | null; read_at: string | null; created_at: string };
+export type NotificationPreference = { notification_type: string; enabled: boolean };
+export type OrganisationVerification = { id: string; organisation_id?: string | null; organisation_name?: string | null; status: string; supporting_information: string; evidence_url: string | null; reviewer_note: string | null; created_at: string };
+export type EmployerAnalytics = {
+  total_applications: number;
+  applications_by_status: Record<string, number>;
+  applications_per_offer: { job_offer_id: string; title: string; applications: number }[];
+  shortlisted: number;
+  interviews: number;
+  hires_reported: number;
+  rejected: number;
+  withdrawn: number;
+  application_to_interview_percent: number | null;
+  interview_to_hire_percent: number | null;
+  average_time_to_first_review_hours: number | null;
+  has_sufficient_data: boolean;
 };
 
 export type CourseStatus = "draft" | "published" | "archived";
@@ -673,11 +734,23 @@ export function generateEmployerOffer(token: string, prompt: string): Promise<{
 
 export function createEmployerOffer(
   token: string,
-  offer: Omit<JobOffer, "id" | "created_at">,
+  offer: Pick<JobOffer, "title" | "description" | "location" | "required_skills">
+    & Partial<Pick<JobOffer, "preferred_skills" | "status">>,
 ): Promise<JobOffer> {
   return authenticatedRequest(token, "/employer/offers", {
     method: "POST",
     body: JSON.stringify(offer),
+  });
+}
+
+export function updateEmployerOfferStatus(
+  token: string,
+  offerId: string,
+  nextStatus: NonNullable<JobOffer["status"]>,
+): Promise<JobOffer> {
+  return authenticatedRequest(token, `/employer/offers/${offerId}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ status: nextStatus }),
   });
 }
 
@@ -691,8 +764,133 @@ export function fetchCandidateApplications(token: string): Promise<JobApplicatio
   return authenticatedRequest(token, "/candidate/applications");
 }
 
+export function fetchCandidateOfferDecisions(token: string): Promise<JobOfferDecision[]> {
+  return authenticatedRequest(token, "/candidate/offer-decisions");
+}
+
+export function respondToJobOffer(token: string, decisionId: string, status: "accepted" | "declined"): Promise<JobOfferDecision> {
+  return authenticatedRequest(token, `/candidate/offer-decisions/${decisionId}`, { method: "PATCH", body: JSON.stringify({ status }) });
+}
+
+export function withdrawCandidateApplication(token: string, applicationId: string): Promise<JobApplication> {
+  return authenticatedRequest(token, `/candidate/applications/${applicationId}/withdraw`, {
+    method: "POST",
+  });
+}
+
 export function fetchEmployerApplications(token: string): Promise<EmployerApplication[]> {
   return authenticatedRequest(token, "/employer/applications");
+}
+
+export function searchEmployerCandidates(token: string, filters: { q?: string; skill?: string; location?: string; offer_id?: string }): Promise<CandidateDiscovery[]> {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) if (value) params.set(key, value);
+  const suffix = params.size ? `?${params.toString()}` : "";
+  return authenticatedRequest(token, `/employer/candidates${suffix}`);
+}
+
+export function fetchTalentPools(token: string): Promise<TalentPool[]> {
+  return authenticatedRequest(token, "/employer/talent-pools");
+}
+
+export function createTalentPool(token: string, name: string): Promise<TalentPool> {
+  return authenticatedRequest(token, "/employer/talent-pools", { method: "POST", body: JSON.stringify({ name }) });
+}
+
+export function addCandidateToTalentPool(token: string, poolId: string, candidateId: string, privateNote?: string): Promise<{ id: string; candidate_id: string }> {
+  return authenticatedRequest(token, `/employer/talent-pools/${poolId}/members`, { method: "POST", body: JSON.stringify({ candidate_id: candidateId, private_note: privateNote ?? null }) });
+}
+
+export function fetchTalentPoolMembers(token: string, poolId: string): Promise<TalentPoolMember[]> {
+  return authenticatedRequest(token, `/employer/talent-pools/${poolId}/members`);
+}
+
+export function removeTalentPoolMember(token: string, poolId: string, candidateId: string): Promise<void> {
+  return authenticatedRequest(token, `/employer/talent-pools/${poolId}/members/${candidateId}`, { method: "DELETE" });
+}
+
+export function fetchEmployerApplicationDetail(token: string, applicationId: string): Promise<EmployerApplicationDetail> {
+  return authenticatedRequest(token, `/employer/applications/${applicationId}/detail`);
+}
+
+export function fetchApplicationNotes(token: string, applicationId: string): Promise<ApplicationNote[]> {
+  return authenticatedRequest(token, `/employer/applications/${applicationId}/notes`);
+}
+
+export function addApplicationNote(token: string, applicationId: string, content: string): Promise<ApplicationNote> {
+  return authenticatedRequest(token, `/employer/applications/${applicationId}/notes`, { method: "POST", body: JSON.stringify({ content }) });
+}
+
+export function fetchApplicationEvaluation(token: string, applicationId: string): Promise<ApplicationEvaluation | null> {
+  return authenticatedRequest(token, `/employer/applications/${applicationId}/evaluation`);
+}
+
+export function saveApplicationEvaluation(token: string, applicationId: string, value: Pick<ApplicationEvaluation, "criteria" | "strengths" | "concerns">): Promise<ApplicationEvaluation> {
+  return authenticatedRequest(token, `/employer/applications/${applicationId}/evaluation`, { method: "PUT", body: JSON.stringify(value) });
+}
+
+export function createFormalOffer(token: string, applicationId: string, value: { response_deadline: string | null; proposed_conditions: Record<string, unknown> }): Promise<JobOfferDecision> {
+  return authenticatedRequest(token, `/employer/applications/${applicationId}/offer-decision`, { method: "POST", body: JSON.stringify(value) });
+}
+
+export function ensureApplicationConversation(token: string, applicationId: string): Promise<Conversation> {
+  return authenticatedRequest(token, `/applications/${applicationId}/conversation`, { method: "POST" });
+}
+
+export function fetchEmployerConversations(token: string): Promise<Conversation[]> {
+  return authenticatedRequest(token, "/employer/conversations");
+}
+
+export function fetchConversationMessages(token: string, conversationId: string): Promise<ConversationMessage[]> {
+  return authenticatedRequest(token, `/conversations/${conversationId}/messages`);
+}
+
+export function sendConversationMessage(token: string, conversationId: string, content: string): Promise<ConversationMessage> {
+  return authenticatedRequest(token, `/conversations/${conversationId}/messages`, { method: "POST", body: JSON.stringify({ content }) });
+}
+
+export function fetchEmployerInterviews(token: string): Promise<EmployerInterview[]> {
+  return authenticatedRequest(token, "/employer/interviews");
+}
+
+export function createEmployerInterview(token: string, value: { application_id: string; starts_at: string; duration_minutes: number; format: "online" | "in_person"; meeting_details: string | null }): Promise<EmployerInterview> {
+  return authenticatedRequest(token, "/employer/interviews", { method: "POST", body: JSON.stringify(value) });
+}
+
+export function updateEmployerInterviewStatus(token: string, interviewId: string, status: string): Promise<EmployerInterview> {
+  return authenticatedRequest(token, `/employer/interviews/${interviewId}/status`, { method: "PATCH", body: JSON.stringify({ status }) });
+}
+
+export function fetchEmployerNotifications(token: string): Promise<EmployerNotification[]> {
+  return authenticatedRequest(token, "/employer/notifications");
+}
+
+export function markEmployerNotificationRead(token: string, notificationId: string): Promise<EmployerNotification> {
+  return authenticatedRequest(token, `/employer/notifications/${notificationId}/read`, { method: "PATCH" });
+}
+
+export function fetchNotificationPreferences(token: string): Promise<NotificationPreference[]> {
+  return authenticatedRequest(token, "/employer/notification-preferences");
+}
+
+export function updateNotificationPreference(token: string, name: string, enabled: boolean): Promise<NotificationPreference> {
+  return authenticatedRequest(token, `/employer/notification-preferences/${name}`, { method: "PUT", body: JSON.stringify({ enabled }) });
+}
+
+export function submitOrganisationVerification(token: string, value: { supporting_information: string; evidence_url: string | null }): Promise<OrganisationVerification> {
+  return authenticatedRequest(token, "/employer/organisation/verification", { method: "POST", body: JSON.stringify(value) });
+}
+
+export function fetchPendingOrganisationVerifications(token: string): Promise<OrganisationVerification[]> {
+  return authenticatedRequest(token, "/admin/organisations/verification");
+}
+
+export function reviewOrganisationVerification(token: string, id: string, status: "verified" | "rejected", reviewer_note: string): Promise<OrganisationVerification> {
+  return authenticatedRequest(token, `/admin/organisations/verification/${id}`, { method: "PATCH", body: JSON.stringify({ status, reviewer_note }) });
+}
+
+export function fetchEmployerAnalytics(token: string): Promise<EmployerAnalytics> {
+  return authenticatedRequest(token, "/employer/analytics");
 }
 
 export function updateEmployerApplicationStatus(

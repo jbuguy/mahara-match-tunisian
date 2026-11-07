@@ -10,6 +10,7 @@ from app.models import (
     CourseEnrollmentStatus,
     CourseStatus,
     JobApplicationStatus,
+    JobOfferStatus,
     Role,
 )
 
@@ -124,6 +125,7 @@ class OrganisationProfileUpdate(BaseModel):
 class OrganisationProfileResponse(OrganisationProfileUpdate):
     id: str
     organisation_type: str
+    verification_status: str = "unverified"
     profile_details: OrganisationProfileDetails = Field(default_factory=OrganisationProfileDetails)
 
 
@@ -171,13 +173,15 @@ class CandidateProfileUpdate(BaseModel):
     experience: str | None = Field(default=None, max_length=5000)
     education_entries: list[EducationEntry] | None = Field(default=None, max_length=30)
     experience_entries: list[ExperienceEntry] | None = Field(default=None, max_length=30)
+    professional_headline: str | None = Field(default=None, max_length=200)
+    employer_discoverable: bool | None = None
 
     @field_validator("skills")
     @classmethod
     def clean_skills(cls, value: list[str] | None) -> list[str] | None:
         return normalize_skills(value) if value is not None else None
 
-    @field_validator("full_name", "phone", "location", "education", "experience")
+    @field_validator("full_name", "phone", "location", "education", "experience", "professional_headline")
     @classmethod
     def trim_profile_text(cls, value: str | None) -> str | None:
         if value is None:
@@ -201,6 +205,8 @@ class CandidateProfileResponse(BaseModel):
     experience: str | None = None
     education_entries: list[EducationEntry] = Field(default_factory=list)
     experience_entries: list[ExperienceEntry] = Field(default_factory=list)
+    professional_headline: str | None = None
+    employer_discoverable: bool = False
     updated_at: datetime | None = None
 
 
@@ -310,6 +316,8 @@ class JobOfferCreate(BaseModel):
     description: str = Field(min_length=10, max_length=5000)
     location: str = Field(min_length=2, max_length=120)
     required_skills: list[str] = Field(min_length=1, max_length=30)
+    preferred_skills: list[str] = Field(default_factory=list, max_length=30)
+    status: JobOfferStatus = JobOfferStatus.PUBLISHED
 
     @field_validator("title", "description", "location")
     @classmethod
@@ -323,6 +331,11 @@ class JobOfferCreate(BaseModel):
         if not normalized:
             raise ValueError("At least one required skill is needed.")
         return normalized
+
+    @field_validator("preferred_skills")
+    @classmethod
+    def clean_preferred_skills(cls, value: list[str]) -> list[str]:
+        return normalize_skills(value)
 
     @model_validator(mode="after")
     def reject_blank_text(self) -> "JobOfferCreate":
@@ -361,7 +374,263 @@ class JobOfferResponse(BaseModel):
     description: str
     location: str
     required_skills: list[str]
+    preferred_skills: list[str] = Field(default_factory=list)
+    status: JobOfferStatus = JobOfferStatus.PUBLISHED
+    employment_type: str | None = None
+    workplace_arrangement: str | None = None
+    positions_count: int = 1
+    salary_min: Decimal | None = None
+    salary_max: Decimal | None = None
+    application_deadline: date | None = None
+    published_at: datetime | None = None
     created_at: datetime
+
+
+class JobOfferStatusUpdate(BaseModel):
+    status: JobOfferStatus
+
+
+class ApplicationStatusHistoryResponse(BaseModel):
+    id: str
+    from_status: JobApplicationStatus | None
+    to_status: JobApplicationStatus
+    created_at: datetime
+
+
+class CandidateDiscoveryResponse(BaseModel):
+    candidate_id: str
+    professional_headline: str | None
+    skills: list[str]
+    location: str | None
+    experience_summary: list[dict[str, object]]
+    education_summary: list[dict[str, object]]
+    matched_skills: list[str] = Field(default_factory=list)
+    missing_skills: list[str] = Field(default_factory=list)
+
+
+class TalentPoolCreateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+
+    @field_validator("name")
+    @classmethod
+    def trim_name(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("A talent pool name is required.")
+        return value.strip()
+
+
+class TalentPoolResponse(BaseModel):
+    id: str
+    name: str
+    created_at: datetime
+    candidate_count: int
+
+
+class TalentPoolMemberRequest(BaseModel):
+    candidate_id: str
+    private_note: str | None = Field(default=None, max_length=2000)
+
+
+class TalentPoolMemberResponse(BaseModel):
+    candidate_id: str
+    professional_headline: str | None
+    skills: list[str]
+    location: str | None
+    private_note: str | None
+    created_at: datetime
+
+
+class ApplicationNoteCreateRequest(BaseModel):
+    content: str = Field(min_length=1, max_length=10000)
+
+    @field_validator("content")
+    @classmethod
+    def trim_note(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("A note cannot be blank.")
+        return value.strip()
+
+
+class ApplicationNoteResponse(BaseModel):
+    id: str
+    content: str
+    created_at: datetime
+
+
+class ApplicationEvaluationRequest(BaseModel):
+    criteria: list[dict[str, object]] = Field(default_factory=list, max_length=20)
+    strengths: str | None = Field(default=None, max_length=5000)
+    concerns: str | None = Field(default=None, max_length=5000)
+
+
+class ApplicationEvaluationResponse(BaseModel):
+    id: str
+    criteria: list[dict[str, object]]
+    strengths: str | None
+    concerns: str | None
+    updated_at: datetime
+
+
+class ConversationResponse(BaseModel):
+    id: str
+    application_id: str
+    candidate_name: str | None
+    job_title: str
+    updated_at: datetime
+    unread_count: int
+
+
+class MessageCreateRequest(BaseModel):
+    content: str = Field(min_length=1, max_length=10000)
+
+    @field_validator("content")
+    @classmethod
+    def trim_message(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("A message cannot be blank.")
+        return value.strip()
+
+
+class MessageResponse(BaseModel):
+    id: str
+    sender_id: str
+    content: str
+    created_at: datetime
+    read_at: datetime | None
+
+
+class InterviewCreateRequest(BaseModel):
+    application_id: str
+    starts_at: datetime
+    duration_minutes: int = Field(default=60, ge=15, le=480)
+    format: Literal["online", "in_person"]
+    meeting_details: str | None = Field(default=None, max_length=2000)
+    interviewer_ids: list[str] = Field(default_factory=list, max_length=20)
+
+    @field_validator("starts_at")
+    @classmethod
+    def require_timezone_aware_start(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("Interview start time must include a timezone.")
+        return value
+
+
+class InterviewStatusUpdate(BaseModel):
+    status: Literal["confirmed", "completed", "cancelled", "no_show"]
+
+
+class InterviewResponse(BaseModel):
+    id: str
+    application_id: str
+    job_title: str
+    candidate_name: str | None
+    starts_at: datetime
+    duration_minutes: int
+    format: str
+    meeting_details: str | None
+    status: str
+
+
+class InterviewFeedbackRequest(BaseModel):
+    criteria: list[dict[str, object]] = Field(default_factory=list, max_length=20)
+    recommendation: str | None = Field(default=None, max_length=1000)
+    notes: str | None = Field(default=None, max_length=10000)
+
+
+class InterviewFeedbackResponse(BaseModel):
+    id: str
+    criteria: list[dict[str, object]]
+    recommendation: str | None
+    notes: str | None
+    created_at: datetime
+
+
+class JobOfferDecisionCreateRequest(BaseModel):
+    response_deadline: datetime | None = None
+    proposed_conditions: dict[str, object] = Field(default_factory=dict)
+
+    @field_validator("response_deadline")
+    @classmethod
+    def validate_decision_deadline(cls, value: datetime | None) -> datetime | None:
+        if value is not None and (value.tzinfo is None or value.utcoffset() is None):
+            raise ValueError("Decision deadline must include a timezone.")
+        return value
+
+
+class JobOfferDecisionUpdateRequest(BaseModel):
+    status: Literal["accepted", "declined"]
+
+
+class JobOfferDecisionResponse(BaseModel):
+    id: str
+    application_id: str
+    job_title: str
+    status: str
+    offered_at: datetime
+    response_deadline: datetime | None
+    proposed_conditions: dict[str, object]
+    responded_at: datetime | None
+
+
+class NotificationResponse(BaseModel):
+    id: str
+    notification_type: str
+    title: str
+    body: str
+    resource_type: str | None
+    resource_id: str | None
+    read_at: datetime | None
+    created_at: datetime
+
+
+class OrganisationVerificationCreateRequest(BaseModel):
+    supporting_information: str = Field(min_length=20, max_length=4000)
+    evidence_url: str | None = Field(default=None, max_length=1000)
+
+    @field_validator("supporting_information")
+    @classmethod
+    def trim_verification_information(cls, value: str) -> str:
+        return value.strip()
+
+
+class OrganisationVerificationResponse(BaseModel):
+    id: str
+    organisation_id: str | None = None
+    organisation_name: str | None = None
+    status: str
+    supporting_information: str
+    evidence_url: str | None
+    reviewer_note: str | None
+    created_at: datetime
+
+
+class OrganisationVerificationReviewRequest(BaseModel):
+    status: Literal["verified", "rejected"]
+    reviewer_note: str = Field(min_length=10, max_length=2000)
+
+
+class NotificationPreferenceResponse(BaseModel):
+    notification_type: str
+    enabled: bool
+
+
+class NotificationPreferenceUpdate(BaseModel):
+    enabled: bool
+
+
+class EmployerAnalyticsResponse(BaseModel):
+    total_applications: int
+    applications_by_status: dict[str, int]
+    applications_per_offer: list[dict[str, object]]
+    shortlisted: int
+    interviews: int
+    hires_reported: int
+    rejected: int
+    withdrawn: int
+    application_to_interview_percent: int | None
+    interview_to_hire_percent: int | None
+    average_time_to_first_review_hours: float | None
+    has_sufficient_data: bool
 
 
 class JobMatchResponse(JobOfferResponse):
@@ -384,6 +653,13 @@ class EmployerApplicationResponse(JobApplicationResponse):
     candidate_name: str | None
     candidate_location: str | None
     candidate_skills: list[str]
+
+
+class EmployerApplicationDetailResponse(EmployerApplicationResponse):
+    professional_headline: str | None
+    education_entries: list[dict[str, object]]
+    experience_entries: list[dict[str, object]]
+    status_history: list[ApplicationStatusHistoryResponse]
 
 
 class JobApplicationStatusUpdate(BaseModel):

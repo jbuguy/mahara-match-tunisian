@@ -36,9 +36,52 @@ class OrganisationType(str, Enum):
 class JobApplicationStatus(str, Enum):
     SUBMITTED = "submitted"
     REVIEWING = "reviewing"
+    SHORTLISTED = "shortlisted"
     INTERVIEW = "interview"
+    INTERVIEW_COMPLETED = "interview_completed"
+    OFFER_MADE = "offer_made"
     HIRED = "hired"
     REJECTED = "rejected"
+    WITHDRAWN = "withdrawn"
+
+
+class JobOfferStatus(str, Enum):
+    DRAFT = "draft"
+    PUBLISHED = "published"
+    PAUSED = "paused"
+    CLOSED = "closed"
+    EXPIRED = "expired"
+    ARCHIVED = "archived"
+
+
+class OrganisationVerificationStatus(str, Enum):
+    UNVERIFIED = "unverified"
+    PENDING = "pending"
+    VERIFIED = "verified"
+    REJECTED = "rejected"
+
+
+class OrganisationMemberRole(str, Enum):
+    OWNER = "owner"
+    ADMINISTRATOR = "administrator"
+    RECRUITER = "recruiter"
+    VIEWER = "viewer"
+
+
+class InterviewStatus(str, Enum):
+    PROPOSED = "proposed"
+    CONFIRMED = "confirmed"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
+    NO_SHOW = "no_show"
+
+
+class JobOfferDecisionStatus(str, Enum):
+    PENDING = "pending"
+    ACCEPTED = "accepted"
+    DECLINED = "declined"
+    EXPIRED = "expired"
+    WITHDRAWN = "withdrawn"
 
 
 class CourseStatus(str, Enum):
@@ -116,6 +159,18 @@ class Organisation(Base):
     contact_email: Mapped[str | None] = mapped_column(String(320), nullable=True)
     location: Mapped[str | None] = mapped_column(String(200), nullable=True)
     profile_details: Mapped[dict[str, object]] = mapped_column(JSON, default=dict, nullable=False)
+    verification_status: Mapped[OrganisationVerificationStatus] = mapped_column(
+        SqlEnum(
+            OrganisationVerificationStatus,
+            name="organisation_verification_status",
+            native_enum=False,
+            create_constraint=False,
+            validate_strings=True,
+            values_callable=lambda values: [member.value for member in values],
+        ),
+        default=OrganisationVerificationStatus.UNVERIFIED,
+        nullable=False,
+    )
     organisation_type: Mapped[OrganisationType] = mapped_column(
         SqlEnum(
             OrganisationType,
@@ -150,12 +205,42 @@ class OrganisationMembership(Base):
     organisation_id: Mapped[str] = mapped_column(
         ForeignKey("organisations.id", ondelete="CASCADE"), nullable=False
     )
+    role: Mapped[OrganisationMemberRole] = mapped_column(
+        SqlEnum(
+            OrganisationMemberRole,
+            name="organisation_member_role",
+            native_enum=False,
+            create_constraint=False,
+            validate_strings=True,
+            values_callable=lambda values: [member.value for member in values],
+        ),
+        default=OrganisationMemberRole.OWNER,
+        nullable=False,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
     )
 
     user: Mapped[User] = relationship(back_populates="memberships")
     organisation: Mapped[Organisation] = relationship(back_populates="memberships")
+
+
+class OrganisationVerificationRequest(Base):
+    __tablename__ = "organisation_verification_requests"
+    __table_args__ = (Index("ix_organisation_verification_status_created", "status", "created_at"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    organisation_id: Mapped[str] = mapped_column(ForeignKey("organisations.id", ondelete="CASCADE"), nullable=False)
+    submitted_by: Mapped[str | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    supporting_information: Mapped[str] = mapped_column(String(4000), nullable=False)
+    evidence_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    status: Mapped[OrganisationVerificationStatus] = mapped_column(
+        SqlEnum(OrganisationVerificationStatus, name="verification_request_status", native_enum=False, create_constraint=True, values_callable=lambda values: [member.value for member in values]),
+        default=OrganisationVerificationStatus.PENDING,
+        nullable=False,
+    )
+    reviewer_note: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
 
 class CandidateProfile(Base):
@@ -172,6 +257,8 @@ class CandidateProfile(Base):
     experience: Mapped[str | None] = mapped_column(String(5000), nullable=True)
     education_entries: Mapped[list[dict[str, object]]] = mapped_column(JSON, default=list, nullable=False)
     experience_entries: Mapped[list[dict[str, object]]] = mapped_column(JSON, default=list, nullable=False)
+    professional_headline: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    employer_discoverable: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
@@ -424,6 +511,26 @@ class JobOffer(Base):
     description: Mapped[str] = mapped_column(String(5000), nullable=False)
     location: Mapped[str] = mapped_column(String(120), nullable=False)
     required_skills: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    preferred_skills: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    employment_type: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    workplace_arrangement: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    positions_count: Mapped[int] = mapped_column(default=1, nullable=False)
+    salary_min: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    salary_max: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    application_deadline: Mapped[date | None] = mapped_column(nullable=True)
+    status: Mapped[JobOfferStatus] = mapped_column(
+        SqlEnum(
+            JobOfferStatus,
+            name="job_offer_status",
+            native_enum=False,
+            create_constraint=False,
+            validate_strings=True,
+            values_callable=lambda values: [member.value for member in values],
+        ),
+        default=JobOfferStatus.PUBLISHED,
+        nullable=False,
+    )
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
     )
@@ -465,6 +572,164 @@ class JobApplication(Base):
         onupdate=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
+
+
+class JobApplicationStatusHistory(Base):
+    __tablename__ = "job_application_status_history"
+    __table_args__ = (Index("ix_application_status_history_application_created", "application_id", "created_at"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    application_id: Mapped[str] = mapped_column(ForeignKey("job_applications.id", ondelete="CASCADE"), nullable=False)
+    actor_id: Mapped[str | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    from_status: Mapped[JobApplicationStatus | None] = mapped_column(
+        SqlEnum(JobApplicationStatus, name="application_history_from_status", native_enum=False, create_constraint=False, values_callable=lambda values: [member.value for member in values]), nullable=True
+    )
+    to_status: Mapped[JobApplicationStatus] = mapped_column(
+        SqlEnum(JobApplicationStatus, name="application_history_to_status", native_enum=False, create_constraint=False, values_callable=lambda values: [member.value for member in values]), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+
+
+class ApplicationNote(Base):
+    __tablename__ = "application_notes"
+    __table_args__ = (Index("ix_application_notes_application_created", "application_id", "created_at"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    application_id: Mapped[str] = mapped_column(ForeignKey("job_applications.id", ondelete="CASCADE"), nullable=False)
+    author_id: Mapped[str | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    content: Mapped[str] = mapped_column(String(10000), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+
+
+class ApplicationEvaluation(Base):
+    __tablename__ = "application_evaluations"
+    __table_args__ = (UniqueConstraint("application_id", "evaluator_id", name="uq_application_evaluation_evaluator"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    application_id: Mapped[str] = mapped_column(ForeignKey("job_applications.id", ondelete="CASCADE"), nullable=False)
+    evaluator_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    criteria: Mapped[list[dict[str, object]]] = mapped_column(JSON, default=list, nullable=False)
+    strengths: Mapped[str | None] = mapped_column(String(5000), nullable=True)
+    concerns: Mapped[str | None] = mapped_column(String(5000), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
+
+
+class TalentPool(Base):
+    __tablename__ = "talent_pools"
+    __table_args__ = (UniqueConstraint("employer_id", "name", name="uq_talent_pool_employer_name"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    employer_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+
+
+class TalentPoolMember(Base):
+    __tablename__ = "talent_pool_members"
+    __table_args__ = (UniqueConstraint("pool_id", "candidate_id", name="uq_talent_pool_candidate"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    pool_id: Mapped[str] = mapped_column(ForeignKey("talent_pools.id", ondelete="CASCADE"), nullable=False)
+    candidate_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    private_note: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+
+
+class Conversation(Base):
+    __tablename__ = "employer_conversations"
+    __table_args__ = (UniqueConstraint("application_id", name="uq_employer_conversation_application"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    application_id: Mapped[str] = mapped_column(ForeignKey("job_applications.id", ondelete="CASCADE"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
+
+
+class Message(Base):
+    __tablename__ = "employer_messages"
+    __table_args__ = (Index("ix_employer_messages_conversation_created", "conversation_id", "created_at"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    conversation_id: Mapped[str] = mapped_column(ForeignKey("employer_conversations.id", ondelete="CASCADE"), nullable=False)
+    sender_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    content: Mapped[str] = mapped_column(String(10000), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class Interview(Base):
+    __tablename__ = "employer_interviews"
+    __table_args__ = (Index("ix_employer_interviews_application_start", "application_id", "starts_at"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    application_id: Mapped[str] = mapped_column(ForeignKey("job_applications.id", ondelete="CASCADE"), nullable=False)
+    created_by: Mapped[str | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    duration_minutes: Mapped[int] = mapped_column(default=60, nullable=False)
+    format: Mapped[str] = mapped_column(String(20), nullable=False)
+    meeting_details: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+    status: Mapped[InterviewStatus] = mapped_column(SqlEnum(InterviewStatus, name="interview_status", native_enum=False, create_constraint=True, values_callable=lambda values: [member.value for member in values]), default=InterviewStatus.PROPOSED, nullable=False)
+    feedback: Mapped[str | None] = mapped_column(String(10000), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+
+
+class InterviewParticipant(Base):
+    __tablename__ = "employer_interview_participants"
+    __table_args__ = (UniqueConstraint("interview_id", "user_id", name="uq_interview_participant_user"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    interview_id: Mapped[str] = mapped_column(ForeignKey("employer_interviews.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+
+
+class InterviewFeedback(Base):
+    __tablename__ = "employer_interview_feedback"
+    __table_args__ = (UniqueConstraint("interview_id", "author_id", name="uq_interview_feedback_author"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    interview_id: Mapped[str] = mapped_column(ForeignKey("employer_interviews.id", ondelete="CASCADE"), nullable=False)
+    author_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    criteria: Mapped[list[dict[str, object]]] = mapped_column(JSON, default=list, nullable=False)
+    recommendation: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    notes: Mapped[str | None] = mapped_column(String(10000), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+
+
+class JobOfferDecision(Base):
+    __tablename__ = "job_offer_decisions"
+    __table_args__ = (UniqueConstraint("application_id", name="uq_job_offer_decision_application"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    application_id: Mapped[str] = mapped_column(ForeignKey("job_applications.id", ondelete="CASCADE"), nullable=False)
+    offered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    response_deadline: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    proposed_conditions: Mapped[dict[str, object]] = mapped_column(JSON, default=dict, nullable=False)
+    status: Mapped[JobOfferDecisionStatus] = mapped_column(SqlEnum(JobOfferDecisionStatus, name="job_offer_decision_status", native_enum=False, create_constraint=True, values_callable=lambda values: [member.value for member in values]), default=JobOfferDecisionStatus.PENDING, nullable=False)
+    responded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class EmployerNotification(Base):
+    __tablename__ = "employer_notifications"
+    __table_args__ = (Index("ix_employer_notifications_user_created", "user_id", "created_at"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    notification_type: Mapped[str] = mapped_column(String(60), nullable=False)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    body: Mapped[str] = mapped_column(String(1000), nullable=False)
+    resource_type: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    resource_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+
+
+class EmployerNotificationPreference(Base):
+    __tablename__ = "employer_notification_preferences"
+
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    notification_type: Mapped[str] = mapped_column(String(60), primary_key=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
 
 class TrainingCourse(Base):

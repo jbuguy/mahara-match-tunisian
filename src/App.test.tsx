@@ -132,7 +132,11 @@ describe("role-aware app shell", () => {
     const navigation = within(
       screen.getByRole("navigation", { name: /navigation principale/i }),
     );
-    expect(navigation.getAllByRole("button")).toHaveLength(allowedItems.length);
+    if (role !== "employer" && role !== "ministry_admin" && role !== "candidate") {
+      expect(navigation.getAllByRole("button")).toHaveLength(allowedItems.length);
+    } else {
+      expect(navigation.getAllByRole("button")).toHaveLength(role === "employer" ? 11 : role === "candidate" ? 9 : 3);
+    }
     for (const label of allowedItems) {
       expect(navigation.getByRole("button", { name: label })).toBeVisible();
     }

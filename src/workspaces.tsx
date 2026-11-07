@@ -46,6 +46,7 @@ import {
   transcribeCandidateAudio,
   updateCandidateRoadmapStep,
   updateCandidateProfile,
+  updateEmployerOfferStatus,
   uploadCandidateCv,
   type CandidateAssistantMessage,
   type CandidateProfileDraft,
@@ -272,6 +273,8 @@ const emptyCandidateProfile: CandidateProfileForm = {
 
 export function CandidateProfilePage({ token }: { token: string }) {
   const [profile, setProfile] = useState(emptyCandidateProfile);
+  const [employerDiscoverable, setEmployerDiscoverable] = useState(false);
+  const [isUpdatingDiscoverability, setIsUpdatingDiscoverability] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingCv, setIsUploadingCv] = useState(false);
@@ -311,6 +314,7 @@ export function CandidateProfilePage({ token }: { token: string }) {
     fetchCandidateProfile(token)
       .then((profile) => {
         if (!cancelled) {
+          setEmployerDiscoverable(profile.employer_discoverable);
           const loadedProfile = {
             full_name: profile.full_name ?? "",
             phone: profile.phone ?? "",
@@ -335,6 +339,23 @@ export function CandidateProfilePage({ token }: { token: string }) {
       cancelled = true;
     };
   }, [token]);
+
+  async function updateDiscoverability(value: boolean) {
+    setIsUpdatingDiscoverability(true);
+    setError("");
+    setNotice("");
+    try {
+      const updated = await updateCandidateProfile(token, { employer_discoverable: value });
+      setEmployerDiscoverable(updated.employer_discoverable);
+      setNotice(value
+        ? "Votre profil peut maintenant être découvert par les recruteurs."
+        : "Votre profil n’apparaît plus dans la recherche des recruteurs.");
+    } catch (cause: unknown) {
+      setError(errorMessage(cause));
+    } finally {
+      setIsUpdatingDiscoverability(false);
+    }
+  }
 
   useEffect(() => {
     const warnBeforeLeave = (event: BeforeUnloadEvent) => {
@@ -676,6 +697,19 @@ export function CandidateProfilePage({ token }: { token: string }) {
                 />
                 </div>
                 <ProfileBuilder value={profile} onChange={(value) => setProfile({ ...profile, ...value })} />
+
+                <label className="candidate-discovery-consent">
+                  <input
+                    type="checkbox"
+                    checked={employerDiscoverable}
+                    disabled={isUpdatingDiscoverability || isLoading}
+                    onChange={(event) => void updateDiscoverability(event.target.checked)}
+                  />
+                  <span>
+                    <strong>Autoriser les recruteurs à découvrir mon profil</strong>
+                    <small>Votre profil n’est partagé qu’avec les employeurs connectés. Vos coordonnées personnelles restent privées.</small>
+                  </span>
+                </label>
 
           {error && <p className="workspace-error" role="alert">{error}</p>}
                 {notice && <p className="workspace-success" role="status">{notice}</p>}
@@ -2473,21 +2507,25 @@ export function EmployerOffersPage({ token }: { token: string }) {
   }
   async function publishOffer(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
+    const offerStatus = submitter?.value === "draft" ? "draft" : "published";
     setIsSaving(true);
     setError("");
     setNotice("");
     try {
       const preferred = splitSkills(form.preferredSkills);
-      const description = preferred.length ? `${form.description.trim()}\n\nCompétences souhaitées : ${preferred.join(", ")}` : form.description.trim();
+      const description = form.description.trim();
       const created = await createEmployerOffer(token, {
         title: form.title.trim(),
         description,
         location: form.location.trim(),
         required_skills: splitSkills(form.requiredSkills),
+        preferred_skills: preferred,
+        status: offerStatus,
       });
       setOffers((current) => [created, ...current]);
       setForm(emptyOffer);
-      setNotice("Votre offre est publiée et peut maintenant être proposée aux candidats.");
+      setNotice(offerStatus === "draft" ? "Votre offre a été enregistrée comme brouillon." : "Votre offre est publiée et peut maintenant être proposée aux candidats.");
     } catch (cause: unknown) {
       setError(errorMessage(cause));
     } finally {
@@ -2560,13 +2598,16 @@ export function EmployerOffersPage({ token }: { token: string }) {
 
           {error && <p className="workspace-error" role="alert">{error}</p>}
           {notice && <p className="workspace-success" role="status">{notice}</p>}
-          <Button type="submit" disabled={isSaving}>
-            {isSaving ? "Publication…" : "Publier l’offre"}
+          <Button type="submit" name="offerStatus" value="draft" variant="secondary" disabled={isSaving}>
+            Enregistrer le brouillon
+          </Button>
+          <Button type="submit" name="offerStatus" value="published" disabled={isSaving}>
+            {isSaving ? "Enregistrement…" : "Publier l’offre"}
           </Button>
         </form>
       </Card>
       <div className="workspace-list-heading">
-        <h2>Offres publiées</h2>
+        <h2>Mes offres</h2>
         <Badge>{offers.length}</Badge>
       </div>
       {isLoading && <p aria-live="polite">Chargement de vos offres…</p>}
@@ -2579,13 +2620,43 @@ export function EmployerOffersPage({ token }: { token: string }) {
         </Card>
       )}
       <div className="workspace-list">
-        {offers.map((offer) => <OfferCard key={offer.id} offer={offer} />)}
+        {offers.map((offer) => <OfferCard key={offer.id} offer={offer} token={token} onUpdated={(updated) => setOffers((current) => current.map((item) => item.id === updated.id ? updated : item))} />)}
       </div>
     </section>
   );
 }
 
-function OfferCard({ offer }: { offer: JobOffer }) {
+function OfferCard({ offer, token, onUpdated }: { offer: JobOffer; token: string; onUpdated: (offer: JobOffer) => void }) {
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [error, setError] = useState("");
+  const statusLabels: Record<NonNullable<JobOffer["status"]>, string> = {
+    draft: "Brouillon",
+    published: "Publiée",
+    paused: "En pause",
+    closed: "Clôturée",
+    expired: "Expirée",
+    archived: "Archivée",
+  };
+  const nextAction: Partial<Record<NonNullable<JobOffer["status"]>, { status: NonNullable<JobOffer["status"]>; label: string }>> = {
+    draft: { status: "published", label: "Publier" },
+    published: { status: "paused", label: "Mettre en pause" },
+    paused: { status: "published", label: "Reprendre" },
+    closed: { status: "archived", label: "Archiver" },
+    expired: { status: "archived", label: "Archiver" },
+  };
+  const action = nextAction[offer.status ?? "published"];
+  async function changeStatus() {
+    if (!action) return;
+    setIsUpdating(true);
+    setError("");
+    try {
+      onUpdated(await updateEmployerOfferStatus(token, offer.id, action.status));
+    } catch (cause: unknown) {
+      setError(errorMessage(cause));
+    } finally {
+      setIsUpdating(false);
+    }
+  }
   return (
     <Card className="offer-card">
       <div className="offer-card__top">
@@ -2593,10 +2664,13 @@ function OfferCard({ offer }: { offer: JobOffer }) {
           <h2>{offer.title}</h2>
           <p className="offer-card__location"><MapPin size={15} aria-hidden="true" />{offer.location}</p>
         </div>
-        <Badge>Publiée</Badge>
+        <Badge>{statusLabels[offer.status ?? "published"]}</Badge>
       </div>
       <p className="offer-card__description">{offer.description}</p>
       <SkillList label="Compétences requises" skills={offer.required_skills} tone="matched" />
+      {offer.preferred_skills?.length ? <SkillList label="Compétences souhaitées" skills={offer.preferred_skills} tone="matched" /> : null}
+      {error && <p className="workspace-error" role="alert">{error}</p>}
+      {action && <Button type="button" variant="secondary" disabled={isUpdating} onClick={() => void changeStatus()}>{isUpdating ? "Mise à jour…" : action.label}</Button>}
     </Card>
   );
 }

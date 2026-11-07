@@ -8,6 +8,23 @@ Status: `[ ]` todo · `[/]` in progress · `[x]` completed · `[!]` blocked
 
 ## Current focus
 
+- [x] Task 13 — Employer recruitment lifecycle foundations.
+  - [x] Extend job offers with draft/publication lifecycle fields and expose
+    employer status transitions; prevent candidates from applying to or
+    preparing against unpublished offers.
+  - [x] Add backward-compatible application stages, status history, and
+    private evaluation, notes, talent pool, interview, messaging, decision,
+    notification, organisation verification, and membership-role records.
+  - [x] Add employer dashboard counts for published and draft offers and the
+    expanded application pipeline; allow offer drafts to be saved and later
+    published or paused.
+  - [x] Apply migrations `0014` through `0016` to the configured
+    local PostgreSQL database and seed the five development demo accounts.
+  - [x] Add API and UI workflows for application detail/evaluation, candidate
+    discovery, talent pools, conversations, interviews, notifications, and
+    organisation verification.
+  - [x] Verify the migration on SQLite and PostgreSQL and validate the complete
+    employer lifecycle before marking this task complete.
 - [/] Task 12 — Persistent assistant surfaces.
   - [x] Reuse user-owned assistant sessions for floating and full-page chat;
     keep the selected conversation across app navigation.
