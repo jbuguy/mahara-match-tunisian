@@ -1078,17 +1078,18 @@ describe("role-aware app shell", () => {
 
   it("logs in via the API using the server-returned role", async () => {
     const candidate = userForRole("candidate");
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => ({ access_token: "issued-token", user: candidate }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => candidate,
-      });
+    const fetchMock = vi.fn().mockImplementation(async (input: string) => {
+      if (input.endsWith("/auth/login")) {
+        return { ok: true, status: 200, json: async () => ({ access_token: "issued-token", user: candidate }) };
+      }
+      if (input.endsWith("/auth/me")) {
+        return { ok: true, status: 200, json: async () => candidate };
+      }
+      if (input.startsWith("http://127.0.0.1:8000/public/")) {
+        return { ok: true, status: 200, json: async () => ({ items: [], total: 0, limit: 20, offset: 0 }) };
+      }
+      return { ok: true, status: 200, json: async () => [] };
+    });
     vi.stubGlobal("fetch", fetchMock);
     render(<App />);
 
@@ -1099,8 +1100,7 @@ describe("role-aware app shell", () => {
     fireEvent.click(screen.getByRole("button", { name: "Se connecter" }));
 
     expect(await screen.findByRole("heading", { name: /bonjour et bienvenue/i })).toBeVisible();
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      1,
+    expect(fetchMock).toHaveBeenCalledWith(
       "http://127.0.0.1:8000/auth/login",
       expect.objectContaining({ method: "POST" }),
     );
@@ -1110,11 +1110,9 @@ describe("role-aware app shell", () => {
   it("shows authentication errors instead of a role dashboard", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue({
-        ok: false,
-        status: 401,
-        json: async () => ({ detail: "Email or password is incorrect." }),
-      }),
+      vi.fn().mockImplementation(async (input: string) => input.startsWith("http://127.0.0.1:8000/public/")
+        ? { ok: true, status: 200, json: async () => ({ items: [], total: 0, limit: 20, offset: 0 }) }
+        : { ok: false, status: 401, json: async () => ({ detail: "Email or password is incorrect." }) }),
     );
     render(<App />);
     fireEvent.change(screen.getByLabelText("Adresse e-mail"), {
@@ -1125,9 +1123,7 @@ describe("role-aware app shell", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Se connecter" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Adresse e-mail ou mot de passe incorrect",
-    );
+    expect(await screen.findByRole("alert")).toHaveTextContent(/Adresse e-mail ou mot de passe incorrect/);
     expect(screen.queryByRole("navigation", { name: /navigation principale/i })).toBeNull();
   });
 

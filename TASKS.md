@@ -8,6 +8,15 @@ Status: `[ ]` todo · `[/]` in progress · `[x]` completed · `[!]` blocked
 
 ## Current focus
 
+- [/] Production Pilot Phase 5 - Release gates.
+  - [x] Add a database readiness endpoint and cover available/unavailable states.
+  - [x] Add CI for backend/frontend checks, clean PostgreSQL migration, and an
+    upgrade from revision 0019 to the current head.
+  - [x] Run backend tests (122), frontend tests (40), and production build.
+  - [ ] Run the PostgreSQL CI jobs on the repository host and complete staging,
+    OAuth, backup/restore, Playwright, and security/privacy gates; see
+    `docs/PILOT_RELEASE_GATES.md`.
+
 - [x] Marketplace Phase 4 — Service requests and eligible reviews.
   - [x] Add requester-owned service requests linked directly to User; no
     customer role or customer profile is required.

@@ -52,9 +52,9 @@ export function GuestDiscovery({ onApply, onRequestService }: { onApply: (offer:
     setError("");
     try {
       const result = await fetchPublicJobs({ q: searchQuery, location: searchLocation, offset: searchOffset });
-      setJobs(result.items);
-      setTotal(result.total);
-      setOffset(result.offset);
+      setJobs(Array.isArray(result?.items) ? result.items : []);
+      setTotal(Number.isFinite(result?.total) ? result.total : 0);
+      setOffset(Number.isFinite(result?.offset) ? result.offset : searchOffset);
     } catch (cause: unknown) {
       setError(cause instanceof ApiError ? cause.message : "Impossible de charger les offres publiques.");
     } finally {
@@ -77,17 +77,17 @@ export function GuestDiscovery({ onApply, onRequestService }: { onApply: (offer:
         fetchPublicTraining({ q: searchQuery, location: searchLocation, limit: 6 }),
         fetchPublicMissions({ q: searchQuery, location: searchLocation, limit: 6 }),
       ]);
-      setServices(serviceResults.items);
-      setProfessionals(professionalResults.items);
-      setCourses(courseResults.items);
-      setMissions(missionResults.items);
-      setServiceTotal(serviceResults.total);
-      setProfessionalTotal(professionalResults.total);
-      setCourseTotal(courseResults.total);
-      setMissionTotal(missionResults.total);
-      setServiceOffset(serviceResults.offset);
-      setProfessionalOffset(professionalResults.offset);
-      setCourseOffset(courseResults.offset);
+      setServices(Array.isArray(serviceResults?.items) ? serviceResults.items : []);
+      setProfessionals(Array.isArray(professionalResults?.items) ? professionalResults.items : []);
+      setCourses(Array.isArray(courseResults?.items) ? courseResults.items : []);
+      setMissions(Array.isArray(missionResults?.items) ? missionResults.items : []);
+      setServiceTotal(Number.isFinite(serviceResults?.total) ? serviceResults.total : 0);
+      setProfessionalTotal(Number.isFinite(professionalResults?.total) ? professionalResults.total : 0);
+      setCourseTotal(Number.isFinite(courseResults?.total) ? courseResults.total : 0);
+      setMissionTotal(Number.isFinite(missionResults?.total) ? missionResults.total : 0);
+      setServiceOffset(Number.isFinite(serviceResults?.offset) ? serviceResults.offset : 0);
+      setProfessionalOffset(Number.isFinite(professionalResults?.offset) ? professionalResults.offset : 0);
+      setCourseOffset(Number.isFinite(courseResults?.offset) ? courseResults.offset : 0);
     } catch (cause: unknown) {
       setExtraError(cause instanceof ApiError ? cause.message : "Impossible de charger les autres contenus publics.");
     } finally {
@@ -142,19 +142,19 @@ export function GuestDiscovery({ onApply, onRequestService }: { onApply: (offer:
       if (category === "services") {
         const offset = serviceOffset + 6;
         const result = await fetchPublicServices({ q: query, location, limit: 6, offset });
-        setServices((current) => [...current, ...result.items]); setServiceOffset(result.offset);
+        setServices((current) => [...current, ...(Array.isArray(result?.items) ? result.items : [])]); setServiceOffset(Number.isFinite(result?.offset) ? result.offset : offset);
       } else if (category === "professionals") {
         const offset = professionalOffset + 6;
         const result = await fetchPublicProfessionals({ q: query, location, limit: 6, offset });
-        setProfessionals((current) => [...current, ...result.items]); setProfessionalOffset(result.offset);
+        setProfessionals((current) => [...current, ...(Array.isArray(result?.items) ? result.items : [])]); setProfessionalOffset(Number.isFinite(result?.offset) ? result.offset : offset);
       } else if (category === "training") {
         const offset = courseOffset + 6;
         const result = await fetchPublicTraining({ q: query, location, limit: 6, offset });
-        setCourses((current) => [...current, ...result.items]); setCourseOffset(result.offset);
+        setCourses((current) => [...current, ...(Array.isArray(result?.items) ? result.items : [])]); setCourseOffset(Number.isFinite(result?.offset) ? result.offset : offset);
       } else {
         const offset = missions.length;
         const result = await fetchPublicMissions({ q: query, location, limit: 6, offset });
-        setMissions((current) => [...current, ...result.items]);
+        setMissions((current) => [...current, ...(Array.isArray(result?.items) ? result.items : [])]);
       }
     } catch (cause: unknown) {
       setExtraError(cause instanceof ApiError ? cause.message : "Impossible de charger la page suivante.");

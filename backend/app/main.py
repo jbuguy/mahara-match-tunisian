@@ -16,7 +16,7 @@ from fastapi import (
 )
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import ValidationError
-from sqlalchemy import String, cast, delete, func, select
+from sqlalchemy import String, cast, delete, func, select, text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -394,6 +394,20 @@ def update_employer_organisation(
 @app.get("/health/live", tags=["health"])
 def liveness() -> dict[str, str]:
     """Report that the API process is responsive; does not imply database readiness."""
+    return {"status": "ok"}
+
+
+@app.get("/health/ready", tags=["health"])
+def readiness(session: Session = Depends(get_session)) -> dict[str, str]:
+    """Report readiness only when the canonical database can execute a query."""
+    try:
+        session.execute(text("SELECT 1"))
+    except SQLAlchemyError as exc:
+        logger.warning("Readiness check failed: database query unavailable (%s).", type(exc).__name__)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Required service unavailable.",
+        ) from exc
     return {"status": "ok"}
 
 

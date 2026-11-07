@@ -54,7 +54,14 @@ export function ProfessionalServicesPage({ token }: { token: string }) {
         }),
         fetchMyServices(token),
       ]);
-      if (savedProfile) {
+      const hasCompleteProfileShape = savedProfile
+        && Array.isArray(savedProfile.languages)
+        && Array.isArray(savedProfile.skills)
+        && Array.isArray(savedProfile.service_area)
+        && Array.isArray(savedProfile.portfolio_items)
+        && typeof savedProfile.availability === "object"
+        && savedProfile.availability !== null;
+      if (hasCompleteProfileShape) {
         setProfileExists(true);
         setProfile({
           display_name: savedProfile.display_name,
@@ -73,7 +80,7 @@ export function ProfessionalServicesPage({ token }: { token: string }) {
           portfolio_items: savedProfile.portfolio_items,
         });
       }
-      setServices(savedServices);
+      setServices(Array.isArray(savedServices) ? savedServices : []);
     } catch (cause: unknown) {
       setError(cause instanceof ApiError ? cause.message : "Impossible de charger votre espace professionnel.");
     } finally {
