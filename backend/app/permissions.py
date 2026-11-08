@@ -15,6 +15,8 @@ class Permission(str, Enum):
     OFFER_MANAGE_ORGANISATION = "offer:manage:organisation"
     APPLICATION_MANAGE_ORGANISATION = "application:manage:organisation"
     APPLICANT_READ_BY_APPLICATION = "applicant:read:by_application"
+    CANDIDATE_DISCOVERY_READ = "candidate:discover:consented"
+    ORGANISATION_VERIFICATION_REVIEW = "organisation_verification:review"
     COURSE_READ_PUBLISHED = "course:read:published"
     COURSE_ENROLL = "course:enroll"
     COURSE_ENROLLMENT_READ_ORGANISATION = "course_enrollment:read:organisation"
@@ -51,12 +53,14 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.OFFER_MANAGE_ORGANISATION,
             Permission.APPLICATION_MANAGE_ORGANISATION,
             Permission.APPLICANT_READ_BY_APPLICATION,
+            Permission.CANDIDATE_DISCOVERY_READ,
         }
     ),
     Role.MINISTRY_ADMIN: frozenset(
         {
             Permission.REFERENTIAL_MANAGE,
             Permission.SUGGESTION_REVIEW,
+            Permission.ORGANISATION_VERIFICATION_REVIEW,
             Permission.DATASET_IMPORT,
             Permission.INDICATOR_READ_AGGREGATE,
             Permission.EXPORT_CREATE_LOGGED,

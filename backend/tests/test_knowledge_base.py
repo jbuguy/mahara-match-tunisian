@@ -188,8 +188,8 @@ def test_embedding_client_validates_service_vectors(monkeypatch: pytest.MonkeyPa
         def json(self) -> dict[str, Any]:
             return {
                 "data": [
-                    {"index": 1, "embedding": [0.0, 1.0] + [0.0] * 382},
-                    {"index": 0, "embedding": [1.0, 0.0] + [0.0] * 382},
+                    {"index": 1, "embedding": [0.0, 1.0] + [0.0] * 1022},
+                    {"index": 0, "embedding": [1.0, 0.0] + [0.0] * 1022},
                 ]
             }
 
@@ -214,7 +214,7 @@ def test_embedding_client_validates_service_vectors(monkeypatch: pytest.MonkeyPa
 
     assert model == "test-embeddings"
     assert len(vectors) == 2
-    assert all(len(vector) == 384 for vector in vectors)
+    assert all(len(vector) == 1024 for vector in vectors)
     assert vectors[0][:2] == [1.0, 0.0]
     assert vectors[1][:2] == [0.0, 1.0]
 
@@ -226,7 +226,7 @@ def test_embedding_client_rejects_dimensions_incompatible_with_pgvector(
     monkeypatch.setenv("MAHARA_EMBEDDING_MODEL", "test-embeddings")
     monkeypatch.setenv("MAHARA_EMBEDDING_DIMENSIONS", "768")
 
-    with pytest.raises(EmbeddingServiceError, match="384 to match the pgvector schema"):
+    with pytest.raises(EmbeddingServiceError, match="1024 to match the pgvector schema"):
         asyncio.run(generate_embeddings(["first"]))
 
 

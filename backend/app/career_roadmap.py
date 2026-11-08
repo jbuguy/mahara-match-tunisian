@@ -24,9 +24,16 @@ def build_career_roadmap(
     offers: Iterable[JobOffer],
     candidate_skills: Iterable[str],
     completed_by_skill: Mapping[str, bool],
+    target_skills: Iterable[str] = (),
 ) -> list[RoadmapStep]:
     known_skills = {skill.strip().casefold() for skill in candidate_skills}
     requirements: dict[str, _SkillRequirement] = {}
+
+    for skill in target_skills:
+        clean_skill = skill.strip()
+        skill_key = clean_skill.casefold()
+        if clean_skill and skill_key not in known_skills:
+            requirements.setdefault(skill_key, _SkillRequirement(skill=clean_skill))
 
     for offer in sorted(offers, key=lambda item: (item.title.casefold(), item.id)):
         seen_in_offer: set[str] = set()

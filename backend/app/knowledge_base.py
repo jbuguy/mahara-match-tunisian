@@ -35,7 +35,7 @@ from app.database import Base
 
 logger = logging.getLogger(__name__)
 MAX_VECTOR_DIMENSIONS = 2000
-POSTGRES_VECTOR_DIMENSIONS = 384
+POSTGRES_VECTOR_DIMENSIONS = 1024
 EMBEDDING_BATCH_SIZE = 32
 
 
@@ -47,7 +47,7 @@ class EmbeddingVector(TypeDecorator[list[float] | None]):
 
     def load_dialect_impl(self, dialect: Any) -> Any:
         if dialect.name == "postgresql":
-            return dialect.type_descriptor(Vector())
+            return dialect.type_descriptor(Vector(POSTGRES_VECTOR_DIMENSIONS))
         return dialect.type_descriptor(JSON())
 
 
@@ -225,7 +225,7 @@ def _embedding_config() -> tuple[str, str, str | None, int | None] | None:
             )
         if configured_dimensions != POSTGRES_VECTOR_DIMENSIONS:
             raise EmbeddingServiceError(
-                "MAHARA_EMBEDDING_DIMENSIONS must be 384 to match the pgvector schema."
+                "MAHARA_EMBEDDING_DIMENSIONS must be 1024 to match the pgvector schema."
             )
     return str(endpoint), model, api_key, dimensions
 

@@ -1,0 +1,375 @@
+code,governorate_code,name_fr,name_ar,delegation_name_fr,sort_order
+tunis-tunis,tunis,Tunis,تونس,,0
+sfax-sfax,sfax,Sfax,صفاقس,,1
+sousse-sousse,sousse,Sousse,سوسة,,2
+kairouan-kairouan,kairouan,Kairouan,القيروان,,3
+bizerte-bizerte,bizerte,Bizerte,بنزرت,,4
+gabes-gabes,gabes,Gabès,,,5
+ariana-la-soukra,ariana,La Soukra,,,6
+ariana-ariana,ariana,Ariana,,,7
+tunis-sidi-hassine,tunis,Sidi Hassine,سيدي حسين,,8
+ben-arous-el-mourouj,ben-arous,El Mourouj,المروج,,9
+gafsa-gafsa,gafsa,Gafsa,,,10
+ariana-raoued,ariana,Raoued,روّاد,,11
+monastir-monastir,monastir,Monastir,المنستير,,12
+tunis-la-marsa,tunis,La Marsa,المرسى,,13
+ariana-mnihla,ariana,Mnihla,المنيهلة,,14
+ben-arous-ben-arous,ben-arous,Ben Arous,بن عروس,,15
+ariana-ettadhamen,ariana,Ettadhamen,حي التضامن,,16
+kasserine-kasserine,kasserine,Kasserine,,,17
+manubah-douar-hicher,manubah,Douar Hicher,دوار هيشر,,18
+medenine-ben-gardane,medenine,Ben Gardane,,,19
+medenine-djerba-houmt-souk,medenine,Djerba - Houmt Souk,,,20
+tunis-le-kram,tunis,Le Kram,الكرم,,21
+nabeul-hammamet,nabeul,Hammamet,الحمامات,,22
+medenine-zarzis,medenine,Zarzis,جرجيس,,23
+tunis-le-bardo,tunis,Le Bardo,,,24
+medenine-medenine,medenine,Médenine,,,25
+nabeul-nabeul,nabeul,Nabeul,نابل,,26
+tataouine-tataouine,tataouine,Tataouine,,,27
+ben-arous-mohamedia,ben-arous,Mohamedia,,,28
+medenine-djerba-midoun,medenine,Djerba - Midoun,جربة ميدون,,29
+beja-beja,beja,Béja,,,30
+sousse-m-saken,sousse,M'saken,مساكن,,31
+ben-arous-rades,ben-arous,Radès,رادس,,32
+manubah-oued-ellil,manubah,Oued Ellil,وادي الليل,,33
+monastir-moknine,monastir,Moknine,المكنين,,34
+le-kef-le-kef,le-kef,Le Kef,,,35
+bizerte-menzel-bourguiba,bizerte,Menzel Bourguiba,منزل بورقيبة,,36
+sousse-kalaa-kebira,sousse,Kalâa Kebira,القلعة الكبرى,,37
+sfax-sakiet-ezzit,sfax,Sakiet Ezzit,ساقية الزيت,,38
+mahdia-mahdia,mahdia,Mahdia,المهدية,,39
+monastir-jemmal,monastir,Jemmal,,,40
+monastir-ksar-hellal,monastir,Ksar Hellal,قصر هلال,,41
+sidi-bou-zid-sidi-bouzid-tunisie,sidi-bou-zid,Sidi Bouzid (Tunisie),,,42
+nabeul-kelibia,nabeul,Kélibia,قليبية,,43
+ben-arous-fouchana,ben-arous,Fouchana,فوشانة,,44
+sfax-sakiet-eddaier,sfax,Sakiet Eddaïer,ساقية الدائر,,45
+tunis-la-goulette,tunis,La Goulette,حلق الوادي,,46
+jendouba-jendouba,jendouba,Jendouba,,,47
+sfax-el-ain,sfax,El Aïn,,,48
+sousse-hammam-sousse,sousse,Hammam Sousse,حمام سوسة,,49
+ben-arous-hammam-lif,ben-arous,Hammam Lif,حمام الأنف,,50
+nabeul-dar-chaabane,nabeul,Dar Chaâbane,,,51
+gabes-el-hamma-gouvernorat-de-gabes,gabes,El Hamma (gouvernorat de Gabès),,,52
+sfax-gremda,sfax,Gremda,,,53
+kasserine-ennour,kasserine,Ennour,,,54
+ben-arous-bou-mhel-el-bassatine,ben-arous,Bou Mhel el-Bassatine,,,55
+nabeul-menzel-temime,nabeul,Menzel Temime,منزل تميم,,56
+nabeul-korba-tunisie,nabeul,Korba (Tunisie),,,57
+gafsa-metlaoui,gafsa,Métlaoui,المتلوي,,58
+nabeul-soliman-tunisie,nabeul,Soliman (Tunisie),,,59
+monastir-teboulba,monastir,Téboulba,طبلبة,,60
+tozeur-tozeur,tozeur,Tozeur,توزر,,61
+ben-arous-ezzahra,ben-arous,Ezzahra,الزهراء,,62
+sfax-ouabed-khazanet,sfax,Ouabed Khazanet,,,63
+sousse-kalaa-seghira,sousse,Kalâa Seghira,,,64
+bizerte-mateur,bizerte,Mateur,ماطر,,65
+gafsa-el-ksar,gafsa,El Ksar,,,66
+sfax-thyna,sfax,Thyna,طينة,,67
+manubah-la-manouba,manubah,La Manouba,,,68
+ben-arous-hammam-chott,ben-arous,Hammam Chott,حمام الشط,,69
+kairouan-sisseb-driaat,kairouan,Sisseb-Driaat,,,70
+siliana-siliana,siliana,Siliana,,,71
+sfax-el-amra-tunisie,sfax,El Amra (Tunisie),,,72
+jendouba-balta-bou-aouane-commune,jendouba,Balta-Bou Aouane (commune),,,73
+kebili-douz,kebili,Douz,,,74
+medenine-zarzis-nord,medenine,Zarzis Nord,,,75
+ben-arous-mornag,ben-arous,Mornag,مرناق,,76
+kasserine-feriana,kasserine,Fériana,فريانة,,77
+bizerte-joumine,bizerte,Joumine,جومين,,78
+mahdia-ksour-essef,mahdia,Ksour Essef,قصور الساف,,79
+manubah-djedeida,manubah,Djedeida,,,80
+bizerte-ras-jebel,bizerte,Ras Jebel,راس الجبل,,81
+ben-arous-naassen,ben-arous,Naassen,,,82
+gabes-ghannouch,gabes,Ghannouch,غنوش,,83
+manubah-tebourba,manubah,Tebourba,طبربة,,84
+sousse-akouda,sousse,Akouda,اكودة,,85
+bizerte-ghezala,bizerte,Ghezala,,,86
+ben-arous-megrine,ben-arous,Mégrine,مقرين,,87
+manubah-den-den,manubah,Den Den,,,88
+sfax-chihia,sfax,Chihia,,,89
+gafsa-redeyef,gafsa,Redeyef,الرديف,,90
+kasserine-sbeitla,kasserine,Sbeïtla,سبيطلة,,91
+nabeul-grombalia,nabeul,Grombalia,قرمبالية,,92
+medenine-djerba-ajim,medenine,Djerba - Ajim,جربة أجيم,,93
+kairouan-raqqada,kairouan,Raqqada,,,94
+kasserine-chrayaa-machrek-chams,kasserine,Chrayaa-Machrek Chams,,,95
+zaghouan-el-fahs,zaghouan,El Fahs,,,96
+nabeul-fondouk-jedid-seltene,nabeul,Fondouk Jedid-Seltene,,,97
+sidi-bou-zid-essaida-ville,sidi-bou-zid,Essaïda (ville),,,98
+mahdia-ouled-chamekh,mahdia,Ouled Chamekh,أولاد شامخ,,99
+bizerte-menzel-jemil,bizerte,Menzel Jemil,منزل جميل,,100
+mahdia-chebba,mahdia,Chebba,الشابة,,101
+sidi-bou-zid-faiedh-bennour,sidi-bou-zid,Faiedh Bennour,,,102
+nabeul-takelsa,nabeul,Takelsa,تاكلسة,,103
+beja-ouchtata-jmila,beja,Ouchtata-Jmila,,,104
+kasserine-ezzouhour-kasserine,kasserine,Ezzouhour (Kasserine),,,105
+monastir-ouerdanine,monastir,Ouerdanine,الوردانين,,106
+gabes-teboulbou,gabes,Teboulbou,,,107
+sidi-bou-zid-souk-jedid,sidi-bou-zid,Souk Jedid,سوق الجديد,,108
+tozeur-nefta,tozeur,Nefta,نفطة,,109
+beja-medjez-el-bab,beja,Medjez el-Bab,,,110
+jendouba-bou-salem,jendouba,Bou Salem,,,111
+nabeul-beni-khiar,nabeul,Béni Khiar,بني خيار,,112
+gafsa-moulares-tunisie,gafsa,Moularès (Tunisie),,,113
+mahdia-el-jem,mahdia,El Jem,الجم,,114
+bizerte-tinja,bizerte,Tinja,تينجة,,115
+mahdia-sidi-zid-awled-moulahem,mahdia,Sidi Zid-Awled Moulahem,,,116
+sfax-nadhour-sidi-ali-ben-abed,sfax,Nadhour-Sidi Ali Ben Abed,,,117
+zaghouan-zaghouan,zaghouan,Zaghouan,زغوان,,118
+sousse-zaouiet-sousse,sousse,Zaouiet Sousse,,,119
+kebili-kebili,kebili,Kébili,,,120
+bizerte-utique,bizerte,Utique,أوتيك,,121
+manubah-mornaguia,manubah,Mornaguia,المرناقية,,122
+jendouba-tabarka,jendouba,Tabarka,طبرقة,,123
+jendouba-ghardimaou,jendouba,Ghardimaou,غار الدماء,,124
+sfax-hadjeb,sfax,Hadjeb,,,125
+sidi-bou-zid-lessouda,sidi-bou-zid,Lessouda,,,126
+kasserine-hassi-el-ferid,kasserine,Hassi El Ferid,حاسي الفريد,,127
+gabes-habib-thameur-bouatouch,gabes,Habib Thameur Bouatouch,,,128
+kasserine-el-ayoun-tunisie,kasserine,El Ayoun (Tunisie),,,129
+bizerte-menzel-abderrahmane,bizerte,Menzel Abderrahmane,,,130
+monastir-sahline-mootmar,monastir,Sahline Moôtmar,,,131
+sousse-grimet-hicher,sousse,Grimet-Hicher,,,132
+sfax-hazeg-ellouza,sfax,Hazeg Ellouza,,,133
+kebili-souk-lahad,kebili,Souk Lahad,,,134
+nabeul-menzel-bouzelfa,nabeul,Menzel Bouzelfa,منزل بوزلفة,,135
+bizerte-el-hachachna,bizerte,El Hachachna,,,136
+bizerte-el-alia,bizerte,El Alia,العالية,,137
+kasserine-thala,kasserine,Thala,تالة,,138
+ariana-kalaat-el-andalous,ariana,Kalâat el-Andalous,قلعة الأندلس,,139
+monastir-bekalta,monastir,Bekalta,البقالطة,,140
+sfax-aachech-aouadna-boujarbou-majel-draj,sfax,Aachech-Aouadna-Boujarbou-Majel Draj,,,141
+le-kef-tajerouine,le-kef,Tajerouine,تاجروين,,142
+sousse-ezzouhour,sousse,Ezzouhour,الزهور,,143
+tunis-carthage,tunis,Carthage,قرطاج,,144
+sfax-ennasr-ville,sfax,Ennasr (ville),,,145
+monastir-zeramdine,monastir,Zéramdine,زرمدين,,146
+jendouba-jouaouda,jendouba,Jouaouda,,,147
+mahdia-tlelsa,mahdia,Tlelsa,,,148
+monastir-bembla-mnara,monastir,Bembla-Mnara,,,149
+sfax-mahres,sfax,Mahrès,المحرس,,150
+sidi-bou-zid-baten-ghzal,sidi-bou-zid,Baten Ghzal,,,151
+sfax-kerkennah,sfax,Kerkennah,قرقنة,,152
+nabeul-beni-khalled,nabeul,Béni Khalled,بني خلاد,,153
+kebili-faouar,kebili,Faouar,فوار,,154
+nabeul-tazougrane-boukrim-zaouiet-el-mgaies,nabeul,Tazougrane-Boukrim-Zaouiet El Mgaies,,,155
+gafsa-zannouch,gafsa,Zannouch,,,156
+kairouan-abida,kairouan,Abida,,,157
+jendouba-ain-sobh-nadhour,jendouba,Aïn Sobh-Nadhour,,,158
+kasserine-rakhmat,kasserine,Rakhmat,,,159
+gabes-chenini-nahal,gabes,Chenini Nahal,,,160
+tataouine-smar,tataouine,Smâr,,,161
+gafsa-belkhir,gafsa,Belkhir,بلخير,,162
+sidi-bou-zid-meknassy,sidi-bou-zid,Meknassy,,,163
+kasserine-bouzguem,kasserine,Bouzguem,,,164
+siliana-sidi-morched,siliana,Sidi Morched,,,165
+monastir-sidi-jedidi,monastir,Sidi Jedidi,,,166
+monastir-bennane-bodheur,monastir,Bennane-Bodheur,,,167
+gafsa-el-guettar-tunisie,gafsa,El Guettar (Tunisie),,,168
+mahdia-hkaima,mahdia,Hkaima,,,169
+manubah-el-bassatine,manubah,El Bassatine,,,170
+siliana-makthar,siliana,Makthar,مكثر,,171
+jendouba-kalaa-maaden-farksan,jendouba,Kalaa-Maaden-Farksan,,,172
+kasserine-ain-khmaissia,kasserine,Aïn Khmaissia,,,173
+beja-testour,beja,Testour,تستور,,174
+gabes-kettana,gabes,Kettana,,,175
+siliana-bou-arada,siliana,Bou Arada,,,176
+monastir-ksibet-el-mediouni,monastir,Ksibet el-Médiouni,قصيبة المديوني,,177
+jendouba-souk-sebt-tunisie,jendouba,Souk Sebt (Tunisie),,,178
+le-kef-dahmani,le-kef,Dahmani,الدهماني,,179
+monastir-sayada-tunisie,monastir,Sayada (Tunisie),,,180
+kairouan-ain-el-beidha,kairouan,Aïn El Beïdha,,,181
+monastir-menzel-hayet,monastir,Menzel Hayet,,,182
+sousse-messaadine,sousse,Messaadine,,,183
+kasserine-khmouda,kasserine,Khmouda,,,184
+le-kef-zaafrana-dir-kef,le-kef,Zaafrana-Dir Kef,,,185
+gafsa-mdhilla,gafsa,Mdhilla,المضيلة,,186
+zaghouan-saouaf,zaghouan,Saouaf,صواف,,187
+nabeul-chrifet-boucharray,nabeul,Chrifet-Boucharray,,,188
+gabes-bouchemma,gabes,Bouchemma,,,189
+jendouba-khmairia,jendouba,Khmairia,,,190
+le-kef-le-sers-tunisie,le-kef,Le Sers (Tunisie),,,191
+mahdia-zelba-commune,mahdia,Zelba (commune),,,192
+zaghouan-el-amaiem,zaghouan,El Amaiem,,,193
+nabeul-bou-argoub,nabeul,Bou Argoub,بوعرقوب,,194
+sfax-skhira,sfax,Skhira,الصخيرة,,195
+beja-teboursouk,beja,Téboursouk,تبرسق,,196
+zaghouan-zriba,zaghouan,Zriba,الزريبة,,197
+kebili-bechli-blidet-jerssin,kebili,Bechli-Blidet-Jerssin,,,198
+monastir-menzel-ennour,monastir,Menzel Ennour,,,199
+gabes-mareth,gabes,Mareth,مارث,,200
+sousse-ksibet-thrayet,sousse,Ksibet Thrayet,,,201
+sfax-agareb,sfax,Agareb,عقارب,,202
+kairouan-chaouachi-commune,kairouan,Chaouachi (commune),,,203
+sidi-bou-zid-regueb,sidi-bou-zid,Regueb,الرقاب,,204
+ariana-sidi-thabet,ariana,Sidi Thabet,سيدي ثابت,,205
+monastir-khniss,monastir,Khniss,,,206
+beja-thibar,beja,Thibar,تيبار,,207
+sousse-enfida,sousse,Enfida,,,208
+gafsa-lela,gafsa,Lela,,,209
+mahdia-rejiche,mahdia,Rejiche,,,210
+gabes-metouia,gabes,Métouia,المطوية,,211
+kairouan-hajeb-el-ayoun,kairouan,Hajeb El Ayoun,حاجب العيون,,212
+kairouan-chraitia-ksour-kairouan,kairouan,Chraitia-Ksour (Kairouan),,,213
+siliana-gaafour,siliana,Gaâfour,قعفور,,214
+sousse-sidi-bou-ali,sousse,Sidi Bou Ali,سيدي بوعلي,,215
+gabes-dkhilet-toujane,gabes,Dkhilet Toujane,,,216
+gabes-menzel-el-habib,gabes,Menzel El Habib,,,217
+gafsa-sidi-aich-tunisie,gafsa,Sidi Aïch (Tunisie),,,218
+beja-sidi-ismail,beja,Sidi Ismaïl,,,219
+gabes-oudhref,gabes,Oudhref,,,220
+sousse-bouficha,sousse,Bouficha,بوفيشة,,221
+bizerte-metline,bizerte,Metline,,,222
+bizerte-raf-raf,bizerte,Raf Raf,,,223
+le-kef-jerissa,le-kef,Jérissa,الجريصة,,224
+jendouba-ain-draham,jendouba,Aïn Draham,عين دراهم,,225
+sidi-bou-zid-mansoura-sidi-bouzid,sidi-bou-zid,Mansoura (Sidi Bouzid),,,226
+tataouine-ghomrassen,tataouine,Ghomrassen,غمراسن,,227
+gafsa-sened,gafsa,Sened,السند,,228
+nabeul-el-haouaria,nabeul,El Haouaria,,,229
+nabeul-tazarka,nabeul,Tazarka,,,230
+sidi-bou-zid-sidi-ali-ben-aoun,sidi-bou-zid,Sidi Ali Ben Aoun,سيدي علي بن عون,,231
+kairouan-jhina,kairouan,Jhina,,,232
+nabeul-hammam-ghezeze,nabeul,Hammam Ghezèze,,,233
+kairouan-oueslatia,kairouan,Oueslatia,الوسلاتية,,234
+kebili-bechri-fatnassa,kebili,Bechri-Fatnassa,,,235
+monastir-beni-hassen,monastir,Beni Hassen,بني حسان,,236
+ben-arous-khalidia,ben-arous,Khalidia,,,237
+monastir-menzel-kamel,monastir,Menzel Kamel,,,238
+kairouan-haffouz,kairouan,Haffouz,حفوز,,239
+monastir-sidi-ameur-tunisie-mesjed-aissa,monastir,Sidi Ameur (Tunisie)-Mesjed-Aïssa,,,240
+sidi-bou-zid-rahal-tunisie,sidi-bou-zid,Rahal (Tunisie),,,241
+zaghouan-bir-mcherga,zaghouan,Bir Mcherga,,,242
+le-kef-bohra,le-kef,Bohra,,,243
+le-kef-kalaat-senan,le-kef,Kalaat Senan,قلعة سنان,,244
+monastir-amiret-hajjaj,monastir,Amiret Hajjaj,,,245
+nabeul-el-maamoura,nabeul,El Maâmoura,,,246
+kairouan-sbikha,kairouan,Sbikha,السبيخة,,247
+tataouine-bir-lahmar,tataouine,Bir Lahmar,بئر الأحمر,,248
+kebili-el-golaa,kebili,El Golâa,,,249
+tozeur-degache,tozeur,Degache,,,250
+nabeul-zaouiet-djedidi,nabeul,Zaouiet Djedidi,,,251
+siliana-el-krib,siliana,El Krib,الكريب,,252
+kairouan-bou-hajla,kairouan,Bou Hajla,,,253
+beja-el-maagoula,beja,El Maâgoula,,,254
+kasserine-foussana,kasserine,Foussana,فوسانة,,255
+siliana-hbabsa,siliana,Hbabsa,,,256
+sfax-el-hencha,sfax,El Hencha,,,257
+zaghouan-nadhour,zaghouan,Nadhour,الناظور,,258
+tataouine-tataouine-sud,tataouine,Tataouine Sud,تطاوين الجنوبية,,259
+gabes-nouvelle-matmata,gabes,Nouvelle Matmata,,,260
+mahdia-sidi-alouane,mahdia,Sidi Alouane,سيدي علوان,,261
+mahdia-kerker,mahdia,Kerker,,,262
+sousse-hergla,sousse,Hergla,هرقلة,,263
+mahdia-el-bradaa,mahdia,El Bradâa,,,264
+sidi-bou-zid-mezzouna,sidi-bou-zid,Mezzouna,,,265
+beja-slouguia,beja,Slouguia,,,266
+beja-nefza,beja,Nefza,نفزة,,267
+sousse-chott-meriem,sousse,Chott Meriem,,,268
+monastir-touza,monastir,Touza,,,269
+kebili-jemna,kebili,Jemna,,,270
+sfax-jebiniana,sfax,Jebiniana,,,271
+sidi-bou-zid-menzel-bouzaiane,sidi-bou-zid,Menzel Bouzaiane,,,272
+nabeul-somaa,nabeul,Somâa,,,273
+kasserine-thelepte,kasserine,Thélepte,,,274
+monastir-zaouiet-kontoch,monastir,Zaouiet Kontoch,,,275
+medenine-boughrara,medenine,Boughrara,,,276
+mahdia-mellouleche,mahdia,Melloulèche,,,277
+manubah-borj-el-amri,manubah,Borj El Amri,برج العامري,,278
+kasserine-sbiba,kasserine,Sbiba,سبيبة,,279
+sidi-bou-zid-bir-el-hafey,sidi-bou-zid,Bir El Hafey,,,280
+kasserine-majel-bel-abbes,kasserine,Majel Bel Abbès,,,281
+manubah-el-batan,manubah,El Batan,,,282
+tozeur-el-hamma-du-jerid,tozeur,El Hamma du Jérid,,,283
+le-kef-sakiet-sidi-youssef,le-kef,Sakiet Sidi Youssef,ساقية سيدي يوسف,,284
+tataouine-remada,tataouine,Remada,رمادة,,285
+monastir-amiret-touazra,monastir,Amiret Touazra,,,286
+monastir-bouhjar,monastir,Bouhjar,,,287
+tunis-sidi-bou-said,tunis,Sidi Bou Saïd,,,288
+le-kef-el-ksour,le-kef,El Ksour,,,289
+sidi-bou-zid-jilma,sidi-bou-zid,Jilma,,,290
+monastir-lamta,monastir,Lamta,,,291
+mahdia-chorbane,mahdia,Chorbane,شربان,,292
+bizerte-sejnane,bizerte,Sejnane,سجنان,,293
+gabes-zarat,gabes,Zarat,,,294
+le-kef-el-marja,le-kef,El Marja,,,295
+mahdia-essouassi,mahdia,Essouassi,,,296
+bizerte-ghar-el-melh,bizerte,Ghar El Melh,غار الملح,,297
+zaghouan-djebel-oust,zaghouan,Djebel Oust,,,298
+monastir-amiret-el-fhoul,monastir,Amiret El Fhoul,,,299
+nabeul-menzel-horr,nabeul,Menzel Horr,,,300
+beja-amdoun,beja,Amdoun,عمدون,,301
+bizerte-aousja,bizerte,Aousja,,,302
+monastir-el-ghnada,monastir,El Ghnada,,,303
+nabeul-azmour,nabeul,Azmour,,,304
+kairouan-nasrallah,kairouan,Nasrallah,نصر اللّه,,305
+siliana-bargou,siliana,Bargou,برقو,,306
+sfax-bir-ali-ben-khalifa,sfax,Bir Ali Ben Khalifa,,,307
+monastir-el-masdour-menzel-harb,monastir,El Masdour-Menzel Harb,,,308
+tozeur-hazoua,tozeur,Hazoua,حزوة,,309
+siliana-rouhia,siliana,Rouhia,الروحية,,310
+nabeul-dar-allouch,nabeul,Dar Allouch,,,311
+monastir-sidi-bennour-tunisie,monastir,Sidi Bennour (Tunisie),,,312
+monastir-cherahil,monastir,Cherahil,,,313
+kasserine-jedelienne,kasserine,Jedelienne,,,314
+mahdia-bou-merdes,mahdia,Bou Merdes,,,315
+tataouine-dehiba,tataouine,Dehiba,,,316
+kebili-rjim-maatoug,kebili,Rjim Maatoug,,,317
+nabeul-el-mida,nabeul,El Mida,الميدة,,318
+beja-goubellat,beja,Goubellat,قبلاط,,319
+gafsa-sidi-boubaker,gafsa,Sidi Boubaker,,,320
+kairouan-menzel-mehiri,kairouan,Menzel Mehiri,,,321
+jendouba-fernana,jendouba,Fernana,فرنانة,,322
+sousse-kondar,sousse,Kondar,كندار,,323
+monastir-menzel-fersi,monastir,Menzel Fersi,,,324
+nabeul-korbous,nabeul,Korbous,,,325
+kasserine-haidra,kasserine,Haïdra,,,326
+sidi-bou-zid-cebbala-ouled-asker,sidi-bou-zid,Cebbala Ouled Asker,,,327
+le-kef-nebeur,le-kef,Nebeur,نبر,,328
+kairouan-el-alaa,kairouan,El Alâa,العلا، تونس,,329
+siliana-sidi-bou-rouis,siliana,Sidi Bou Rouis,,,330
+sfax-graiba,sfax,Graïba,الغريبة,,331
+mahdia-hebira,mahdia,Hebira,,,332
+medenine-sidi-makhlouf-tunisie,medenine,Sidi Makhlouf (Tunisie),,,333
+medenine-beni-khedache,medenine,Beni Khedache,بني خداش,,334
+kairouan-chebika-kairouan,kairouan,Chebika (Kairouan),,,335
+siliana-el-aroussa,siliana,El Aroussa,,,336
+sousse-sidi-el-hani,sousse,Sidi El Hani,سيدي الهاني,,337
+siliana-kesra-ville,siliana,Kesra (ville),,,338
+le-kef-kalaat-khasba,le-kef,Kalâat Khasba,,,339
+sidi-bou-zid-ouled-haffouz,sidi-bou-zid,Ouled Haffouz,أولاد حفوز,,340
+jendouba-oued-meliz,jendouba,Oued Meliz,,,341
+tozeur-tamerza,tozeur,Tamerza,,,342
+sfax-menzel-chaker,sfax,Menzel Chaker,منزل شاكر,,343
+le-kef-touiref,le-kef,Touiref,,,344
+gabes-matmata,gabes,Matmata,مطماطة,,345
+le-kef-menzel-salem,le-kef,Menzel Salem,,,346
+kairouan-ain-djeloula,kairouan,Aïn Djeloula,,,347
+kairouan-echrarda,kairouan,Echrarda,,,348
+jendouba-beni-m-tir-tunisie,jendouba,Beni M'Tir (Tunisie),,,349
+tunis-autre,tunis,Autre / zone rurale,أخرى / منطقة ريفية,,999
+ariana-autre,ariana,Autre / zone rurale,أخرى / منطقة ريفية,,999
+ben-arous-autre,ben-arous,Autre / zone rurale,أخرى / منطقة ريفية,,999
+manubah-autre,manubah,Autre / zone rurale,أخرى / منطقة ريفية,,999
+nabeul-autre,nabeul,Autre / zone rurale,أخرى / منطقة ريفية,,999
+zaghouan-autre,zaghouan,Autre / zone rurale,أخرى / منطقة ريفية,,999
+bizerte-autre,bizerte,Autre / zone rurale,أخرى / منطقة ريفية,,999
+beja-autre,beja,Autre / zone rurale,أخرى / منطقة ريفية,,999
+jendouba-autre,jendouba,Autre / zone rurale,أخرى / منطقة ريفية,,999
+le-kef-autre,le-kef,Autre / zone rurale,أخرى / منطقة ريفية,,999
+siliana-autre,siliana,Autre / zone rurale,أخرى / منطقة ريفية,,999
+sousse-autre,sousse,Autre / zone rurale,أخرى / منطقة ريفية,,999
+monastir-autre,monastir,Autre / zone rurale,أخرى / منطقة ريفية,,999
+mahdia-autre,mahdia,Autre / zone rurale,أخرى / منطقة ريفية,,999
+sfax-autre,sfax,Autre / zone rurale,أخرى / منطقة ريفية,,999
+kairouan-autre,kairouan,Autre / zone rurale,أخرى / منطقة ريفية,,999
+kasserine-autre,kasserine,Autre / zone rurale,أخرى / منطقة ريفية,,999
+sidi-bou-zid-autre,sidi-bou-zid,Autre / zone rurale,أخرى / منطقة ريفية,,999
+gabes-autre,gabes,Autre / zone rurale,أخرى / منطقة ريفية,,999
+medenine-autre,medenine,Autre / zone rurale,أخرى / منطقة ريفية,,999
+tataouine-autre,tataouine,Autre / zone rurale,أخرى / منطقة ريفية,,999
+gafsa-autre,gafsa,Autre / zone rurale,أخرى / منطقة ريفية,,999
+tozeur-autre,tozeur,Autre / zone rurale,أخرى / منطقة ريفية,,999
+kebili-autre,kebili,Autre / zone rurale,أخرى / منطقة ريفية,,999

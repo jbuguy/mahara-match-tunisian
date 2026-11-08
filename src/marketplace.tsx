@@ -1,15 +1,24 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { ArrowUpRight, BriefcaseBusiness } from "lucide-react";
-import { Badge, Button, Card, ChartFrame, DataTable, EmptyState } from "./components/ui";
+import { ArrowUpRight, BriefcaseBusiness, Search, UserPlus } from "lucide-react";
+import { Badge, Button, Card, DataTable, EmptyState } from "./components/ui";
+import { LocationSelect } from "./components/LocationSelect";
+import { AdminObservatoryDashboard } from "./components/AdminObservatoryDashboard";
 import {
   ApiError,
   createTrainingCourse,
   createEmployerOrganisation,
   enrollInCourse,
-  fetchAdminIndicators,
   fetchCandidateApplications,
+  fetchCandidateOfferDecisions,
+  respondToJobOffer,
   fetchCandidateEnrollments,
   fetchEmployerApplications,
+  fetchEmployerApplicationDetail,
+  fetchApplicationNotes,
+  addApplicationNote,
+  fetchApplicationEvaluation,
+  saveApplicationEvaluation,
+  createFormalOffer,
   fetchEmployerOffers,
   fetchEmployerOrganisation,
   fetchProviderCourseEnrollments,
@@ -17,19 +26,54 @@ import {
   fetchTrainingCourses,
   updateCourseEnrollmentStatus,
   updateEmployerApplicationStatus,
+  withdrawCandidateApplication,
   updateEmployerOrganisation,
+  searchEmployerCandidates,
+  fetchTalentPools,
+  createTalentPool,
+  addCandidateToTalentPool,
+  fetchTalentPoolMembers,
+  fetchEmployerConversations,
+  removeTalentPoolMember,
+  ensureApplicationConversation,
+  fetchConversationMessages,
+  sendConversationMessage,
+  fetchEmployerInterviews,
+  createEmployerInterview,
+  updateEmployerInterviewStatus,
+  fetchEmployerNotifications,
+  markEmployerNotificationRead,
+  fetchNotificationPreferences,
+  updateNotificationPreference,
+  submitOrganisationVerification,
+  fetchEmployerAnalytics,
+  fetchPendingOrganisationVerifications,
+  reviewOrganisationVerification,
   updateTrainingCourse,
-  type AdminIndicators,
   type CourseDeliveryMode,
   type CourseEnrollment,
   type CourseEnrollmentStatus,
   type EmployerApplication,
+  type EmployerApplicationDetail,
+  type ApplicationNote,
+  type ApplicationEvaluation,
+  type JobOfferDecision,
   type JobApplication,
   type JobApplicationStatus,
   type OrganisationProfile,
   type ProviderCourseEnrollment,
   type TrainingCourse,
   type TrainingCourseDraft,
+  type CandidateDiscovery,
+  type TalentPool,
+  type TalentPoolMember,
+  type Conversation,
+  type ConversationMessage,
+  type EmployerInterview,
+  type EmployerNotification,
+  type NotificationPreference,
+  type EmployerAnalytics,
+  type OrganisationVerification,
 } from "./auth";
 
 function errorMessage(error: unknown): string {
@@ -41,9 +85,38 @@ function errorMessage(error: unknown): string {
 const applicationStatusLabels: Record<JobApplicationStatus, string> = {
   submitted: "Reçue",
   reviewing: "À l’étude",
+  shortlisted: "Présélectionnée",
   interview: "Entretien",
+  interview_completed: "Entretien terminé",
+  offer_made: "Offre envoyée",
+  interviewed: "Entretien réalisé",
+  offered: "Offre proposée",
   hired: "Recrutée",
   rejected: "Non retenue",
+  withdrawn: "Retirée",
+};
+
+const employerApplicationNextStatuses: Record<JobApplicationStatus, JobApplicationStatus[]> = {
+  submitted: ["reviewing", "shortlisted", "interview", "hired", "rejected"],
+  reviewing: ["shortlisted", "interview", "hired", "rejected"],
+  shortlisted: ["reviewing", "interview", "hired", "rejected"],
+  interview: ["interview_completed", "offer_made", "hired", "rejected"],
+  interview_completed: ["offer_made", "hired", "rejected"],
+  interviewed: ["offered", "hired", "rejected"],
+  offered: ["hired", "rejected"],
+  offer_made: ["hired", "rejected"],
+  hired: [],
+  rejected: [],
+  withdrawn: [],
+};
+
+const jobOfferStatusLabels: Record<NonNullable<import("./auth").JobOffer["status"]>, string> = {
+  draft: "Brouillon",
+  published: "Publiée",
+  paused: "En pause",
+  closed: "Clôturée",
+  expired: "Expirée",
+  archived: "Archivée",
 };
 
 const enrollmentStatusLabels: Record<CourseEnrollmentStatus, string> = {
@@ -82,6 +155,9 @@ function MetricCard({
 }
 
 export function AdminDashboardPage({ token }: { token: string }) {
+  return <AdminObservatoryDashboard token={token} />;
+}
+  /*
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [appliedRange, setAppliedRange] = useState({ startDate: "", endDate: "" });
@@ -299,12 +375,17 @@ export function AdminDashboardPage({ token }: { token: string }) {
   );
 }
 
+*/
+
 type CourseFormValues = {
   title: string;
   summary: string;
   skills: string;
   delivery_mode: CourseDeliveryMode;
   location: string;
+  governorate_code: string;
+  municipality_code: string;
+  street_address: string;
   starts_on: string;
   ends_on: string;
   duration_hours: string;
@@ -319,6 +400,9 @@ const emptyCourseForm: CourseFormValues = {
   skills: "",
   delivery_mode: "online",
   location: "",
+  governorate_code: "",
+  municipality_code: "",
+  street_address: "",
   starts_on: "",
   ends_on: "",
   duration_hours: "1",
@@ -334,6 +418,9 @@ function courseDraft(values: CourseFormValues): TrainingCourseDraft {
     skills: values.skills.split(/[,\n]/).map((skill) => skill.trim()).filter(Boolean),
     delivery_mode: values.delivery_mode,
     location: values.location.trim() || null,
+    governorate_code: values.governorate_code || null,
+    municipality_code: values.municipality_code || null,
+    street_address: values.street_address.trim() || null,
     starts_on: values.starts_on || null,
     ends_on: values.ends_on || null,
     duration_hours: Number(values.duration_hours),
@@ -350,6 +437,9 @@ function valuesFromCourse(course: TrainingCourse): CourseFormValues {
     skills: course.skills.join(", "),
     delivery_mode: course.delivery_mode,
     location: course.location ?? "",
+    governorate_code: course.governorate_code ?? "",
+    municipality_code: course.municipality_code ?? "",
+    street_address: course.street_address ?? "",
     starts_on: course.starts_on ?? "",
     ends_on: course.ends_on ?? "",
     duration_hours: String(course.duration_hours),
@@ -522,11 +612,15 @@ export function TrainingProviderDashboardPage({ token }: { token: string }) {
               <option value="hybrid">Hybride</option>
             </select>
           </label>
-          <label className="form-field">
-            <span className="form-field__label">Lieu (obligatoire en présentiel/hybride)</span>
-            <input className="input" maxLength={120} value={form.location}
-              onChange={(event) => setForm({ ...form, location: event.target.value })} />
-          </label>
+          <LocationSelect
+            governorateRequired={form.delivery_mode !== "online"}
+            governorateCode={form.governorate_code}
+            municipalityCode={form.municipality_code}
+            streetAddress={form.street_address}
+            onChange={({ governorateCode, municipalityCode, streetAddress }) =>
+              setForm({ ...form, governorate_code: governorateCode, municipality_code: municipalityCode, street_address: streetAddress, location: streetAddress })
+            }
+          />
           <label className="form-field">
             <span className="form-field__label">Date de début</span>
             <input className="input" type="date" value={form.starts_on}
@@ -762,12 +856,14 @@ export function CandidateApplicationsPage({ token }: { token: string }) {
   const [applications, setApplications] = useState<JobApplication[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [busyId, setBusyId] = useState("");
+  const [decisions, setDecisions] = useState<JobOfferDecision[]>([]);
 
   useEffect(() => {
     let cancelled = false;
-    fetchCandidateApplications(token)
-      .then((results) => {
-        if (!cancelled) setApplications(results);
+    Promise.all([fetchCandidateApplications(token), fetchCandidateOfferDecisions(token)])
+      .then(([results, offers]) => {
+        if (!cancelled) { setApplications(Array.isArray(results) ? results : []); setDecisions(Array.isArray(offers) ? offers : []); }
       })
       .catch((cause: unknown) => {
         if (!cancelled) setError(errorMessage(cause));
@@ -779,6 +875,26 @@ export function CandidateApplicationsPage({ token }: { token: string }) {
       cancelled = true;
     };
   }, [token]);
+
+  async function withdraw(application: JobApplication) {
+    setBusyId(application.id);
+    setError("");
+    try {
+      const updated = await withdrawCandidateApplication(token, application.id);
+      setApplications((current) => current.map((item) => item.id === updated.id ? updated : item));
+    } catch (cause: unknown) {
+      setError(errorMessage(cause));
+    } finally {
+      setBusyId("");
+    }
+  }
+
+  async function respond(decision: JobOfferDecision, status: "accepted" | "declined") {
+    setBusyId(decision.id);
+    try { const updated = await respondToJobOffer(token, decision.id, status); setDecisions((all) => all.map((item) => item.id === updated.id ? updated : item)); if (status === "accepted") setApplications((all) => all.map((item) => item.id === decision.application_id ? { ...item, status: "hired" } : item)); }
+    catch (cause: unknown) { setError(errorMessage(cause)); }
+    finally { setBusyId(""); }
+  }
 
   return (
     <section className="market-page">
@@ -802,6 +918,12 @@ export function CandidateApplicationsPage({ token }: { token: string }) {
             <Badge tone={application.status === "hired" ? "success" : "neutral"}>
               {applicationStatusLabels[application.status]}
             </Badge>
+            {decisions.filter((decision) => decision.application_id === application.id && decision.status === "pending").map((decision) => <div className="market-section-heading" key={decision.id}><p>Offre formelle reçue{decision.response_deadline ? ` · réponse avant le ${new Date(decision.response_deadline).toLocaleDateString("fr-FR")}` : ""}</p><Button disabled={busyId === decision.id} onClick={() => void respond(decision, "accepted")}>Accepter</Button><Button variant="secondary" disabled={busyId === decision.id} onClick={() => void respond(decision, "declined")}>Décliner</Button></div>)}
+            {!(["hired", "rejected", "withdrawn"] as JobApplicationStatus[]).includes(application.status) && (
+              <Button variant="ghost" disabled={busyId === application.id} onClick={() => void withdraw(application)}>
+                {busyId === application.id ? "Retrait…" : "Retirer ma candidature"}
+              </Button>
+            )}
           </Card>
         ))}
       </div>
@@ -809,11 +931,16 @@ export function CandidateApplicationsPage({ token }: { token: string }) {
   );
 }
 
-export function EmployerApplicationsPage({ token }: { token: string }) {
+export function EmployerApplicationsPage({ token, onNavigate }: { token: string; onNavigate: (page: string) => void }) {
   const [applications, setApplications] = useState<EmployerApplication[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState("");
+  const [detail, setDetail] = useState<EmployerApplicationDetail | null>(null);
+  const [notes, setNotes] = useState<ApplicationNote[]>([]);
+  const [evaluation, setEvaluation] = useState<ApplicationEvaluation | null>(null);
+  const [noteDraft, setNoteDraft] = useState("");
+  const [offerTerms, setOfferTerms] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -850,6 +977,16 @@ export function EmployerApplicationsPage({ token }: { token: string }) {
     }
   }
 
+  async function openDetail(applicationId: string) {
+    if (detail?.id === applicationId) { setDetail(null); return; }
+    try {
+      const [applicationDetail, applicationNotes, applicationEvaluation] = await Promise.all([
+        fetchEmployerApplicationDetail(token, applicationId), fetchApplicationNotes(token, applicationId), fetchApplicationEvaluation(token, applicationId),
+      ]);
+      setDetail(applicationDetail); setNotes(applicationNotes); setEvaluation(applicationEvaluation);
+    } catch (cause: unknown) { setError(errorMessage(cause)); }
+  }
+
   return (
     <section className="market-page">
       <div className="eyebrow">RECRUTEMENT</div>
@@ -867,7 +1004,7 @@ export function EmployerApplicationsPage({ token }: { token: string }) {
       )}
       <div className="market-list">
         {applications.map((application) => {
-          const closed = application.status === "hired" || application.status === "rejected";
+          const closed = ["hired", "rejected", "withdrawn"].includes(application.status);
           return (
             <Card className="market-applicant-card" key={application.id}>
               <div className="market-panel__heading">
@@ -893,11 +1030,10 @@ export function EmployerApplicationsPage({ token }: { token: string }) {
                         )
                       }
                     >
-                      {application.status === "submitted" && <option value="submitted">Reçue</option>}
-                      <option value="reviewing">À l’étude</option>
-                      <option value="interview">Entretien</option>
-                      <option value="hired">Recrutée</option>
-                      <option value="rejected">Non retenue</option>
+                      <option value={application.status}>{applicationStatusLabels[application.status]}</option>
+                      {employerApplicationNextStatuses[application.status].map((nextStatus) => (
+                        <option value={nextStatus} key={nextStatus}>{applicationStatusLabels[nextStatus]}</option>
+                      ))}
                     </select>
                   </label>
                 )}
@@ -907,6 +1043,8 @@ export function EmployerApplicationsPage({ token }: { token: string }) {
                   ? application.candidate_skills.join(", ")
                   : "Non renseignées"}
               </p>
+              <Button variant="ghost" onClick={() => void openDetail(application.id)}>{detail?.id === application.id ? "Masquer les détails" : "Détails, notes et évaluation"}</Button>
+              {detail?.id === application.id && <section className="market-panel"><h3>Parcours déclaré</h3><p>{detail.experience_entries.length} expérience(s) · {detail.education_entries.length} formation(s)</p><Button variant="secondary" onClick={() => void ensureApplicationConversation(token, application.id).then((conversation) => { sessionStorage.setItem("mahara-match-active-conversation", conversation.id); onNavigate("Messages"); }).catch((cause: unknown) => setError(errorMessage(cause)))}>Ouvrir une conversation</Button>{application.status === "offer_made" && <form className="workspace-form" onSubmit={(event) => { event.preventDefault(); void createFormalOffer(token, application.id, { response_deadline: null, proposed_conditions: { summary: offerTerms } }).then(() => setOfferTerms("" )).catch((cause: unknown) => setError(errorMessage(cause))); }}><label className="form-field"><span className="form-field__label">Conditions de l’offre formelle</span><textarea className="input workspace-textarea" required minLength={10} value={offerTerms} onChange={(event) => setOfferTerms(event.target.value)}/></label><Button type="submit">Envoyer l’offre formelle</Button></form>}<h3>Notes privées</h3>{notes.map((note) => <p key={note.id}>{note.content}</p>)}<form className="workspace-form" onSubmit={(event) => { event.preventDefault(); void addApplicationNote(token, application.id, noteDraft).then((note) => { setNotes((all) => [...all, note]); setNoteDraft(""); }).catch((cause: unknown) => setError(errorMessage(cause))); }}><label className="form-field"><span className="form-field__label">Ajouter une note privée</span><textarea className="input workspace-textarea" required value={noteDraft} onChange={(event) => setNoteDraft(event.target.value)}/></label><Button type="submit">Enregistrer la note</Button></form><h3>Évaluation structurée</h3><label className="form-field"><span className="form-field__label">Points forts</span><textarea className="input workspace-textarea" value={evaluation?.strengths ?? ""} onChange={(event) => setEvaluation({ id: evaluation?.id ?? "", criteria: evaluation?.criteria ?? [], strengths: event.target.value, concerns: evaluation?.concerns ?? null, updated_at: "" })}/></label><label className="form-field"><span className="form-field__label">Points à approfondir</span><textarea className="input workspace-textarea" value={evaluation?.concerns ?? ""} onChange={(event) => setEvaluation({ id: evaluation?.id ?? "", criteria: evaluation?.criteria ?? [], strengths: evaluation?.strengths ?? null, concerns: event.target.value, updated_at: "" })}/></label><Button variant="secondary" onClick={() => void saveApplicationEvaluation(token, application.id, { criteria: evaluation?.criteria ?? [], strengths: evaluation?.strengths ?? null, concerns: evaluation?.concerns ?? null }).then(setEvaluation).catch((cause: unknown) => setError(errorMessage(cause)))}>Enregistrer l’évaluation</Button></section>}
               {closed && <p className="market-footnote">Décision clôturée et enregistrée.</p>}
             </Card>
           );
@@ -929,17 +1067,40 @@ export function EmployerDashboardPage({ token, onNavigate }: { token: string; on
       .finally(() => { if (!cancelled) setIsLoading(false); });
     return () => { cancelled = true; };
   }, [token]);
-  const active = applications.filter((item) => !["hired", "rejected"].includes(item.status)).length;
+  const newApplications = applications.filter((item) => item.status === "submitted");
+  const inReview = applications.filter((item) => item.status === "reviewing").length;
+  const interviews = applications.filter((item) => item.status === "interview").length;
   const hired = applications.filter((item) => item.status === "hired").length;
+  const publishedOffers = offers.filter((offer) => offer.status === "published").length;
+  const draftOffers = offers.filter((offer) => offer.status === "draft").length;
+  const recentApplications = [...applications]
+    .sort((left, right) => Date.parse(right.created_at) - Date.parse(left.created_at))
+    .slice(0, 5);
   return <section className="market-page">
     <div className="eyebrow">VUE D’ENSEMBLE</div><h1>Votre espace employeur</h1>
-    <p className="market-page__intro">Retrouvez vos recrutements et les prochaines étapes de votre activité.</p>
+    <p className="market-page__intro">Retrouvez vos recrutements, les candidatures à examiner et les prochaines étapes.</p>
     <Card className="employer-create-cta"><span className="overview-icon overview-icon--blue"><BriefcaseBusiness size={22}/></span><div><p className="eyebrow">RECRUTEMENT</p><h2>Publiez une offre pour trouver les bons profils</h2><p>Décrivez le poste et ses compétences clés pour la proposer aux candidats.</p></div><Button onClick={() => onNavigate("Mes offres")}>Créer une offre <ArrowUpRight size={16}/></Button></Card>
     {error && <p className="workspace-error" role="alert">{error}</p>}
     {isLoading ? <p aria-live="polite">Chargement de votre activité…</p> : <>
-      <div className="market-metrics market-metrics--three"><MetricCard label="Offres publiées" value={offers.length} detail="Offres associées à votre compte"/><MetricCard label="Candidatures à traiter" value={active} detail="Reçues, à l’étude ou en entretien"/><MetricCard label="Recrutements déclarés" value={hired} detail="Candidatures marquées comme recrutées"/></div>
+      <div className="market-metrics employer-dashboard-metrics">
+        <MetricCard label="Offres actives" value={publishedOffers} detail="Offres actuellement publiées"/>
+        <MetricCard label="Brouillons" value={draftOffers} detail="Offres enregistrées avant publication"/>
+        <MetricCard label="À examiner" value={newApplications.length} detail="Nouvelles candidatures reçues"/>
+        <MetricCard label="En cours d’examen" value={inReview} detail="Candidatures à l’étude"/>
+        <MetricCard label="Entretiens" value={interviews} detail="Candidatures au stade entretien"/>
+        <MetricCard label="Candidatures" value={applications.length} detail="Toutes les candidatures reçues"/>
+        <MetricCard label="Recrutements déclarés" value={hired} detail="Résultats déclarés par votre organisation"/>
+      </div>
+      <Card className="market-panel employer-dashboard-attention">
+        <div className="market-section-heading"><div><h2>À traiter en priorité</h2><p>Les candidatures reçues attendent une première décision.</p></div><Badge>{newApplications.length}</Badge></div>
+        {newApplications.length ? <Button variant="secondary" onClick={() => onNavigate("Candidatures")}>Examiner les candidatures <ArrowUpRight size={16}/></Button> : <p className="market-footnote">Aucune nouvelle candidature à examiner.</p>}
+      </Card>
       <Card className="market-panel"><div className="market-section-heading"><div><h2>Offres récentes</h2><p>Suivez les candidatures liées à vos offres.</p></div><Badge>{offers.length}</Badge></div>
-        {offers.length ? <div className="market-list">{offers.map((offer) => { const count = applications.filter((item) => item.job_offer_id === offer.id).length; return <article className="market-org-offer" key={offer.id}><div><h3>{offer.title}</h3><p>{offer.location} · Publiée le {formatDate(offer.created_at)}</p></div><Badge>{count} candidature{count === 1 ? "" : "s"}</Badge></article>; })}</div> : <EmptyState title="Aucune offre enregistrée" description="Créez votre première offre pour commencer à suivre votre recrutement."/>}
+        {offers.length ? <div className="market-list">{offers.map((offer) => { const count = applications.filter((item) => item.job_offer_id === offer.id).length; const offerStatus = offer.status ?? "published"; return <article className="market-org-offer" key={offer.id}><div><h3>{offer.title}</h3><p>{offer.location} · {offer.published_at ? `Publiée le ${formatDate(offer.published_at)}` : `Créée le ${formatDate(offer.created_at)}`}</p></div><div className="employer-dashboard-offer-badges"><Badge>{count} candidature{count === 1 ? "" : "s"}</Badge><Badge>{jobOfferStatusLabels[offerStatus]}</Badge></div></article>; })}</div> : <EmptyState title="Aucune offre enregistrée" description="Créez votre première offre pour commencer à suivre votre recrutement."/>}
+      </Card>
+      <Card className="market-panel">
+        <div className="market-section-heading"><div><h2>Candidatures récentes</h2><p>Classées par date de réception.</p></div><Button variant="secondary" onClick={() => onNavigate("Candidatures")}>Tout voir</Button></div>
+        {recentApplications.length ? <div className="market-list">{recentApplications.map((application) => <article className="market-org-offer" key={application.id}><div><h3>{application.candidate_name || "Candidat sans nom renseigné"}</h3><p>{application.job_title} · Reçue le {formatDate(application.created_at)}</p></div><Badge tone={application.status === "hired" ? "success" : "neutral"}>{applicationStatusLabels[application.status]}</Badge></article>)}</div> : <EmptyState title="Aucune candidature reçue" description="Les candidatures à vos offres apparaîtront ici."/>}
       </Card>
     </>}
   </section>;
@@ -952,18 +1113,23 @@ export function EmployerOrganisationPage({ token }: { token: string }) {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [creating, setCreating] = useState(false);
+  const [verification, setVerification] = useState("");
+  const [evidenceUrl, setEvidenceUrl] = useState("");
+  const [verificationStatus, setVerificationStatus] = useState("");
   useEffect(() => { let cancelled = false; fetchEmployerOrganisation(token).then((value) => { if (!cancelled) setProfile(value); }).catch((cause: unknown) => { if (!cancelled) { if (cause instanceof ApiError && cause.status === 404) { setCreating(true); setProfile({ id: "", organisation_type: "employer", name: "", website: null, sector: null, size: null, description: null, phone: null, contact_email: null, location: null, profile_details: {} }); } else setError(errorMessage(cause)); } }).finally(() => { if (!cancelled) setLoading(false); }); return () => { cancelled = true; }; }, [token]);
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); if (!profile) return; setSaving(true); setError(""); setNotice("");
     try { setProfile(creating ? await createEmployerOrganisation(token, profile) : await updateEmployerOrganisation(token, profile)); setCreating(false); setNotice("Les informations de votre organisation ont été enregistrées."); }
     catch (cause: unknown) { setError(errorMessage(cause)); } finally { setSaving(false); }
   }
+  async function submitVerification(event: FormEvent<HTMLFormElement>) { event.preventDefault(); setError(""); try { const result = await submitOrganisationVerification(token, { supporting_information: verification, evidence_url: evidenceUrl || null }); setVerificationStatus(result.status); setNotice("Demande de vérification envoyée."); } catch (cause: unknown) { setError(errorMessage(cause)); } }
   const details = profile?.profile_details ?? {};
   function setDetail(key: string, value: unknown) { if (profile) setProfile({ ...profile, profile_details: { ...profile.profile_details, [key]: value } }); }
   const detailField = (label: string, key: string, multiline = false) => <label className="form-field"><span className="form-field__label">{label}</span>{multiline ? <textarea className="input workspace-textarea" rows={3} value={String(details[key] ?? "")} onChange={(event) => setDetail(key, event.target.value)}/> : <input className="input" value={String(details[key] ?? "")} onChange={(event) => setDetail(key, event.target.value)}/>}</label>;
   if (loading) return <section className="market-page"><h1>Mon organisation</h1><p aria-live="polite">Chargement des informations de votre organisation…</p></section>;
   if (!profile) return <section className="market-page"><div className="eyebrow">ESPACE EMPLOYEUR</div><h1>Mon organisation</h1><Card className="market-panel"><EmptyState title="Organisation non reliée à votre compte" description="Votre espace employeur n’est pas encore associé à une organisation. Contactez l’administrateur de la plateforme pour terminer la configuration."/>{error && <p className="workspace-error" role="alert">{error}</p>}</Card></section>;
   return <section className="market-page"><div className="eyebrow">ESPACE EMPLOYEUR</div><h1>{creating ? "Créer mon organisation" : "Mon organisation"}</h1><p className="market-page__intro">Présentez votre entreprise et ses besoins pour donner à l’assistant de recrutement un contexte utile.</p>{error && <p className="workspace-error" role="alert">{error}</p>}
+    {!creating && <Card className="market-panel"><div className="market-section-heading"><div><h2>Vérification de l’organisation</h2><p>Le statut de vérification est visible dans votre espace.</p></div><Badge>{verificationStatus || profile.verification_status || "non vérifiée"}</Badge></div><form className="workspace-form" onSubmit={(event) => void submitVerification(event)}><label className="form-field"><span className="form-field__label">Informations justificatives</span><textarea className="input workspace-textarea" rows={3} minLength={20} required value={verification} onChange={(event) => setVerification(event.target.value)}/></label><label className="form-field"><span className="form-field__label">Lien vers un justificatif (facultatif)</span><input className="input" type="url" value={evidenceUrl} onChange={(event) => setEvidenceUrl(event.target.value)}/></label><Button type="submit">Demander la vérification</Button></form></Card>}
     <form className="workspace-form" onSubmit={(event) => void save(event)}>
       <Card className="market-panel"><div className="market-section-heading"><div><h2>Informations de base</h2><p>Les informations principales de votre structure.</p></div><Badge>Entreprise</Badge></div>
         <label className="form-field"><span className="form-field__label">Nom de l’organisation</span><input className="input" required minLength={2} maxLength={200} value={profile.name} onChange={(event) => setProfile({ ...profile, name: event.target.value })}/></label>
@@ -983,6 +1149,63 @@ export function EmployerOrganisationPage({ token }: { token: string }) {
     </form></section>;
 }
 
+export function EmployerCandidatesPage({ token }: { token: string }) {
+  const [query, setQuery] = useState(""); const [skill, setSkill] = useState(""); const [rows, setRows] = useState<CandidateDiscovery[]>([]); const [pools, setPools] = useState<TalentPool[]>([]); const [error, setError] = useState(""); const [busy, setBusy] = useState("");
+  useEffect(() => { fetchTalentPools(token).then(setPools).catch((cause: unknown) => setError(errorMessage(cause))); }, [token]);
+  async function search(event: FormEvent<HTMLFormElement>) { event.preventDefault(); setError(""); try { setRows(await searchEmployerCandidates(token, { q: query, skill })); } catch (cause: unknown) { setError(errorMessage(cause)); } }
+  async function save(candidateId: string) { if (!pools[0]) { setError("Créez d’abord une liste de talents."); return; } setBusy(candidateId); try { await addCandidateToTalentPool(token, pools[0].id, candidateId); } catch (cause: unknown) { setError(errorMessage(cause)); } finally { setBusy(""); } }
+  return <section className="market-page"><div className="eyebrow">RECRUTEMENT</div><h1>Découvrir des candidats</h1><p className="market-page__intro">Seuls les candidats ayant activé la visibilité employeur apparaissent ici.</p>{error && <p className="workspace-error" role="alert">{error}</p>}<Card className="market-panel"><form className="workspace-form" onSubmit={(event) => void search(event)}><label className="form-field"><span className="form-field__label">Nom, titre ou mot-clé</span><input className="input" value={query} onChange={(event) => setQuery(event.target.value)}/></label><label className="form-field"><span className="form-field__label">Compétence</span><input className="input" value={skill} onChange={(event) => setSkill(event.target.value)}/></label><Button type="submit"><Search size={16}/> Rechercher</Button></form></Card><div className="market-list">{rows.map((candidate) => <Card className="market-applicant-card" key={candidate.candidate_id}><div><h2>{candidate.professional_headline || "Profil candidat"}</h2><p>{candidate.location || "Lieu non renseigné"} · {candidate.skills.join(" · ")}</p>{candidate.matched_skills.length > 0 && <p>Compétences correspondantes : {candidate.matched_skills.join(", ")}</p>}</div><Button variant="secondary" disabled={busy === candidate.candidate_id} onClick={() => void save(candidate.candidate_id)}><UserPlus size={16}/> Ajouter à mes talents</Button></Card>)}</div>{!rows.length && <Card className="market-panel"><EmptyState title="Aucun résultat" description="Lancez une recherche pour consulter les profils visibles."/></Card>}</section>;
+}
+
+export function EmployerTalentPoolsPage({ token }: { token: string }) {
+  const [pools, setPools] = useState<TalentPool[]>([]); const [active, setActive] = useState(""); const [members, setMembers] = useState<TalentPoolMember[]>([]); const [name, setName] = useState(""); const [error, setError] = useState("");
+  useEffect(() => { fetchTalentPools(token).then((items) => { setPools(items); if (items[0]) setActive(items[0].id); }).catch((cause: unknown) => setError(errorMessage(cause))); }, [token]);
+  useEffect(() => { if (active) fetchTalentPoolMembers(token, active).then(setMembers).catch((cause: unknown) => setError(errorMessage(cause))); }, [token, active]);
+  async function create(event: FormEvent<HTMLFormElement>) { event.preventDefault(); try { const pool = await createTalentPool(token, name); setPools((current) => [...current, pool]); setActive(pool.id); setName(""); } catch (cause: unknown) { setError(errorMessage(cause)); } }
+  return <section className="market-page"><div className="eyebrow">VIVIER DE TALENTS</div><h1>Talents sauvegardés</h1>{error && <p className="workspace-error" role="alert">{error}</p>}<Card className="market-panel"><form className="workspace-form" onSubmit={(event) => void create(event)}><label className="form-field"><span className="form-field__label">Nouvelle liste</span><input className="input" required value={name} onChange={(event) => setName(event.target.value)}/></label><Button type="submit">Créer une liste</Button></form><label className="form-field"><span className="form-field__label">Liste</span><select className="input" value={active} onChange={(event) => setActive(event.target.value)}>{pools.map((pool) => <option key={pool.id} value={pool.id}>{pool.name}</option>)}</select></label></Card><div className="market-list">{members.map((member) => <Card className="market-applicant-card" key={member.candidate_id}><div><h2>{member.professional_headline || "Profil candidat"}</h2><p>{member.location || "Lieu non renseigné"} · {member.skills.join(" · ")}</p>{member.private_note && <p>{member.private_note}</p>}</div><Button variant="ghost" onClick={() => void removeTalentPoolMember(token, active, member.candidate_id).then(() => setMembers((list) => list.filter((item) => item.candidate_id !== member.candidate_id))).catch((cause: unknown) => setError(errorMessage(cause)))}>Retirer</Button></Card>)}</div></section>;
+}
+
+export function EmployerMessagesPage({ token }: { token: string }) {
+  const [conversations, setConversations] = useState<Conversation[]>([]); const [active, setActive] = useState(""); const [messages, setMessages] = useState<ConversationMessage[]>([]); const [draft, setDraft] = useState(""); const [error, setError] = useState("");
+  useEffect(() => { fetchEmployerConversations(token).then((items) => { setConversations(items); const requested = sessionStorage.getItem("mahara-match-active-conversation"); setActive(requested && items.some((item) => item.id === requested) ? requested : items[0]?.id ?? ""); sessionStorage.removeItem("mahara-match-active-conversation"); }).catch((cause: unknown) => setError(errorMessage(cause))); }, [token]);
+  useEffect(() => { if (active) fetchConversationMessages(token, active).then(setMessages).catch((cause: unknown) => setError(errorMessage(cause))); }, [token, active]);
+  async function send(event: FormEvent<HTMLFormElement>) { event.preventDefault(); if (!active || !draft.trim()) return; try { const message = await sendConversationMessage(token, active, draft.trim()); setMessages((items) => [...items, message]); setDraft(""); } catch (cause: unknown) { setError(errorMessage(cause)); } }
+  return <section className="market-page"><div className="eyebrow">ÉCHANGES</div><h1>Messages</h1>{error && <p className="workspace-error" role="alert">{error}</p>}<Card className="market-panel"><label className="form-field"><span className="form-field__label">Conversation</span><select className="input" value={active} onChange={(event) => setActive(event.target.value)}>{conversations.map((item) => <option value={item.id} key={item.id}>{item.candidate_name || "Candidat"} · {item.job_title}</option>)}</select></label><div className="market-list">{messages.map((message) => <article className="market-org-offer" key={message.id}><p>{message.content}</p><small>{new Date(message.created_at).toLocaleString("fr-FR")}</small></article>)}</div><form className="workspace-form" onSubmit={(event) => void send(event)}><label className="form-field"><span className="form-field__label">Votre message</span><textarea className="input workspace-textarea" required value={draft} onChange={(event) => setDraft(event.target.value)}/></label><Button type="submit" disabled={!active}>Envoyer</Button></form></Card></section>;
+}
+
+export function EmployerInterviewsPage({ token }: { token: string }) {
+  const [items, setItems] = useState<EmployerInterview[]>([]); const [applications, setApplications] = useState<EmployerApplication[]>([]); const [error, setError] = useState(""); const [applicationId, setApplicationId] = useState(""); const [startsAt, setStartsAt] = useState(""); const [duration, setDuration] = useState(45); const [format, setFormat] = useState<"online" | "in_person">("online"); const [details, setDetails] = useState("");
+  useEffect(() => { fetchEmployerInterviews(token).then(setItems).catch((cause: unknown) => setError(errorMessage(cause))); fetchEmployerApplications(token).then(setApplications).catch((cause: unknown) => setError(errorMessage(cause))); }, [token]);
+  async function schedule(event: FormEvent<HTMLFormElement>) { event.preventDefault(); try { const created = await createEmployerInterview(token, { application_id: applicationId, starts_at: new Date(startsAt).toISOString(), duration_minutes: duration, format, meeting_details: details || null }); setItems((all) => [...all, created].sort((a, b) => Date.parse(a.starts_at) - Date.parse(b.starts_at))); setApplicationId(""); setStartsAt(""); setDetails(""); } catch (cause: unknown) { setError(errorMessage(cause)); } }
+  return <section className="market-page"><div className="eyebrow">RECRUTEMENT</div><h1>Entretiens</h1><p className="market-page__intro">Planifiez des rendez-vous depuis les candidatures et suivez les confirmations.</p>{error && <p className="workspace-error" role="alert">{error}</p>}<Card className="market-panel"><h2>Planifier un entretien</h2><form className="workspace-form" onSubmit={(event) => void schedule(event)}><label className="form-field"><span className="form-field__label">Candidature</span><select className="input" required value={applicationId} onChange={(event) => setApplicationId(event.target.value)}><option value="">Choisir une candidature</option>{applications.filter((app) => !["hired", "rejected", "withdrawn"].includes(app.status)).map((app) => <option key={app.id} value={app.id}>{app.candidate_name || "Candidat"} · {app.job_title}</option>)}</select></label><label className="form-field"><span className="form-field__label">Date et heure</span><input className="input" type="datetime-local" required value={startsAt} onChange={(event) => setStartsAt(event.target.value)}/></label><label className="form-field"><span className="form-field__label">Durée (minutes)</span><input className="input" type="number" min={15} max={240} step={15} value={duration} onChange={(event) => setDuration(Number(event.target.value))}/></label><label className="form-field"><span className="form-field__label">Format</span><select className="input" value={format} onChange={(event) => setFormat(event.target.value as "online" | "in_person")}><option value="online">À distance</option><option value="in_person">En présentiel</option></select></label><label className="form-field"><span className="form-field__label">Lien ou lieu</span><input className="input" value={details} onChange={(event) => setDetails(event.target.value)}/></label><Button type="submit" disabled={!applicationId}>Planifier</Button></form></Card><div className="market-list">{items.map((item) => <Card className="market-applicant-card" key={item.id}><div><h2>{item.candidate_name || "Candidat"} · {item.job_title}</h2><p>{new Date(item.starts_at).toLocaleString("fr-FR")} · {item.duration_minutes} min · {item.format === "online" ? "À distance" : "En présentiel"}</p>{item.meeting_details && <p>{item.meeting_details}</p>}</div><Badge>{item.status}</Badge>{item.status === "confirmed" && <Button variant="ghost" onClick={() => void updateEmployerInterviewStatus(token, item.id, "completed").then((updated) => setItems((all) => all.map((old) => old.id === updated.id ? updated : old))).catch((cause: unknown) => setError(errorMessage(cause)))}>Marquer terminé</Button>}</Card>)}</div></section>;
+}
+
+export function CandidateInterviewsPage({ token }: { token: string }) {
+  const [items, setItems] = useState<EmployerInterview[]>([]); const [error, setError] = useState("");
+  useEffect(() => { fetchEmployerInterviews(token).then(setItems).catch((cause: unknown) => setError(errorMessage(cause))); }, [token]);
+  async function respond(item: EmployerInterview, status: string) { try { const updated = await updateEmployerInterviewStatus(token, item.id, status); setItems((all) => all.map((row) => row.id === updated.id ? updated : row)); } catch (cause: unknown) { setError(errorMessage(cause)); } }
+  return <section className="market-page"><div className="eyebrow">SUIVI PERSONNEL</div><h1>Mes entretiens</h1><p className="market-page__intro">Consultez les propositions d’entretien et confirmez votre disponibilité.</p>{error && <p className="workspace-error" role="alert">{error}</p>}{items.length ? <div className="market-list">{items.map((item) => <Card className="market-applicant-card" key={item.id}><div><h2>{item.job_title}</h2><p>{new Date(item.starts_at).toLocaleString("fr-FR")} · {item.duration_minutes} min · {item.format === "online" ? "À distance" : "En présentiel"}</p>{item.meeting_details && <p>{item.meeting_details}</p>}</div><Badge>{item.status}</Badge>{item.status === "proposed" && <Button onClick={() => void respond(item, "confirmed")}>Confirmer l’entretien</Button>}{["proposed", "confirmed"].includes(item.status) && <Button variant="ghost" onClick={() => void respond(item, "cancelled")}>Décliner</Button>}</Card>)}</div> : <Card className="market-panel"><EmptyState title="Aucun entretien proposé" description="Les entretiens proposés par les employeurs apparaîtront ici."/></Card>}</section>;
+}
+
+export function EmployerNotificationsPage({ token }: { token: string }) {
+  const [items, setItems] = useState<EmployerNotification[]>([]); const [preferences, setPreferences] = useState<NotificationPreference[]>([]); const [error, setError] = useState("");
+  useEffect(() => { fetchEmployerNotifications(token).then(setItems).catch((cause: unknown) => setError(errorMessage(cause))); fetchNotificationPreferences(token).then(setPreferences).catch((cause: unknown) => setError(errorMessage(cause))); }, [token]);
+  return <section className="market-page"><div className="eyebrow">ACTIVITÉ</div><h1>Notifications</h1>{error && <p className="workspace-error" role="alert">{error}</p>}<Card className="market-panel"><h2>Préférences</h2>{preferences.map((pref) => <label className="candidate-discovery-consent" key={pref.notification_type}><input type="checkbox" checked={pref.enabled} onChange={(event) => void updateNotificationPreference(token, pref.notification_type, event.target.checked).then((updated) => setPreferences((all) => all.map((item) => item.notification_type === updated.notification_type ? updated : item))).catch((cause: unknown) => setError(errorMessage(cause)))}/>{pref.notification_type}</label>)}</Card><div className="market-list">{items.map((item) => <Card className="market-applicant-card" key={item.id}><div><h2>{item.title}</h2><p>{item.body}</p><small>{new Date(item.created_at).toLocaleString("fr-FR")}</small></div>{!item.read_at && <Button variant="ghost" onClick={() => void markEmployerNotificationRead(token, item.id).then((updated) => setItems((all) => all.map((row) => row.id === updated.id ? updated : row)))}>Marquer comme lue</Button>}</Card>)}</div></section>;
+}
+
+export function EmployerAnalyticsPage({ token }: { token: string }) {
+  const [data, setData] = useState<EmployerAnalytics | null>(null); const [error, setError] = useState("");
+  useEffect(() => { fetchEmployerAnalytics(token).then(setData).catch((cause: unknown) => setError(errorMessage(cause))); }, [token]);
+  return <section className="market-page"><div className="eyebrow">INDICATEURS</div><h1>Statistiques de recrutement</h1>{error && <p className="workspace-error" role="alert">{error}</p>}{data && <><div className="market-metrics employer-dashboard-metrics"><MetricCard label="Candidatures" value={data.total_applications} detail="Toutes les candidatures"/><MetricCard label="Présélectionnées" value={data.shortlisted} detail="Au stade présélection"/><MetricCard label="Entretiens" value={data.interviews} detail="Entretiens engagés"/><MetricCard label="Recrutements" value={data.hires_reported} detail="Déclarés"/></div><Card className="market-panel"><h2>Résultats par offre</h2><div className="market-list">{data.applications_per_offer.map((offer) => <article className="market-org-offer" key={offer.job_offer_id}><h3>{offer.title}</h3><Badge>{offer.applications} candidature{offer.applications === 1 ? "" : "s"}</Badge></article>)}</div><p>Taux candidature vers entretien : {data.application_to_interview_percent ?? "—"}% · entretien vers recrutement : {data.interview_to_hire_percent ?? "—"}%</p>{!data.has_sufficient_data && <p className="market-footnote">Les indicateurs restent préliminaires avant cinq candidatures.</p>}</Card></>}</section>;
+}
+
+export function AdminOrganisationVerificationPage({ token }: { token: string }) {
+  const [requests, setRequests] = useState<OrganisationVerification[]>([]); const [error, setError] = useState(""); const [busy, setBusy] = useState(""); const [notes, setNotes] = useState<Record<string, string>>({});
+  useEffect(() => { fetchPendingOrganisationVerifications(token).then((items) => setRequests(Array.isArray(items) ? items : [])).catch((cause: unknown) => setError(errorMessage(cause))); }, [token]);
+  async function review(item: OrganisationVerification, status: "verified" | "rejected") { setBusy(item.id); setError(""); try { await reviewOrganisationVerification(token, item.id, status, notes[item.id] ?? "Vérification effectuée selon les justificatifs fournis."); setRequests((all) => all.filter((row) => row.id !== item.id)); } catch (cause: unknown) { setError(errorMessage(cause)); } finally { setBusy(""); } }
+  return <section className="market-page"><div className="eyebrow">ADMINISTRATION</div><h1>Vérification des organisations</h1><p className="market-page__intro">Examinez les justificatifs et enregistrez une décision avec une note de suivi.</p>{error && <p className="workspace-error" role="alert">{error}</p>}{requests.length === 0 ? <Card className="market-panel"><EmptyState title="Aucune demande en attente" description="Les demandes reçues apparaîtront ici."/></Card> : <div className="market-list">{requests.map((item) => <Card className="market-panel" key={item.id}><h2>{item.organisation_name || "Organisation"}</h2><p>{item.supporting_information}</p>{item.evidence_url && <p><a href={item.evidence_url} target="_blank" rel="noreferrer">Consulter le justificatif</a></p>}<label className="form-field"><span className="form-field__label">Note de décision (10 caractères minimum)</span><textarea className="input workspace-textarea" minLength={10} value={notes[item.id] ?? ""} onChange={(event) => setNotes((all) => ({ ...all, [item.id]: event.target.value }))}/></label><div className="market-section-heading"><Button disabled={busy === item.id || (notes[item.id] ?? "Vérification effectuée selon les justificatifs fournis.").trim().length < 10} onClick={() => void review(item, "verified")}>Vérifier</Button><Button variant="secondary" disabled={busy === item.id || (notes[item.id] ?? "").trim().length < 10} onClick={() => void review(item, "rejected")}>Rejeter</Button></div></Card>)}</div>}</section>;
+}
+
 function RepeatableOrganisationEntries({ title, fields, value, onChange }: { title: string; fields: { key: string; label: string }[]; value: unknown; onChange: (value: Record<string, string>[]) => void }) {
   const entries = Array.isArray(value) ? value as Record<string, string>[] : [];
   return <section className="organisation-entries"><h3>{title}</h3>{entries.map((entry, index) => <div className="organisation-entry" key={`${title}-${index}`}>
@@ -990,8 +1213,3 @@ function RepeatableOrganisationEntries({ title, fields, value, onChange }: { tit
     <button className="button button--secondary" type="button" onClick={() => onChange(entries.filter((_, row) => row !== index))}>Supprimer</button>
   </div>)}<button className="button button--secondary" type="button" onClick={() => onChange([...entries, Object.fromEntries(fields.map((field) => [field.key, ""]))])}>Ajouter</button></section>;
 }
-
-
-
-
-

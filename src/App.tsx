@@ -8,6 +8,11 @@ import {
   Compass,
   ClipboardCheck,
   GraduationCap,
+  Search,
+  Bookmark,
+  CalendarClock,
+  Bell,
+  ChartNoAxesCombined,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -28,10 +33,17 @@ import {
   EmployerApplicationsPage,
   EmployerDashboardPage,
   EmployerOrganisationPage,
+  EmployerCandidatesPage,
+  EmployerTalentPoolsPage,
+  EmployerMessagesPage,
+  EmployerInterviewsPage,
+  EmployerNotificationsPage,
+  EmployerAnalyticsPage,
+  AdminOrganisationVerificationPage,
+  CandidateInterviewsPage,
   TrainingProviderDashboardPage,
 } from "./marketplace";
 import {
-  CandidateAssistantPage,
   CandidateInterviewPreparationPage,
   CandidateMatchesPage,
   CandidateProfilePage,
@@ -40,13 +52,19 @@ import {
 } from "./workspaces";
 import {
   ApiError,
-  demoAccounts,
   fetchCurrentUser,
+  applyToJob,
   login,
   registerCandidate,
   type AuthUser,
   type Role,
 } from "./auth";
+import { GuestDiscovery } from "./GuestDiscovery";
+import { GuestAuth } from "./GuestAuth";
+import { ProfessionalServicesPage } from "./ProfessionalServices";
+import { MissionsWorkspace } from "./MissionsWorkspace";
+import { ServiceRequestsWorkspace } from "./ServiceRequestsWorkspace";
+import { UnifiedAssistantWorkspace } from "./UnifiedAssistantWorkspace";
 
 const roleConfiguration: Record<
   Role,
@@ -66,6 +84,7 @@ const roleConfiguration: Record<
       { label: "Préparer un entretien", icon: ClipboardCheck },
       { label: "Formations", icon: GraduationCap },
       { label: "Mes candidatures", icon: ClipboardList },
+      { label: "Mes entretiens", icon: CalendarClock },
       { label: "Assistant", icon: MessageCircle },
       { label: "Mon profil", icon: UserRound },
     ],
@@ -78,6 +97,12 @@ const roleConfiguration: Record<
       { label: "Vue d’ensemble", icon: LayoutDashboard },
       { label: "Mes offres", icon: BriefcaseBusiness },
       { label: "Candidatures", icon: UserRound },
+      { label: "Trouver des candidats", icon: Search },
+      { label: "Talents sauvegardés", icon: Bookmark },
+      { label: "Messages", icon: MessageCircle },
+      { label: "Entretiens", icon: CalendarClock },
+      { label: "Notifications", icon: Bell },
+      { label: "Statistiques", icon: ChartNoAxesCombined },
       { label: "Assistant", icon: MessageCircle },
       { label: "Mon organisation", icon: Building2 },
     ],
@@ -86,8 +111,8 @@ const roleConfiguration: Record<
   },
   ministry_admin: {
     label: "Administration",
-    navigation: [
-      { label: "Vue d’ensemble", icon: LayoutDashboard },
+    navigation: [{ label: "Vue d’ensemble", icon: LayoutDashboard },
+      { label: "Vérifications organisations", icon: Building2 },
       { label: "Assistant", icon: MessageCircle },
     ],
     dashboardTitle: "Espace administration",
@@ -120,6 +145,14 @@ export default function App() {
   const [activePage, setActivePage] = useState("Vue d’ensemble");
   const [menuOpen, setMenuOpen] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [guestPage, setGuestPage] = useState<"discovery" | "auth">(() =>
+    window.location.hash === "#guest-auth" || window.location.hash === "#guest-auth-signup"
+      ? "auth"
+      : "discovery",
+  );
+  const [isRegistering, setIsRegistering] = useState(
+    () => window.location.hash === "#guest-auth-signup",
+  );
   const [accessToken, setAccessToken] = useState<string | null>(() =>
     sessionStorage.getItem("mahara-match-token"),
   );
@@ -127,6 +160,38 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(Boolean(accessToken));
   const [authError, setAuthError] = useState("");
   const isDashboard = activePage === "Vue d’ensemble";
+
+  useEffect(() => {
+    function syncGuestRoute() {
+      const authRoute =
+        window.location.hash === "#guest-auth" ||
+        window.location.hash === "#guest-auth-signup";
+      setGuestPage(authRoute ? "auth" : "discovery");
+      setIsRegistering(window.location.hash === "#guest-auth-signup");
+    }
+
+    window.addEventListener("hashchange", syncGuestRoute);
+    return () => window.removeEventListener("hashchange", syncGuestRoute);
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    const syncAssistantRoute = () => {
+      const hash = window.location.hash;
+      const projectMatch = hash.match(/^#assistant\/project\/([^/?#]+)/);
+      if (projectMatch) {
+        if (user.role !== "employer") {
+          window.location.hash = "#assistant";
+        }
+        setActivePage("Assistant");
+      } else if (hash === "#assistant") {
+        setActivePage("Assistant");
+      }
+    };
+    syncAssistantRoute();
+    window.addEventListener("hashchange", syncAssistantRoute);
+    return () => window.removeEventListener("hashchange", syncAssistantRoute);
+  }, [user]);
 
   useEffect(() => {
     if (!accessToken) {
@@ -179,11 +244,29 @@ export default function App() {
       sessionStorage.setItem("mahara-match-token", result.access_token);
       setAccessToken(result.access_token);
       setUser(result.user);
-      setActivePage(
-        isRegistration
-          ? "Mon profil"
-          : roleConfiguration[result.user.role].navigation[0].label,
-      );
+      let destination = isRegistration
+        ? "Mon profil"
+        : roleConfiguration[result.user.role].navigation[0].label;
+      const pendingOfferId = sessionStorage.getItem("mahara-match-return-job");
+      if (pendingOfferId && result.user.role === "candidate") {
+        try {
+          await applyToJob(result.access_token, pendingOfferId);
+          sessionStorage.removeItem("mahara-match-return-job");
+          sessionStorage.removeItem("mahara-match-return-job-title");
+          destination = "Mes candidatures";
+        } catch (error: unknown) {
+          setAuthError(error instanceof ApiError ? error.message : "Impossible de reprendre votre candidature.");
+          destination = "Mes opportunités";
+        }
+      } else if (pendingOfferId && result.user.role !== "candidate") {
+        setAuthError("Connectez-vous avec un compte candidat pour postuler à cette offre.");
+      }
+      if (sessionStorage.getItem("mahara-match-return-service")) {
+        destination = "Mes demandes";
+        sessionStorage.removeItem("mahara-match-return-service");
+        sessionStorage.removeItem("mahara-match-return-service-title");
+      }
+      setActivePage(destination);
     } catch (error: unknown) {
       setAuthError(
         error instanceof ApiError
@@ -212,23 +295,51 @@ export default function App() {
   }
 
   if (!user || !accessToken) {
+    const pendingOfferTitle = sessionStorage.getItem("mahara-match-return-job-title");
+    const pendingServiceTitle = sessionStorage.getItem("mahara-match-return-service-title");
+    const pendingNote = pendingOfferTitle
+      ? `Connectez-vous pour postuler à « ${pendingOfferTitle} »`
+      : pendingServiceTitle
+        ? `Connectez-vous pour demander « ${pendingServiceTitle} »`
+        : "";
     return (
       <div className="app-shell" data-theme={theme}>
-        <LoginPage
-          error={authError}
-          theme={theme}
-          onToggleTheme={() => setTheme(theme === "light" ? "dark" : "light")}
-          onAuthenticate={handleAuthentication}
-        />
+        {guestPage === "discovery" ? (
+          <GuestDiscovery
+            onApply={(offer) => {
+              sessionStorage.setItem("mahara-match-return-job", offer.id);
+              sessionStorage.setItem("mahara-match-return-job-title", offer.title);
+              window.location.hash = "#guest-auth";
+            }}
+            onRequestService={(service) => {
+              sessionStorage.setItem("mahara-match-return-service", service.id);
+              sessionStorage.setItem("mahara-match-return-service-title", service.title);
+              window.location.hash = "#guest-auth";
+            }}
+          />
+        ) : (
+          <GuestAuth
+            error={authError}
+            isRegistering={isRegistering}
+            pendingNote={pendingNote}
+            onModeChange={(registering) => {
+              window.location.hash = registering ? "#guest-auth-signup" : "#guest-auth";
+            }}
+            onAuthenticate={handleAuthentication}
+          />
+        )}
       </div>
     );
   }
 
   const configuration = roleConfiguration[user.role];
   const isCandidate = user.role === "candidate";
+  const assistantRoute = window.location.hash.match(/^#assistant(?:\/project\/([^/?#]+))?/);
+  const assistantProjectId = assistantRoute?.[1];
+
 
   return (
-    <div className="app-shell" data-theme={theme}>
+    <div className={`app-shell ${activePage === "Assistant" ? "app-shell--assistant" : ""}`} data-theme={theme}>
       <aside className={`sidebar ${menuOpen ? "sidebar--open" : ""}`}>
         <div className="brand-row">
           <a
@@ -266,6 +377,7 @@ export default function App() {
               onClick={() => {
                 setActivePage(label);
                 setMenuOpen(false);
+                if (label === "Assistant") window.location.hash = "#assistant";
               }}
             >
               <Icon size={19} strokeWidth={1.8} aria-hidden="true" />
@@ -331,6 +443,9 @@ export default function App() {
             <strong>{activePage}</strong>
           </div>
           <div className="topbar__actions">
+            {user.role !== "candidate" && <button className="professional-profile-link" type="button" onClick={() => setActivePage("Profil professionnel")}>Profil professionnel</button>}
+            <button className="professional-profile-link" type="button" onClick={() => setActivePage("Missions")}>Missions</button>
+            <button className="professional-profile-link" type="button" onClick={() => setActivePage("Mes demandes")}>Mes demandes</button>
             <button
               className="icon-button"
               type="button"
@@ -368,8 +483,17 @@ export default function App() {
                 onNavigate={setActivePage}
               />
             )
+          ) : user.role !== "candidate" && activePage === "Profil professionnel" ? (
+            <ProfessionalServicesPage token={accessToken} />
+          ) : activePage === "Missions" ? (
+            <MissionsWorkspace token={accessToken} />
+          ) : activePage === "Mes demandes" ? (
+            <ServiceRequestsWorkspace token={accessToken} userId={user.id} />
           ) : isCandidate && activePage === "Mon profil" ? (
-            <CandidateProfilePage token={accessToken} />
+            <>
+              <CandidateProfilePage token={accessToken} />
+              <ProfessionalServicesPage token={accessToken} />
+            </>
           ) : isCandidate && activePage === "Mes opportunités" ? (
             <CandidateMatchesPage token={accessToken} onNavigate={setActivePage} />
           ) : isCandidate && activePage === "Mon parcours" ? (
@@ -377,17 +501,33 @@ export default function App() {
           ) : isCandidate && activePage === "Préparer un entretien" ? (
             <CandidateInterviewPreparationPage token={accessToken} onNavigate={setActivePage} />
           ) : activePage === "Assistant" ? (
-            <CandidateAssistantPage token={accessToken} onNavigate={setActivePage} role={user.role} />
+            <UnifiedAssistantWorkspace token={accessToken} role={user.role} projectId={assistantProjectId} onNavigate={setActivePage} />
           ) : isCandidate && activePage === "Formations" ? (
             <CandidateCoursesPage token={accessToken} />
           ) : isCandidate && activePage === "Mes candidatures" ? (
             <CandidateApplicationsPage token={accessToken} />
+          ) : isCandidate && activePage === "Mes entretiens" ? (
+            <CandidateInterviewsPage token={accessToken} />
           ) : user.role === "employer" && activePage === "Mes offres" ? (
             <EmployerOffersPage token={accessToken} />
           ) : user.role === "employer" && activePage === "Candidatures" ? (
-            <EmployerApplicationsPage token={accessToken} />
+            <EmployerApplicationsPage token={accessToken} onNavigate={setActivePage} />
           ) : user.role === "employer" && activePage === "Mon organisation" ? (
             <EmployerOrganisationPage token={accessToken} />
+          ) : user.role === "employer" && activePage === "Trouver des candidats" ? (
+            <EmployerCandidatesPage token={accessToken} />
+          ) : user.role === "employer" && activePage === "Talents sauvegardés" ? (
+            <EmployerTalentPoolsPage token={accessToken} />
+          ) : user.role === "employer" && activePage === "Messages" ? (
+            <EmployerMessagesPage token={accessToken} />
+          ) : user.role === "employer" && activePage === "Entretiens" ? (
+            <EmployerInterviewsPage token={accessToken} />
+          ) : user.role === "employer" && activePage === "Notifications" ? (
+            <EmployerNotificationsPage token={accessToken} />
+          ) : user.role === "employer" && activePage === "Statistiques" ? (
+            <EmployerAnalyticsPage token={accessToken} />
+          ) : user.role === "ministry_admin" && activePage === "Vérifications organisations" ? (
+            <AdminOrganisationVerificationPage token={accessToken} />
           ) : user.role === "training_provider" && activePage === "Catalogue de formations" ? (
             <TrainingProviderDashboardPage token={accessToken} />
           ) : (
@@ -406,114 +546,16 @@ export default function App() {
           )}
         </div>
       </main>
-      <FloatingAssistant token={accessToken} onExpand={() => setActivePage("Assistant")} />
+      {activePage !== "Assistant" && (
+        <FloatingAssistant
+          token={accessToken}
+          onExpand={() => {
+            window.location.hash = "#assistant";
+            setActivePage("Assistant");
+          }}
+        />
+      )}
     </div>
-  );
-}
-
-function LoginPage({
-  error,
-  theme,
-  onToggleTheme,
-  onAuthenticate,
-}: {
-  error: string;
-  theme: "light" | "dark";
-  onToggleTheme: () => void;
-  onAuthenticate: (
-    event: FormEvent<HTMLFormElement>,
-    email: string,
-    password: string,
-    isRegistration: boolean,
-  ) => Promise<void>;
-}) {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [isRegistering, setIsRegistering] = useState(false);
-
-  return (
-    <main className="auth-page">
-      <div className="auth-toolbar">
-        <a className="brand" href="#accueil" aria-label="Mahara Match, accueil">
-          <span className="brand__mark" aria-hidden="true">m</span>
-          <span className="brand__name">mahara<span>match</span></span>
-        </a>
-        <button
-          className="icon-button"
-          type="button"
-          aria-label={theme === "light" ? "Activer le thème sombre" : "Activer le thème clair"}
-          onClick={onToggleTheme}
-        >
-          {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
-        </button>
-      </div>
-      <section className="auth-card" aria-labelledby="login-title">
-        <Badge tone="accent">Mahara Match</Badge>
-        <h1 id="login-title">
-          {isRegistering ? "Créez votre espace candidat" : "Connectez-vous à votre espace"}
-        </h1>
-        <p>
-          {isRegistering
-            ? "Créez votre compte, puis complétez votre profil avec l’assistant."
-            : "Chaque compte accède uniquement aux fonctions de son rôle."}
-        </p>
-        <form
-          className="auth-form"
-          onSubmit={(event) => void onAuthenticate(event, email, password, isRegistering)}
-        >
-          <label>
-            <span>Adresse e-mail</span>
-            <input
-              autoComplete={isRegistering ? "email" : "username"}
-              type="email"
-              required
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-            />
-          </label>
-          <label>
-            <span>Mot de passe</span>
-            <input
-              autoComplete={isRegistering ? "new-password" : "current-password"}
-              type="password"
-              required
-              minLength={isRegistering ? 12 : undefined}
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-            />
-          </label>
-          {isRegistering && (
-            <p className="auth-password-hint">Utilisez au moins 12 caractères.</p>
-          )}
-          {error && <p className="auth-error" role="alert">{error}</p>}
-          <Button type="submit" className="auth-submit">
-            {isRegistering ? "Créer mon compte" : "Se connecter"}
-          </Button>
-        </form>
-        <button
-          className="auth-mode-toggle"
-          type="button"
-          onClick={() => setIsRegistering(!isRegistering)}
-        >
-          {isRegistering ? "J’ai déjà un compte" : "Créer un compte candidat"}
-        </button>
-        {!isRegistering && <div className="demo-account-list">
-          <strong>Comptes de démonstration</strong>
-          <p>Choisissez un compte pour remplir son adresse e-mail. Le mot de passe est fourni lors du seed local.</p>
-          <div className="demo-account-list__buttons">
-            {demoAccounts.map((account) => (
-              <button
-                key={account.role}
-                type="button"
-                onClick={() => setEmail(account.email)}
-              >
-                {account.label}
-              </button>
-            ))}
-          </div>
-        </div>}
-      </section>
-    </main>
   );
 }
 

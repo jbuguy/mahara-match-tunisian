@@ -1,6 +1,8 @@
 import os
 import json
 import logging
+import re
+from datetime import datetime, timezone
 
 from fastapi import (
     BackgroundTasks,
@@ -15,7 +17,7 @@ from fastapi import (
 )
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import ValidationError
-from sqlalchemy import select
+from sqlalchemy import String, cast, delete, func, select, text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -48,6 +50,14 @@ from app.cv_parser import normalize_candidate_profile_from_cv
 from app.database import get_session
 from app.dependencies import get_current_user, require_permission, require_role
 from app.marketplace import router as marketplace_router
+from app.employer import router as employer_router
+from app.professional import router as professional_router
+from app.missions import router as missions_router
+from app.service_requests import router as service_requests_router
+from app.planning import router as planning_router
+from app.locations import router as locations_router
+from app.locations import validate_location
+from app.skill_catalog import recognised_skill_share, sync_candidate_skills, sync_offer_skills
 from app.models import (
     AuditEvent,
     CandidateAssistantSession,
@@ -56,17 +66,22 @@ from app.models import (
     CandidateInterviewTranscription,
     CandidateProfile,
     CourseStatus,
+    CandidateRoadmapGoal,
+    CandidateRoadmapProject,
+    CandidateRoadmapProposal,
     CandidateRoadmapStep,
     CandidateTechnicalAssessment,
     CandidateTechnicalAssessmentAnswer,
     BehavioralAssessmentStatus,
     InterviewTranscriptionStatus,
     JobOffer,
+    JobOfferStatus,
     Organisation,
     OrganisationMembership,
     OrganisationType,
     Role,
     TechnicalAssessmentStatus,
+    TalentPoolMember,
     TrainingCourse,
     User,
 )
@@ -87,8 +102,15 @@ from app.schemas import (
     CandidateInterviewRoleResponse,
     CandidateTechnicalAssessmentResponse,
     CandidateRoadmapResponse,
+    CandidateRoadmapGoalUpdate,
     CandidateRoadmapStepResponse,
     CandidateRoadmapStepUpdate,
+    CandidateRoadmapProjectCreate,
+    CandidateRoadmapProjectResponse,
+    CandidateRoadmapProjectStatusUpdate,
+    CandidateRoadmapAssessmentResponse,
+    CandidateRoadmapProposalDecision,
+    CandidateRoadmapProposalResponse,
     CandidateProfileDraft,
     CandidateProfileResponse,
     CandidateProfileUpdate,
@@ -100,6 +122,8 @@ from app.schemas import (
     JobMatchResponse,
     JobOfferCreate,
     JobOfferResponse,
+    PublicJobOfferPage,
+    JobOfferStatusUpdate,
     LoginRequest,
     LoginResponse,
     OrganisationProfileResponse,
@@ -135,7 +159,82 @@ app = FastAPI(
     description="API for the Mahara Match employment support platform.",
     version="0.1.0",
 )
+
+
+@app.get("/data-quality/skills-recognition", tags=["data quality"])
+def skill_recognition_quality(session: Session = Depends(get_session)) -> dict[str, float]:
+    return {"recognised_skill_share": recognised_skill_share(session)}
 app.include_router(marketplace_router)
+app.include_router(employer_router)
+app.include_router(professional_router)
+app.include_router(missions_router)
+app.include_router(service_requests_router)
+app.include_router(planning_router)
+app.include_router(locations_router)
+
+
+@app.get("/public/jobs", response_model=PublicJobOfferPage, tags=["public discovery"])
+def search_public_jobs(
+    q: str | None = Query(default=None, min_length=1, max_length=160),
+    location: str | None = Query(default=None, min_length=1, max_length=120),
+    employment_type: str | None = Query(default=None, min_length=1, max_length=40),
+    workplace_arrangement: str | None = Query(default=None, min_length=1, max_length=20),
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    session: Session = Depends(get_session),
+) -> PublicJobOfferPage:
+    """Search explicitly published jobs without exposing employer or applicant records."""
+    now = datetime.now(timezone.utc)
+    filters = [JobOffer.status == JobOfferStatus.PUBLISHED]
+    filters.append(
+        (JobOffer.application_deadline.is_(None))
+        | (JobOffer.application_deadline >= now.date())
+    )
+    if q:
+        pattern = f"%{q.strip()}%"
+        filters.append(
+            JobOffer.title.ilike(pattern)
+            | JobOffer.description.ilike(pattern)
+            | JobOffer.location.ilike(pattern)
+            | cast(JobOffer.required_skills, String).ilike(pattern)
+            | cast(JobOffer.preferred_skills, String).ilike(pattern)
+        )
+    if location:
+        filters.append(JobOffer.location.ilike(f"%{location.strip()}%"))
+    if employment_type:
+        filters.append(JobOffer.employment_type == employment_type.strip())
+    if workplace_arrangement:
+        filters.append(JobOffer.workplace_arrangement == workplace_arrangement.strip())
+
+    total = session.scalar(select(func.count()).select_from(JobOffer).where(*filters)) or 0
+    offers = session.scalars(
+        select(JobOffer)
+        .where(*filters)
+        .order_by(JobOffer.published_at.desc(), JobOffer.created_at.desc(), JobOffer.id)
+        .offset(offset)
+        .limit(limit)
+    )
+    return PublicJobOfferPage(
+        items=[JobOfferResponse.model_validate(offer) for offer in offers],
+        total=total,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@app.get("/public/jobs/{offer_id}", response_model=JobOfferResponse, tags=["public discovery"])
+def get_public_job(offer_id: str, session: Session = Depends(get_session)) -> JobOfferResponse:
+    offer = session.scalar(
+        select(JobOffer).where(
+            JobOffer.id == offer_id,
+            JobOffer.status == JobOfferStatus.PUBLISHED,
+            (JobOffer.application_deadline.is_(None))
+            | (JobOffer.application_deadline >= datetime.now(timezone.utc).date()),
+        )
+    )
+    if offer is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job offer not found.")
+    return JobOfferResponse.model_validate(offer)
 
 allowed_origins = [
     origin.strip()
@@ -185,6 +284,7 @@ def get_employer_organisation(
         **{field: getattr(organisation, field) for field in OrganisationProfileUpdate.model_fields},
         "id": organisation.id,
         "organisation_type": organisation.organisation_type.value,
+        "verification_status": organisation.verification_status.value,
     })
 
 
@@ -228,6 +328,7 @@ def create_employer_organisation(
         **{field: getattr(organisation, field) for field in OrganisationProfileUpdate.model_fields},
         "id": organisation.id,
         "organisation_type": organisation.organisation_type.value,
+        "verification_status": organisation.verification_status.value,
     })
 
 
@@ -308,12 +409,27 @@ def update_employer_organisation(
         **{field: getattr(organisation, field) for field in OrganisationProfileUpdate.model_fields},
         "id": organisation.id,
         "organisation_type": organisation.organisation_type.value,
+        "verification_status": organisation.verification_status.value,
     })
 
 
 @app.get("/health/live", tags=["health"])
 def liveness() -> dict[str, str]:
     """Report that the API process is responsive; does not imply database readiness."""
+    return {"status": "ok"}
+
+
+@app.get("/health/ready", tags=["health"])
+def readiness(session: Session = Depends(get_session)) -> dict[str, str]:
+    """Report readiness only when the canonical database can execute a query."""
+    try:
+        session.execute(text("SELECT 1"))
+    except SQLAlchemyError as exc:
+        logger.warning("Readiness check failed: database query unavailable (%s).", type(exc).__name__)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Required service unavailable.",
+        ) from exc
     return {"status": "ok"}
 
 
@@ -355,6 +471,10 @@ def login(
         actor=user,
         resource_type="authentication",
     )
+    if user.role == Role.CANDIDATE:
+        profile = session.get(CandidateProfile, user.id)
+        if profile is not None:
+            profile.last_active_at = datetime.now(timezone.utc)
     session.commit()
     return LoginResponse(
         access_token=access_token,
@@ -450,6 +570,8 @@ def candidate_profile(
         experience=profile.experience if profile else None,
         education_entries=profile.education_entries if profile else [],
         experience_entries=profile.experience_entries if profile else [],
+        professional_headline=profile.professional_headline if profile else None,
+        employer_discoverable=profile.employer_discoverable if profile else False,
         updated_at=profile.updated_at if profile else None,
     )
 
@@ -464,6 +586,7 @@ def update_candidate_profile(
     user: User = Depends(require_permission(Permission.PROFILE_WRITE_OWN)),
     session: Session = Depends(get_session),
 ) -> CandidateProfileResponse:
+    validate_location(session, request.governorate_code, request.municipality_code)
     profile = session.get(CandidateProfile, user.id)
     if profile is None:
         profile = CandidateProfile(user_id=user.id, skills=[])
@@ -473,6 +596,10 @@ def update_candidate_profile(
         if field in {"education_entries", "experience_entries"}:
             value = [entry.model_dump() if hasattr(entry, "model_dump") else entry for entry in value]
         setattr(profile, field, value)
+    if "skills" in updates:
+        profile.skills = sync_candidate_skills(session, user.id, profile.skills)
+    if updates.get("employer_discoverable") is False:
+        session.execute(delete(TalentPoolMember).where(TalentPoolMember.candidate_id == user.id))
     if "education_entries" in updates:
         profile.education = "\n".join(
             " — ".join(part for part in (entry.get("degree"), entry.get("institution"), entry.get("field_of_study")) if part)
@@ -491,6 +618,13 @@ def update_candidate_profile(
         resource_id=user.id,
         details={"fields": sorted(updates)},
     )
+    profile.last_active_at = datetime.now(timezone.utc)
+    if (
+        profile.profile_completed_at is None
+        and profile.full_name
+        and profile.governorate_code
+    ):
+        profile.profile_completed_at = datetime.now(timezone.utc)
     session.commit()
     session.refresh(profile)
     return CandidateProfileResponse(
@@ -499,10 +633,18 @@ def update_candidate_profile(
         full_name=profile.full_name,
         phone=profile.phone,
         location=profile.location,
+        birth_year=profile.birth_year,
+        governorate_code=profile.governorate_code,
+        municipality_code=profile.municipality_code,
+        street_address=profile.street_address,
         education=profile.education,
         experience=profile.experience,
         education_entries=profile.education_entries,
         experience_entries=profile.experience_entries,
+        professional_headline=profile.professional_headline,
+        employer_discoverable=profile.employer_discoverable,
+        profile_completed_at=profile.profile_completed_at,
+        last_active_at=profile.last_active_at,
         updated_at=profile.updated_at,
     )
 
@@ -647,6 +789,98 @@ def rename_candidate_assistant_session(
     return CandidateAssistantSessionResponse.model_validate(chat_session)
 
 
+def _draft_roadmap_proposal(
+    session: Session,
+    user: User,
+    message: str,
+) -> CandidateRoadmapProposal | None:
+    if user.role != Role.CANDIDATE or session.scalar(
+        select(CandidateRoadmapProposal.id).where(
+            CandidateRoadmapProposal.user_id == user.id,
+            CandidateRoadmapProposal.status == "pending",
+        )
+    ) is not None:
+        return None
+
+    clean_message = re.sub(r"\s+", " ", message).strip()
+    folded = clean_message.casefold()
+    skill_prefixes = (
+        "i want to learn ", "i'd like to learn ", "i would like to learn ",
+        "i want to improve ", "i want to add skill ", "je veux apprendre ",
+        "je souhaite apprendre ", "je voudrais apprendre ", "je veux améliorer ",
+        "nheb net3allem ",
+    )
+    for prefix in skill_prefixes:
+        if folded.startswith(prefix):
+            requested_skills = [
+                value.strip(" .!?;:")
+                for value in re.split(r"\s*(?:,|\band\b|\bet\b|&)\s*", clean_message[len(prefix):], flags=re.IGNORECASE)
+                if value.strip(" .!?;:")
+            ]
+            if not requested_skills or len(requested_skills) > 30 or any(len(skill) > 60 for skill in requested_skills):
+                return None
+            goal = session.get(CandidateRoadmapGoal, user.id)
+            skills = list(goal.skills) if goal and goal.goal_type == "skill_exploration" else []
+            seen = {existing.casefold() for existing in skills}
+            additions = []
+            for skill in requested_skills:
+                if skill.casefold() not in seen:
+                    additions.append(skill)
+                    seen.add(skill.casefold())
+            if not additions:
+                return None
+            skills.extend(additions)
+            previous = goal.title if goal is not None else None
+            explanation = (
+                f"You asked to work on {', '.join(additions)}. This proposal creates a skill-exploration goal"
+                + (f" in place of “{previous}”." if previous else ".")
+            )
+            proposal = CandidateRoadmapProposal(
+                user_id=user.id,
+                goal_type="skill_exploration",
+                target_offer_id=None,
+                title=f"Explore {', '.join(skills[:3])}"[:160],
+                skills=skills[:30],
+                explanation=explanation[:1000],
+            )
+            session.add(proposal)
+            session.flush()
+            return proposal
+
+    role_prefixes = (
+        "i want to become ", "i'd like to become ", "i would like to become ",
+        "je veux devenir ", "je souhaite devenir ", "je voudrais devenir ",
+    )
+    for prefix in role_prefixes:
+        if folded.startswith(prefix):
+            requested_title = clean_message[len(prefix):].strip(" .!?;:")
+            if not requested_title:
+                return None
+            offer = next((
+                item for item in session.scalars(
+                    select(JobOffer).where(JobOffer.status == JobOfferStatus.PUBLISHED)
+                )
+                if item.title.casefold() == requested_title.casefold()
+            ), None)
+            if offer is None:
+                return None
+            goal = session.get(CandidateRoadmapGoal, user.id)
+            if goal and goal.goal_type == "target_job" and goal.target_offer_id == offer.id:
+                return None
+            proposal = CandidateRoadmapProposal(
+                user_id=user.id,
+                goal_type="target_job",
+                target_offer_id=offer.id,
+                title=offer.title,
+                skills=[],
+                explanation=f"You asked to work toward this role. It matches the published offer “{offer.title}”.",
+            )
+            session.add(proposal)
+            session.flush()
+            return proposal
+    return None
+
+
 @app.post(
     "/candidate/assistant/sessions/{session_id}/messages",
     response_model=CandidateAssistantSessionResponse,
@@ -764,7 +998,11 @@ async def send_candidate_assistant_session_message(
         "local data is missing or stale, and cite retrieved evidence using its "
         "[S#] source marker. When referring to an application job offer, use its "
         "exact database ID and title. Historical training specialties do not "
-        "prove a course is currently available."
+        "prove a course is currently available. For candidate career-development requests, "
+        "explain roadmap information from verified application records and distinguish it "
+        "from suggestions. Never claim that a roadmap changed because of this chat. A "
+        "proposed goal is only a proposal until the candidate explicitly accepts it in "
+        "the roadmap panel; do not imply that approval happened."
         f"{employer_context}"
     )
     model_messages = [
@@ -788,6 +1026,21 @@ async def send_candidate_assistant_session_message(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="The assistant returned an invalid message. Please retry.",
         ) from error
+
+    proposal = _draft_roadmap_proposal(session, user, request.content)
+    if proposal is not None:
+        french_request = request.content.casefold().startswith((
+            "je veux", "je souhaite", "je voudrais",
+        ))
+        proposal_notice = (
+            "J’ai préparé une proposition pour votre parcours. Consultez Mon parcours; elle ne sera appliquée qu’après votre accord."
+            if french_request
+            else "I prepared a roadmap-change proposal. Review it in My Roadmap; it will apply only if you accept it."
+        )
+        reply = AssistantMessage(
+            role="assistant",
+            content=reply[: 3000 - len(proposal_notice) - 2].rstrip() + "\n\n" + proposal_notice,
+        ).content
 
     stored_messages = [
         *chat_session.messages,
@@ -1009,7 +1262,11 @@ def candidate_matches(
     candidate_skills = {
         skill.casefold(): skill for skill in (profile.skills if profile else [])
     }
-    offers = session.scalars(select(JobOffer).order_by(JobOffer.created_at.desc()))
+    offers = session.scalars(
+        select(JobOffer)
+        .where(JobOffer.status == JobOfferStatus.PUBLISHED)
+        .order_by(JobOffer.created_at.desc())
+    )
     matches: list[JobMatchResponse] = []
     for offer in offers:
         matched = [
@@ -1039,7 +1296,8 @@ def candidate_roadmap(
     session: Session = Depends(get_session),
 ) -> CandidateRoadmapResponse:
     profile = session.get(CandidateProfile, user.id)
-    offers = list(session.scalars(select(JobOffer)))
+    goal = session.get(CandidateRoadmapGoal, user.id)
+    offers, target_skills = _roadmap_inputs(goal, session)
     saved_steps = session.scalars(
         select(CandidateRoadmapStep).where(CandidateRoadmapStep.user_id == user.id)
     )
@@ -1048,6 +1306,7 @@ def candidate_roadmap(
         offers,
         profile.skills if profile else [],
         completed_by_skill,
+        target_skills=target_skills,
     )
     record_sensitive_read(
         session,
@@ -1056,7 +1315,62 @@ def candidate_roadmap(
         resource_id=user.id,
     )
     session.commit()
-    return roadmap_response(steps)
+    return roadmap_response(steps, goal)
+
+
+@app.put(
+    "/candidate/roadmap/goal",
+    response_model=CandidateRoadmapResponse,
+    tags=["candidate"],
+)
+def update_candidate_roadmap_goal(
+    request: CandidateRoadmapGoalUpdate,
+    user: User = Depends(require_permission(Permission.ROADMAP_MANAGE_OWN)),
+    session: Session = Depends(get_session),
+) -> CandidateRoadmapResponse:
+    offer = None
+    if request.goal_type == "target_job":
+        offer = session.scalar(
+            select(JobOffer).where(
+                JobOffer.id == request.target_offer_id,
+                JobOffer.status == JobOfferStatus.PUBLISHED,
+            )
+        )
+        if offer is None:
+            raise HTTPException(status_code=404, detail="Published target job not found.")
+
+    goal = session.get(CandidateRoadmapGoal, user.id)
+    if goal is None:
+        goal = CandidateRoadmapGoal(user_id=user.id)
+        session.add(goal)
+    goal.goal_type = request.goal_type
+    goal.title = request.title
+    goal.target_offer_id = request.target_offer_id
+    goal.skills = request.skills
+    record_audit_event(
+        session,
+        action="candidate.roadmap.goal.updated",
+        actor=user,
+        resource_type="candidate_roadmap_goal",
+        resource_id=user.id,
+        details={"goal_type": request.goal_type},
+    )
+    session.flush()
+    profile = session.get(CandidateProfile, user.id)
+    offers, target_skills = _roadmap_inputs(goal, session)
+    saved_steps = list(
+        session.scalars(
+            select(CandidateRoadmapStep).where(CandidateRoadmapStep.user_id == user.id)
+        )
+    )
+    steps = build_career_roadmap(
+        offers,
+        profile.skills if profile else [],
+        {step.skill_key: step.completed for step in saved_steps},
+        target_skills=target_skills,
+    )
+    session.commit()
+    return roadmap_response(steps, goal)
 
 
 @app.put(
@@ -1070,7 +1384,8 @@ def update_candidate_roadmap_step(
     session: Session = Depends(get_session),
 ) -> CandidateRoadmapResponse:
     profile = session.get(CandidateProfile, user.id)
-    offers = list(session.scalars(select(JobOffer)))
+    goal = session.get(CandidateRoadmapGoal, user.id)
+    offers, target_skills = _roadmap_inputs(goal, session)
     saved_steps = list(
         session.scalars(
             select(CandidateRoadmapStep).where(CandidateRoadmapStep.user_id == user.id)
@@ -1081,6 +1396,7 @@ def update_candidate_roadmap_step(
         offers,
         profile.skills if profile else [],
         completed_by_skill,
+        target_skills=target_skills,
     )
     skill_key = request.skill.casefold()
     if not any(step.skill_key == skill_key for step in roadmap):
@@ -1122,11 +1438,255 @@ def update_candidate_roadmap_step(
         offers,
         profile.skills if profile else [],
         completed_by_skill,
+        target_skills=target_skills,
     )
-    return roadmap_response(updated_steps)
+    return roadmap_response(updated_steps, goal)
 
 
-def roadmap_response(steps: list[RoadmapStep]) -> CandidateRoadmapResponse:
+@app.get(
+    "/candidate/roadmap/projects",
+    response_model=list[CandidateRoadmapProjectResponse],
+    tags=["candidate"],
+)
+def list_candidate_roadmap_projects(
+    user: User = Depends(require_permission(Permission.ROADMAP_MANAGE_OWN)),
+    session: Session = Depends(get_session),
+) -> list[CandidateRoadmapProjectResponse]:
+    projects = session.scalars(
+        select(CandidateRoadmapProject)
+        .where(CandidateRoadmapProject.user_id == user.id)
+        .order_by(CandidateRoadmapProject.created_at.desc())
+    )
+    return [CandidateRoadmapProjectResponse.model_validate(project) for project in projects]
+
+
+@app.post(
+    "/candidate/roadmap/projects",
+    response_model=CandidateRoadmapProjectResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=["candidate"],
+)
+def create_candidate_roadmap_project(
+    request: CandidateRoadmapProjectCreate,
+    user: User = Depends(require_permission(Permission.ROADMAP_MANAGE_OWN)),
+    session: Session = Depends(get_session),
+) -> CandidateRoadmapProjectResponse:
+    profile = session.get(CandidateProfile, user.id)
+    goal = session.get(CandidateRoadmapGoal, user.id)
+    offers, target_skills = _roadmap_inputs(goal, session)
+    saved_steps = session.scalars(
+        select(CandidateRoadmapStep).where(CandidateRoadmapStep.user_id == user.id)
+    )
+    steps = build_career_roadmap(
+        offers,
+        profile.skills if profile else [],
+        {step.skill_key: step.completed for step in saved_steps},
+        target_skills=target_skills,
+    )
+    skill_key = request.skill.casefold()
+    roadmap_step = next((step for step in steps if step.skill_key == skill_key), None)
+    if roadmap_step is None:
+        raise HTTPException(status_code=404, detail="This skill is not part of your current roadmap.")
+    project = CandidateRoadmapProject(
+        user_id=user.id,
+        skill_key=skill_key,
+        skill=roadmap_step.skill,
+        title=request.title,
+        description=request.description,
+    )
+    session.add(project)
+    record_audit_event(
+        session,
+        action="candidate.roadmap.project.created",
+        actor=user,
+        resource_type="candidate_roadmap_project",
+        details={"skill_key": skill_key},
+    )
+    session.commit()
+    session.refresh(project)
+    return CandidateRoadmapProjectResponse.model_validate(project)
+
+
+@app.patch(
+    "/candidate/roadmap/projects/{project_id}",
+    response_model=CandidateRoadmapProjectResponse,
+    tags=["candidate"],
+)
+def update_candidate_roadmap_project_status(
+    project_id: str,
+    request: CandidateRoadmapProjectStatusUpdate,
+    user: User = Depends(require_permission(Permission.ROADMAP_MANAGE_OWN)),
+    session: Session = Depends(get_session),
+) -> CandidateRoadmapProjectResponse:
+    project = session.scalar(
+        select(CandidateRoadmapProject).where(
+            CandidateRoadmapProject.id == project_id,
+            CandidateRoadmapProject.user_id == user.id,
+        )
+    )
+    if project is None:
+        raise HTTPException(status_code=404, detail="This project could not be found.")
+    project.status = request.status
+    record_audit_event(
+        session,
+        action="candidate.roadmap.project.status.updated",
+        actor=user,
+        resource_type="candidate_roadmap_project",
+        resource_id=project.id,
+        details={"status": request.status},
+    )
+    session.commit()
+    session.refresh(project)
+    return CandidateRoadmapProjectResponse.model_validate(project)
+
+
+@app.get(
+    "/candidate/roadmap/assessments",
+    response_model=list[CandidateRoadmapAssessmentResponse],
+    tags=["candidate"],
+)
+def list_candidate_roadmap_assessments(
+    user: User = Depends(require_permission(Permission.ROADMAP_MANAGE_OWN)),
+    session: Session = Depends(get_session),
+) -> list[CandidateRoadmapAssessmentResponse]:
+    items: list[CandidateRoadmapAssessmentResponse] = []
+    technical = session.scalars(
+        select(CandidateTechnicalAssessment).where(
+            CandidateTechnicalAssessment.candidate_id == user.id
+        )
+    )
+    for assessment in technical:
+        answers = list(session.scalars(
+            select(CandidateTechnicalAssessmentAnswer).where(
+                CandidateTechnicalAssessmentAnswer.assessment_id == assessment.id
+            )
+        ))
+        items.append(CandidateRoadmapAssessmentResponse(
+            assessment_type="technical",
+            assessment_id=assessment.id,
+            skill=assessment.skill,
+            status=assessment.status.value,
+            score=sum(int(answer.evaluation.get("score", 0)) for answer in answers),
+            max_score=sum(int(answer.evaluation.get("max_score", 0)) for answer in answers),
+        ))
+    behavioral = session.scalars(
+        select(CandidateBehavioralAssessment).where(
+            CandidateBehavioralAssessment.candidate_id == user.id
+        )
+    )
+    for assessment in behavioral:
+        answers = list(session.scalars(
+            select(CandidateBehavioralAssessmentAnswer).where(
+                CandidateBehavioralAssessmentAnswer.assessment_id == assessment.id
+            )
+        ))
+        items.append(CandidateRoadmapAssessmentResponse(
+            assessment_type="behavioral",
+            assessment_id=assessment.id,
+            skill=assessment.competency_name,
+            status=assessment.status.value,
+            score=sum(int(answer.evaluation.get("score", 0)) for answer in answers),
+            max_score=sum(int(answer.evaluation.get("max_score", 0)) for answer in answers),
+        ))
+    return items
+
+
+@app.get(
+    "/candidate/roadmap/proposals",
+    response_model=list[CandidateRoadmapProposalResponse],
+    tags=["candidate"],
+)
+def list_candidate_roadmap_proposals(
+    user: User = Depends(require_permission(Permission.ROADMAP_MANAGE_OWN)),
+    session: Session = Depends(get_session),
+) -> list[CandidateRoadmapProposalResponse]:
+    proposals = session.scalars(
+        select(CandidateRoadmapProposal)
+        .where(
+            CandidateRoadmapProposal.user_id == user.id,
+            CandidateRoadmapProposal.status == "pending",
+        )
+        .order_by(CandidateRoadmapProposal.created_at.desc())
+    )
+    return [CandidateRoadmapProposalResponse.model_validate(item) for item in proposals]
+
+
+@app.patch(
+    "/candidate/roadmap/proposals/{proposal_id}",
+    response_model=CandidateRoadmapProposalResponse,
+    tags=["candidate"],
+)
+def decide_candidate_roadmap_proposal(
+    proposal_id: str,
+    request: CandidateRoadmapProposalDecision,
+    user: User = Depends(require_permission(Permission.ROADMAP_MANAGE_OWN)),
+    session: Session = Depends(get_session),
+) -> CandidateRoadmapProposalResponse:
+    proposal = session.scalar(
+        select(CandidateRoadmapProposal).where(
+            CandidateRoadmapProposal.id == proposal_id,
+            CandidateRoadmapProposal.user_id == user.id,
+        )
+    )
+    if proposal is None:
+        raise HTTPException(status_code=404, detail="This roadmap proposal could not be found.")
+    if proposal.status != "pending":
+        raise HTTPException(status_code=409, detail="This roadmap proposal has already been decided.")
+    if request.decision == "accepted":
+        if proposal.goal_type == "target_job":
+            offer = session.scalar(
+                select(JobOffer).where(
+                    JobOffer.id == proposal.target_offer_id,
+                    JobOffer.status == JobOfferStatus.PUBLISHED,
+                )
+            )
+            if offer is None:
+                raise HTTPException(status_code=409, detail="The proposed job offer is no longer published.")
+        goal = session.get(CandidateRoadmapGoal, user.id)
+        if goal is None:
+            goal = CandidateRoadmapGoal(user_id=user.id)
+            session.add(goal)
+        goal.goal_type = proposal.goal_type
+        goal.target_offer_id = proposal.target_offer_id
+        goal.title = proposal.title
+        goal.skills = proposal.skills
+    proposal.status = request.decision
+    record_audit_event(
+        session,
+        action=f"candidate.roadmap.proposal.{request.decision}",
+        actor=user,
+        resource_type="candidate_roadmap_proposal",
+        resource_id=proposal.id,
+        details={"goal_type": proposal.goal_type},
+    )
+    session.commit()
+    session.refresh(proposal)
+    return CandidateRoadmapProposalResponse.model_validate(proposal)
+
+
+def _roadmap_inputs(
+    goal: CandidateRoadmapGoal | None,
+    session: Session,
+) -> tuple[list[JobOffer], list[str]]:
+    if goal is not None and goal.goal_type == "skill_exploration":
+        return [], list(goal.skills)
+    if goal is not None and goal.goal_type == "target_job" and goal.target_offer_id:
+        offer = session.scalar(
+            select(JobOffer).where(
+                JobOffer.id == goal.target_offer_id,
+                JobOffer.status == JobOfferStatus.PUBLISHED,
+            )
+        )
+        return ([offer] if offer is not None else []), []
+    return list(
+        session.scalars(select(JobOffer).where(JobOffer.status == JobOfferStatus.PUBLISHED))
+    ), []
+
+
+def roadmap_response(
+    steps: list[RoadmapStep],
+    goal: CandidateRoadmapGoal | None = None,
+) -> CandidateRoadmapResponse:
     responses = [
         CandidateRoadmapStepResponse(
             skill=step.skill,
@@ -1144,6 +1704,10 @@ def roadmap_response(steps: list[RoadmapStep]) -> CandidateRoadmapResponse:
         completed_steps=completed_steps,
         total_steps=total_steps,
         progress_percent=round(100 * completed_steps / total_steps) if total_steps else 0,
+        goal_type=goal.goal_type if goal is not None else None,
+        goal_title=goal.title if goal is not None else None,
+        target_offer_id=goal.target_offer_id if goal is not None else None,
+        selected_skills=goal.skills if goal is not None else [],
     )
 
 
@@ -1157,7 +1721,9 @@ def candidate_interview_prep_roles(
     session: Session = Depends(get_session),
 ) -> list[CandidateInterviewRoleResponse]:
     offers = session.scalars(
-        select(JobOffer).order_by(JobOffer.title, JobOffer.id)
+        select(JobOffer)
+        .where(JobOffer.status == JobOfferStatus.PUBLISHED)
+        .order_by(JobOffer.title, JobOffer.id)
     )
     return [
         CandidateInterviewRoleResponse(
@@ -1182,7 +1748,7 @@ def candidate_interview_preparation_profile(
     session: Session = Depends(get_session),
 ) -> CandidateInterviewPreparationProfileResponse:
     offer = session.get(JobOffer, offer_id)
-    if offer is None:
+    if offer is None or offer.status != JobOfferStatus.PUBLISHED:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="This job offer could not be found.",
@@ -1200,6 +1766,8 @@ def candidate_interview_preparation_profile(
             experience=profile.experience,
             education_entries=profile.education_entries,
             experience_entries=profile.experience_entries,
+            professional_headline=profile.professional_headline,
+            employer_discoverable=profile.employer_discoverable,
             updated_at=profile.updated_at,
         )
         if profile else None
@@ -1249,7 +1817,7 @@ def start_candidate_technical_assessment(
     session: Session = Depends(get_session),
 ) -> CandidateTechnicalAssessmentResponse:
     offer = session.get(JobOffer, request.offer_id)
-    if offer is None:
+    if offer is None or offer.status != JobOfferStatus.PUBLISHED:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="This job offer could not be found.",
@@ -1505,7 +2073,7 @@ def start_candidate_behavioral_assessment(
     session: Session = Depends(get_session),
 ) -> CandidateBehavioralAssessmentResponse:
     offer = session.get(JobOffer, request.offer_id)
-    if offer is None:
+    if offer is None or offer.status != JobOfferStatus.PUBLISHED:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="This job offer could not be found.",
@@ -1888,15 +2456,25 @@ def create_employer_offer(
     user: User = Depends(require_permission(Permission.OFFER_MANAGE_ORGANISATION)),
     session: Session = Depends(get_session),
 ) -> JobOfferResponse:
+    validate_location(session, request.governorate_code, request.municipality_code)
     offer = JobOffer(
         employer_id=user.id,
         title=request.title,
         description=request.description,
-        location=request.location,
+        location=request.street_address or "",
+        governorate_code=request.governorate_code,
+        municipality_code=request.municipality_code,
+        street_address=request.street_address,
         required_skills=request.required_skills,
+        preferred_skills=request.preferred_skills,
+        status=request.status,
+        published_at=datetime.now(timezone.utc) if request.status == JobOfferStatus.PUBLISHED else None,
     )
     session.add(offer)
     session.flush()
+    offer.required_skills, offer.preferred_skills = sync_offer_skills(
+        session, offer.id, offer.required_skills, offer.preferred_skills
+    )
     record_audit_event(
         session,
         action="employer.job_offer.created",
@@ -1904,6 +2482,52 @@ def create_employer_offer(
         resource_type="job_offer",
         resource_id=offer.id,
         details={"required_skill_count": len(request.required_skills)},
+    )
+    session.commit()
+    session.refresh(offer)
+    return JobOfferResponse.model_validate(offer)
+
+
+@app.patch(
+    "/employer/offers/{offer_id}/status",
+    response_model=JobOfferResponse,
+    tags=["employer"],
+)
+def update_employer_offer_status(
+    offer_id: str,
+    request: JobOfferStatusUpdate,
+    user: User = Depends(require_permission(Permission.OFFER_MANAGE_ORGANISATION)),
+    session: Session = Depends(get_session),
+) -> JobOfferResponse:
+    offer = session.scalar(
+        select(JobOffer).where(JobOffer.id == offer_id, JobOffer.employer_id == user.id)
+    )
+    if offer is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job offer not found.")
+    transitions = {
+        JobOfferStatus.DRAFT: {JobOfferStatus.PUBLISHED, JobOfferStatus.ARCHIVED},
+        JobOfferStatus.PUBLISHED: {JobOfferStatus.PAUSED, JobOfferStatus.CLOSED},
+        JobOfferStatus.PAUSED: {JobOfferStatus.PUBLISHED, JobOfferStatus.CLOSED, JobOfferStatus.ARCHIVED},
+        JobOfferStatus.CLOSED: {JobOfferStatus.ARCHIVED},
+        JobOfferStatus.EXPIRED: {JobOfferStatus.ARCHIVED},
+        JobOfferStatus.ARCHIVED: set(),
+    }
+    previous = offer.status
+    if request.status not in transitions[previous]:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Cannot change an offer from {previous.value} to {request.status.value}.",
+        )
+    offer.status = request.status
+    if request.status == JobOfferStatus.PUBLISHED:
+        offer.published_at = datetime.now(timezone.utc)
+    record_audit_event(
+        session,
+        action="employer.job_offer.status_updated",
+        actor=user,
+        resource_type="job_offer",
+        resource_id=offer.id,
+        details={"from": previous.value, "to": request.status.value},
     )
     session.commit()
     session.refresh(offer)

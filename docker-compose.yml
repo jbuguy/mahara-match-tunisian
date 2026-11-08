@@ -23,13 +23,13 @@ services:
       retries: 5
 
   embeddings:
-    image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.7
+    image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.8
     container_name: mahara_match_embeddings
     restart: unless-stopped
     profiles: ["rag"]
     command:
       - --model-id
-      - sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+      - BAAI/bge-m3
     ports:
       - "8080:80"
     volumes:
@@ -37,6 +37,42 @@ services:
     environment:
       HF_HOME: /data
 
+  whisper:
+    image: onerahmet/openai-whisper-asr-webservice:latest
+    container_name: mahara_match_whisper
+    restart: unless-stopped
+    profiles: ["voice"]
+    command:
+      - --model-name
+      - large-v3-turbo
+      - --port
+      - "9000"
+    ports:
+      - "9000:9000"
+    volumes:
+      - whisper_cache:/root/.cache/whisper
+    environment:
+      HF_HOME: /root/.cache/huggingface
+
+  tts:
+    image: ghcr.io/coqui-ai/tts:latest
+    container_name: mahara_match_tts
+    restart: unless-stopped
+    profiles: ["voice"]
+    command:
+      - --model_name
+      - tts_models/multilingual/multi-dataset/xtts_v2
+      - --port
+      - "5000"
+    ports:
+      - "5000:5000"
+    volumes:
+      - tts_cache:/root/.local/share/tts
+    environment:
+      HF_HOME: /root/.cache/huggingface
+
 volumes:
   postgres_data:
   huggingface_cache:
+  whisper_cache:
+  tts_cache:

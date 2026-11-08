@@ -1,0 +1,127 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`GovernorateMap > renders the accessible controls snapshot 1`] = `
+<div>
+  <section
+    class="governorate-map"
+  >
+    <div
+      aria-label="Indicateur cartographique"
+      class="governorate-map-switcher"
+      role="group"
+    >
+      <button
+        aria-pressed="false"
+        type="button"
+      >
+        Candidats
+      </button>
+      <button
+        aria-pressed="false"
+        type="button"
+      >
+        Postes ouverts
+      </button>
+      <button
+        aria-pressed="false"
+        type="button"
+      >
+        Formations
+      </button>
+      <button
+        aria-pressed="true"
+        type="button"
+      >
+        Candidats par poste
+      </button>
+    </div>
+    <div
+      class="governorate-map-layout"
+    >
+      <div>
+        <div
+          class="map-loading"
+          role="status"
+        >
+          Chargement de la carte…
+        </div>
+        <button
+          type="button"
+        >
+          Afficher en tableau
+        </button>
+        <div
+          aria-label="Légende"
+          class="map-legend"
+        >
+          <span>
+            <i
+              style="background: rgb(237, 247, 245);"
+            />
+             
+            1
+          </span>
+          <span>
+            <i
+              style="background: rgb(184, 221, 215);"
+            />
+             
+            2
+          </span>
+          <span>
+            <i
+              style="background: rgb(110, 184, 174);"
+            />
+             
+            5
+          </span>
+          <span>
+            <i
+              style="background: rgb(45, 137, 128);"
+            />
+             
+            10
+          </span>
+          <span>
+            <i
+              style="background: rgb(7, 91, 84);"
+            />
+             
+            +
+          </span>
+          <span>
+            <i
+              class="hatched"
+            />
+             masqué (&lt;5 personnes)
+          </span>
+          <span>
+            <i
+              style="background: rgb(213, 213, 213);"
+            />
+             pas d'offres
+          </span>
+        </div>
+      </div>
+      <aside>
+        <h3>
+          Gouvernorats à renforcer en priorité
+        </h3>
+        <ol />
+      </aside>
+    </div>
+    <footer
+      class="map-source"
+    >
+      Source : 
+      Mahara Match platform
+       · 
+       · 
+       · récupéré le 
+      <div>
+        Limites administratives : geoBoundaries TUN ADM1, ODbL 1.0 ; © OpenStreetMap contributors.
+      </div>
+    </footer>
+  </section>
+</div>
+`;

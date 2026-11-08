@@ -25,6 +25,7 @@ def test_sqlite_migration_enforces_append_only_audit_log(
         "job_offers",
         "candidate_assistant_sessions",
         "candidate_roadmap_steps",
+        "candidate_roadmap_goals",
         "job_applications",
         "training_courses",
         "course_enrollments",
@@ -33,6 +34,17 @@ def test_sqlite_migration_enforces_append_only_audit_log(
         "candidate_behavioral_assessments",
         "candidate_behavioral_assessment_answers",
         "candidate_interview_transcriptions",
+        "job_application_status_history",
+        "application_notes",
+        "application_evaluations",
+        "talent_pools",
+        "employer_conversations",
+        "employer_interviews",
+        "job_offer_decisions",
+        "employer_notifications",
+        "organisation_verification_requests",
+        "employer_notification_preferences",
+        "employer_planning_sessions",
     } <= tables
     profile_columns = {column["name"] for column in inspect(engine).get_columns("candidate_profiles")}
     assert {
@@ -41,6 +53,8 @@ def test_sqlite_migration_enforces_append_only_audit_log(
         "location",
         "education",
         "experience",
+        "professional_headline",
+        "employer_discoverable",
     } <= profile_columns
     with engine.begin() as connection:
         connection.execute(

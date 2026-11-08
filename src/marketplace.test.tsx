@@ -110,7 +110,7 @@ describe("marketplace dashboards", () => {
         throw new Error(`Unexpected API request: ${input}`);
       }),
     );
-    render(<EmployerApplicationsPage token="token" />);
+    render(<EmployerApplicationsPage token="token" onNavigate={() => undefined} />);
 
     const statusSelect = await screen.findByRole("combobox", {
       name: "Statut de la candidature de Candidate",

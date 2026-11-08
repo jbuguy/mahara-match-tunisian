@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { Badge, Button, Card, Select } from "./components/ui";
 import { ProfileBuilder, type ProfileBuilderValue } from "./components/ProfileBuilder";
+import { LocationSelect } from "./components/LocationSelect";
 import {
   ApiError,
   applyToJob,
@@ -46,6 +47,7 @@ import {
   transcribeCandidateAudio,
   updateCandidateRoadmapStep,
   updateCandidateProfile,
+  updateEmployerOfferStatus,
   uploadCandidateCv,
   type CandidateAssistantMessage,
   type CandidateProfileDraft,
@@ -251,7 +253,11 @@ export function analyzeCommunicationSignals(value: string): {
 type CandidateProfileForm = {
   full_name: string;
   phone: string;
+  birth_year: string;
   location: string;
+  governorate_code: string;
+  municipality_code: string;
+  street_address: string;
   education: string;
   experience: string;
   education_entries: ProfileBuilderValue["education_entries"];
@@ -262,7 +268,11 @@ type CandidateProfileForm = {
 const emptyCandidateProfile: CandidateProfileForm = {
   full_name: "",
   phone: "",
+  birth_year: "",
   location: "",
+  governorate_code: "",
+  municipality_code: "",
+  street_address: "",
   education: "",
   experience: "",
   education_entries: [],
@@ -272,6 +282,8 @@ const emptyCandidateProfile: CandidateProfileForm = {
 
 export function CandidateProfilePage({ token }: { token: string }) {
   const [profile, setProfile] = useState(emptyCandidateProfile);
+  const [employerDiscoverable, setEmployerDiscoverable] = useState(false);
+  const [isUpdatingDiscoverability, setIsUpdatingDiscoverability] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingCv, setIsUploadingCv] = useState(false);
@@ -311,10 +323,15 @@ export function CandidateProfilePage({ token }: { token: string }) {
     fetchCandidateProfile(token)
       .then((profile) => {
         if (!cancelled) {
+          setEmployerDiscoverable(profile.employer_discoverable);
           const loadedProfile = {
             full_name: profile.full_name ?? "",
             phone: profile.phone ?? "",
+            birth_year: profile.birth_year?.toString() ?? "",
             location: profile.location ?? "",
+            governorate_code: profile.governorate_code ?? "",
+            municipality_code: profile.municipality_code ?? "",
+            street_address: profile.street_address ?? "",
             education: profile.education ?? "",
             experience: profile.experience ?? "",
             education_entries: profile.education_entries?.length ? profile.education_entries : legacyEducation(profile.education),
@@ -336,6 +353,23 @@ export function CandidateProfilePage({ token }: { token: string }) {
     };
   }, [token]);
 
+  async function updateDiscoverability(value: boolean) {
+    setIsUpdatingDiscoverability(true);
+    setError("");
+    setNotice("");
+    try {
+      const updated = await updateCandidateProfile(token, { employer_discoverable: value });
+      setEmployerDiscoverable(updated.employer_discoverable);
+      setNotice(value
+        ? "Votre profil peut maintenant être découvert par les recruteurs."
+        : "Votre profil n’apparaît plus dans la recherche des recruteurs.");
+    } catch (cause: unknown) {
+      setError(errorMessage(cause));
+    } finally {
+      setIsUpdatingDiscoverability(false);
+    }
+  }
+
   useEffect(() => {
     const warnBeforeLeave = (event: BeforeUnloadEvent) => {
       if (savedProfileSnapshot.current && JSON.stringify(profile) !== savedProfileSnapshot.current) {
@@ -356,7 +390,10 @@ export function CandidateProfilePage({ token }: { token: string }) {
       const saved = await updateCandidateProfile(token, {
         full_name: profile.full_name,
         phone: profile.phone,
-        location: profile.location,
+        birth_year: profile.birth_year ? Number(profile.birth_year) : null,
+        governorate_code: profile.governorate_code || null,
+        municipality_code: profile.municipality_code || null,
+        street_address: profile.street_address || null,
         education: profile.education,
         experience: profile.experience,
         education_entries: profile.education_entries,
@@ -366,7 +403,11 @@ export function CandidateProfilePage({ token }: { token: string }) {
       const savedForm = {
         full_name: saved.full_name ?? "",
         phone: saved.phone ?? "",
+        birth_year: saved.birth_year?.toString() ?? "",
         location: saved.location ?? "",
+        governorate_code: saved.governorate_code ?? "",
+        municipality_code: saved.municipality_code ?? "",
+        street_address: saved.street_address ?? "",
         education: saved.education ?? "",
         experience: saved.experience ?? "",
         education_entries: saved.education_entries?.length ? saved.education_entries : profile.education_entries,
@@ -395,7 +436,11 @@ export function CandidateProfilePage({ token }: { token: string }) {
       setCvDraft({
         full_name: extracted.full_name ?? profile.full_name,
         phone: extracted.phone ?? profile.phone,
+        birth_year: extracted.birth_year?.toString() ?? profile.birth_year,
         location: extracted.location ?? profile.location,
+        governorate_code: profile.governorate_code ?? "",
+        municipality_code: profile.municipality_code ?? "",
+        street_address: profile.street_address ?? "",
         education: extracted.education ?? profile.education,
         experience: extracted.experience ?? profile.experience,
         education_entries: mergeEntries(profile.education_entries, extracted.education_entries?.length ? extracted.education_entries : legacyEducation(extracted.education)),
@@ -425,7 +470,9 @@ export function CandidateProfilePage({ token }: { token: string }) {
       const saved = await updateCandidateProfile(token, {
         full_name: cvDraft.full_name,
         phone: cvDraft.phone,
-        location: cvDraft.location,
+        governorate_code: cvDraft.governorate_code || null,
+        municipality_code: cvDraft.municipality_code || null,
+        street_address: cvDraft.street_address || null,
         education: cvDraft.education,
         experience: cvDraft.experience,
         education_entries: cvDraft.education_entries,
@@ -435,7 +482,11 @@ export function CandidateProfilePage({ token }: { token: string }) {
       const savedForm = {
         full_name: saved.full_name ?? "",
         phone: saved.phone ?? "",
+        birth_year: saved.birth_year?.toString() ?? "",
         location: saved.location ?? "",
+        governorate_code: saved.governorate_code ?? "",
+        municipality_code: saved.municipality_code ?? "",
+        street_address: saved.street_address ?? "",
         education: saved.education ?? "",
         experience: saved.experience ?? "",
         education_entries: saved.education_entries?.length ? saved.education_entries : cvDraft.education_entries,
@@ -565,7 +616,7 @@ export function CandidateProfilePage({ token }: { token: string }) {
   return (
     <section className="workspace-page">
       <div className="eyebrow">VOTRE PROFIL</div>
-      <h1>Mon profil professionnel</h1>
+      <h1>Mon profil candidat</h1>
       <p className="workspace-page__intro">
         Vérifiez vos informations et complétez les détails de votre parcours à votre rythme.
       </p>
@@ -669,13 +720,35 @@ export function CandidateProfilePage({ token }: { token: string }) {
                   onChange={(value) => setProfile({ ...profile, phone: value })}
                 />
                 <ProfileTextField
-                  label="Lieu de résidence"
-                  value={profile.location}
-                  maxLength={120}
-                  onChange={(value) => setProfile({ ...profile, location: value })}
+                  label="Année de naissance"
+                  value={profile.birth_year}
+                  maxLength={4}
+                  onChange={(value) => setProfile({ ...profile, birth_year: value })}
+                />
+                <p className="field-help">Votre année de naissance est utilisée uniquement pour produire des statistiques nationales agrégées.</p>
+                <LocationSelect
+                  governorateCode={profile.governorate_code}
+                  municipalityCode={profile.municipality_code}
+                  streetAddress={profile.street_address}
+                  onChange={({ governorateCode, municipalityCode, streetAddress }) =>
+                    setProfile({ ...profile, governorate_code: governorateCode, municipality_code: municipalityCode, street_address: streetAddress })
+                  }
                 />
                 </div>
                 <ProfileBuilder value={profile} onChange={(value) => setProfile({ ...profile, ...value })} />
+
+                <label className="candidate-discovery-consent">
+                  <input
+                    type="checkbox"
+                    checked={employerDiscoverable}
+                    disabled={isUpdatingDiscoverability || isLoading}
+                    onChange={(event) => void updateDiscoverability(event.target.checked)}
+                  />
+                  <span>
+                    <strong>Autoriser les recruteurs à découvrir mon profil</strong>
+                    <small>Votre profil n’est partagé qu’avec les employeurs connectés. Vos coordonnées personnelles restent privées.</small>
+                  </span>
+                </label>
 
           {error && <p className="workspace-error" role="alert">{error}</p>}
                 {notice && <p className="workspace-success" role="status">{notice}</p>}
@@ -2421,6 +2494,9 @@ type OfferForm = {
   title: string;
   description: string;
   location: string;
+  governorate_code: string;
+  municipality_code: string;
+  street_address: string;
   requiredSkills: string;
   preferredSkills: string;
 };
@@ -2429,6 +2505,9 @@ const emptyOffer: OfferForm = {
   title: "",
   description: "",
   location: "",
+  governorate_code: "",
+  municipality_code: "",
+  street_address: "",
   requiredSkills: "",
   preferredSkills: "",
 };
@@ -2465,7 +2544,7 @@ export function EmployerOffersPage({ token }: { token: string }) {
     setIsGenerating(true); setError(""); setNotice("");
     try {
       const draft = await generateEmployerOffer(token, aiPrompt);
-      setForm({ title: draft.title, description: draft.description, location: draft.location, requiredSkills: draft.required_skills.join(", "), preferredSkills: draft.preferred_skills.join(", ") });
+      setForm({ ...emptyOffer, title: draft.title, description: draft.description, location: draft.location, requiredSkills: draft.required_skills.join(", "), preferredSkills: draft.preferred_skills.join(", ") });
       setSuggested(true);
       setNotice("Suggestion générée. Relisez et modifiez chaque champ avant de publier.");
     } catch (cause: unknown) { setError(errorMessage(cause)); }
@@ -2473,21 +2552,27 @@ export function EmployerOffersPage({ token }: { token: string }) {
   }
   async function publishOffer(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
+    const offerStatus = submitter?.value === "draft" ? "draft" : "published";
     setIsSaving(true);
     setError("");
     setNotice("");
     try {
       const preferred = splitSkills(form.preferredSkills);
-      const description = preferred.length ? `${form.description.trim()}\n\nCompétences souhaitées : ${preferred.join(", ")}` : form.description.trim();
+      const description = form.description.trim();
       const created = await createEmployerOffer(token, {
         title: form.title.trim(),
         description,
-        location: form.location.trim(),
+        governorate_code: form.governorate_code,
+        municipality_code: form.municipality_code || null,
+        street_address: form.street_address.trim() || null,
         required_skills: splitSkills(form.requiredSkills),
+        preferred_skills: preferred,
+        status: offerStatus,
       });
       setOffers((current) => [created, ...current]);
-      setForm(emptyOffer);
-      setNotice("Votre offre est publiée et peut maintenant être proposée aux candidats.");
+      setForm({ ...emptyOffer });
+      setNotice(offerStatus === "draft" ? "Votre offre a été enregistrée comme brouillon." : "Votre offre est publiée et peut maintenant être proposée aux candidats.");
     } catch (cause: unknown) {
       setError(errorMessage(cause));
     } finally {
@@ -2522,17 +2607,15 @@ export function EmployerOffersPage({ token }: { token: string }) {
               onChange={(event) => setForm({ ...form, title: event.target.value })}
             />
           </label>
-          <label className="form-field">
-            <span className="form-field__label">Lieu</span>
-            <input
-              className="input"
-              required
-              minLength={2}
-              maxLength={120}
-              value={form.location}
-              onChange={(event) => setForm({ ...form, location: event.target.value })}
-            />
-          </label>
+          <LocationSelect
+            governorateRequired
+            governorateCode={form.governorate_code}
+            municipalityCode={form.municipality_code}
+            streetAddress={form.street_address}
+            onChange={({ governorateCode, municipalityCode, streetAddress }) =>
+              setForm({ ...form, governorate_code: governorateCode, municipality_code: municipalityCode, street_address: streetAddress, location: streetAddress })
+            }
+          />
           <label className="form-field">
             <span className="form-field__label">Description</span>
             <textarea
@@ -2560,13 +2643,16 @@ export function EmployerOffersPage({ token }: { token: string }) {
 
           {error && <p className="workspace-error" role="alert">{error}</p>}
           {notice && <p className="workspace-success" role="status">{notice}</p>}
-          <Button type="submit" disabled={isSaving}>
-            {isSaving ? "Publication…" : "Publier l’offre"}
+          <Button type="submit" name="offerStatus" value="draft" variant="secondary" disabled={isSaving}>
+            Enregistrer le brouillon
+          </Button>
+          <Button type="submit" name="offerStatus" value="published" disabled={isSaving}>
+            {isSaving ? "Enregistrement…" : "Publier l’offre"}
           </Button>
         </form>
       </Card>
       <div className="workspace-list-heading">
-        <h2>Offres publiées</h2>
+        <h2>Mes offres</h2>
         <Badge>{offers.length}</Badge>
       </div>
       {isLoading && <p aria-live="polite">Chargement de vos offres…</p>}
@@ -2579,13 +2665,43 @@ export function EmployerOffersPage({ token }: { token: string }) {
         </Card>
       )}
       <div className="workspace-list">
-        {offers.map((offer) => <OfferCard key={offer.id} offer={offer} />)}
+        {offers.map((offer) => <OfferCard key={offer.id} offer={offer} token={token} onUpdated={(updated) => setOffers((current) => current.map((item) => item.id === updated.id ? updated : item))} />)}
       </div>
     </section>
   );
 }
 
-function OfferCard({ offer }: { offer: JobOffer }) {
+function OfferCard({ offer, token, onUpdated }: { offer: JobOffer; token: string; onUpdated: (offer: JobOffer) => void }) {
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [error, setError] = useState("");
+  const statusLabels: Record<NonNullable<JobOffer["status"]>, string> = {
+    draft: "Brouillon",
+    published: "Publiée",
+    paused: "En pause",
+    closed: "Clôturée",
+    expired: "Expirée",
+    archived: "Archivée",
+  };
+  const nextAction: Partial<Record<NonNullable<JobOffer["status"]>, { status: NonNullable<JobOffer["status"]>; label: string }>> = {
+    draft: { status: "published", label: "Publier" },
+    published: { status: "paused", label: "Mettre en pause" },
+    paused: { status: "published", label: "Reprendre" },
+    closed: { status: "archived", label: "Archiver" },
+    expired: { status: "archived", label: "Archiver" },
+  };
+  const action = nextAction[offer.status ?? "published"];
+  async function changeStatus() {
+    if (!action) return;
+    setIsUpdating(true);
+    setError("");
+    try {
+      onUpdated(await updateEmployerOfferStatus(token, offer.id, action.status));
+    } catch (cause: unknown) {
+      setError(errorMessage(cause));
+    } finally {
+      setIsUpdating(false);
+    }
+  }
   return (
     <Card className="offer-card">
       <div className="offer-card__top">
@@ -2593,10 +2709,13 @@ function OfferCard({ offer }: { offer: JobOffer }) {
           <h2>{offer.title}</h2>
           <p className="offer-card__location"><MapPin size={15} aria-hidden="true" />{offer.location}</p>
         </div>
-        <Badge>Publiée</Badge>
+        <Badge>{statusLabels[offer.status ?? "published"]}</Badge>
       </div>
       <p className="offer-card__description">{offer.description}</p>
       <SkillList label="Compétences requises" skills={offer.required_skills} tone="matched" />
+      {offer.preferred_skills?.length ? <SkillList label="Compétences souhaitées" skills={offer.preferred_skills} tone="matched" /> : null}
+      {error && <p className="workspace-error" role="alert">{error}</p>}
+      {action && <Button type="button" variant="secondary" disabled={isUpdating} onClick={() => void changeStatus()}>{isUpdating ? "Mise à jour…" : action.label}</Button>}
     </Card>
   );
 }
@@ -2696,9 +2815,3 @@ export function RoleAssistant({
     </section>
   );
 }
-
-
-
-
-
-
