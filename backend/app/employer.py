@@ -23,6 +23,7 @@ from app.models import (
     JobApplication,
     JobApplicationStatus,
     JobApplicationStatusHistory,
+    record_application_status_event,
     JobOffer,
     JobOfferDecisionStatus,
     JobOfferDecision,
@@ -525,6 +526,7 @@ def create_interview(
     if application.status not in {JobApplicationStatus.INTERVIEW, JobApplicationStatus.INTERVIEW_COMPLETED}:
         application.status = JobApplicationStatus.INTERVIEW
         session.add(JobApplicationStatusHistory(application_id=application.id, actor_id=user.id, from_status=previous_status, to_status=JobApplicationStatus.INTERVIEW))
+        record_application_status_event(session, application, previous_status, JobApplicationStatus.INTERVIEW, "employer")
     session.commit()
     session.refresh(interview)
     return InterviewResponse(id=interview.id, application_id=application.id, job_title=offer.title, candidate_name=candidate.full_name if candidate else None, starts_at=interview.starts_at, duration_minutes=interview.duration_minutes, format=interview.format, meeting_details=interview.meeting_details, status=interview.status.value)
@@ -646,6 +648,7 @@ def respond_to_offer_decision(
         previous_status = application.status
         application.status = JobApplicationStatus.HIRED
         session.add(JobApplicationStatusHistory(application_id=application.id, actor_id=user.id, from_status=previous_status, to_status=application.status))
+        record_application_status_event(session, application, previous_status, JobApplicationStatus.HIRED, "employer")
     _notification(session, offer.employer_id, "offer_decision_response", "Réponse à une offre", "Le candidat a répondu à l’offre d’emploi.", "offer_decision", decision.id)
     session.commit()
     return _decision_response(decision, offer)

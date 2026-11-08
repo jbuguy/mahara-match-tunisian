@@ -10,6 +10,7 @@ from sqlalchemy.sql.elements import ColumnElement
 from app.audit import record_audit_event, record_sensitive_read
 from app.database import get_session
 from app.dependencies import require_permission
+from app.locations import validate_location
 from app.models import (
     CandidateProfile,
     EmployerNotification,
@@ -20,6 +21,7 @@ from app.models import (
     CourseStatus,
     JobApplication,
     JobApplicationStatusHistory,
+    record_application_status_event,
     JobOfferStatus,
     JobApplicationStatus,
     JobOffer,
@@ -76,16 +78,28 @@ _EMPLOYER_APPLICATION_TRANSITIONS = {
     },
     JobApplicationStatus.INTERVIEW: {
         JobApplicationStatus.INTERVIEW_COMPLETED,
+        JobApplicationStatus.INTERVIEWED,
         JobApplicationStatus.OFFER_MADE,
         JobApplicationStatus.HIRED,
         JobApplicationStatus.REJECTED,
     },
     JobApplicationStatus.INTERVIEW_COMPLETED: {
         JobApplicationStatus.OFFER_MADE,
+        JobApplicationStatus.OFFERED,
         JobApplicationStatus.HIRED,
         JobApplicationStatus.REJECTED,
     },
     JobApplicationStatus.OFFER_MADE: {
+        JobApplicationStatus.HIRED,
+        JobApplicationStatus.REJECTED,
+    },
+    JobApplicationStatus.INTERVIEWED: {
+        JobApplicationStatus.OFFERED,
+        JobApplicationStatus.OFFER_MADE,
+        JobApplicationStatus.HIRED,
+        JobApplicationStatus.REJECTED,
+    },
+    JobApplicationStatus.OFFERED: {
         JobApplicationStatus.HIRED,
         JobApplicationStatus.REJECTED,
     },
@@ -188,6 +202,9 @@ def apply_to_job(
         status=JobApplicationStatus.SUBMITTED,
     )
     session.add(application)
+    candidate_profile = session.get(CandidateProfile, user.id)
+    if candidate_profile is not None:
+        candidate_profile.last_active_at = datetime.now(timezone.utc)
     try:
         session.flush()
     except IntegrityError as error:
@@ -218,6 +235,9 @@ def apply_to_job(
             from_status=None,
             to_status=JobApplicationStatus.SUBMITTED,
         )
+    )
+    record_application_status_event(
+        session, application, None, JobApplicationStatus.SUBMITTED, "system"
     )
     preference = session.get(EmployerNotificationPreference, (offer.employer_id, "application"))
     if preference is None or preference.enabled:
@@ -316,6 +336,9 @@ def withdraw_candidate_application(
         )
     previous_status = application.status
     application.status = JobApplicationStatus.WITHDRAWN
+    record_application_status_event(
+        session, application, previous_status, JobApplicationStatus.WITHDRAWN, "candidate"
+    )
     session.add(
         JobApplicationStatusHistory(
             application_id=application.id,
@@ -421,6 +444,7 @@ def update_application_status(
             detail=f"Cannot change an application from {previous_status.value} to {request.status.value}.",
         )
     application.status = request.status
+    record_application_status_event(session, application, previous_status, request.status, "employer")
     session.add(
         JobApplicationStatusHistory(
             application_id=application.id,
@@ -473,6 +497,7 @@ def create_course(
     user: User = Depends(require_permission(Permission.COURSE_MANAGE_ORGANISATION)),
     session: Session = Depends(get_session),
 ) -> TrainingCourseResponse:
+    validate_location(session, request.governorate_code, request.municipality_code)
     course = TrainingCourse(provider_id=user.id, **request.model_dump())
     if course.status == CourseStatus.PUBLISHED:
         course.published_at = datetime.now(timezone.utc)
@@ -502,6 +527,7 @@ def update_course(
     user: User = Depends(require_permission(Permission.COURSE_MANAGE_ORGANISATION)),
     session: Session = Depends(get_session),
 ) -> TrainingCourseResponse:
+    validate_location(session, request.governorate_code, request.municipality_code)
     course = session.scalar(
         select(TrainingCourse).where(
             TrainingCourse.id == course_id,
@@ -640,6 +666,8 @@ def update_course_enrollment(
     )
     previous_status = enrollment.status
     enrollment.status = request.status
+    if request.status == CourseEnrollmentStatus.COMPLETED:
+        enrollment.completed_at = datetime.now(timezone.utc)
     record_audit_event(
         session,
         action="training.enrollment.status_updated",

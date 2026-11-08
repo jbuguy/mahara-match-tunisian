@@ -54,6 +54,8 @@ from app.professional import router as professional_router
 from app.missions import router as missions_router
 from app.service_requests import router as service_requests_router
 from app.planning import router as planning_router
+from app.locations import router as locations_router
+from app.locations import validate_location
 from app.models import (
     AuditEvent,
     CandidateAssistantSession,
@@ -151,6 +153,7 @@ app.include_router(professional_router)
 app.include_router(missions_router)
 app.include_router(service_requests_router)
 app.include_router(planning_router)
+app.include_router(locations_router)
 
 
 @app.get("/public/jobs", response_model=PublicJobOfferPage, tags=["public discovery"])
@@ -451,6 +454,10 @@ def login(
         actor=user,
         resource_type="authentication",
     )
+    if user.role == Role.CANDIDATE:
+        profile = session.get(CandidateProfile, user.id)
+        if profile is not None:
+            profile.last_active_at = datetime.now(timezone.utc)
     session.commit()
     return LoginResponse(
         access_token=access_token,
@@ -562,6 +569,7 @@ def update_candidate_profile(
     user: User = Depends(require_permission(Permission.PROFILE_WRITE_OWN)),
     session: Session = Depends(get_session),
 ) -> CandidateProfileResponse:
+    validate_location(session, request.governorate_code, request.municipality_code)
     profile = session.get(CandidateProfile, user.id)
     if profile is None:
         profile = CandidateProfile(user_id=user.id, skills=[])
@@ -591,6 +599,13 @@ def update_candidate_profile(
         resource_id=user.id,
         details={"fields": sorted(updates)},
     )
+    profile.last_active_at = datetime.now(timezone.utc)
+    if (
+        profile.profile_completed_at is None
+        and profile.full_name
+        and profile.governorate_code
+    ):
+        profile.profile_completed_at = datetime.now(timezone.utc)
     session.commit()
     session.refresh(profile)
     return CandidateProfileResponse(
@@ -599,12 +614,18 @@ def update_candidate_profile(
         full_name=profile.full_name,
         phone=profile.phone,
         location=profile.location,
+        birth_year=profile.birth_year,
+        governorate_code=profile.governorate_code,
+        municipality_code=profile.municipality_code,
+        street_address=profile.street_address,
         education=profile.education,
         experience=profile.experience,
         education_entries=profile.education_entries,
         experience_entries=profile.experience_entries,
         professional_headline=profile.professional_headline,
         employer_discoverable=profile.employer_discoverable,
+        profile_completed_at=profile.profile_completed_at,
+        last_active_at=profile.last_active_at,
         updated_at=profile.updated_at,
     )
 
@@ -2002,11 +2023,15 @@ def create_employer_offer(
     user: User = Depends(require_permission(Permission.OFFER_MANAGE_ORGANISATION)),
     session: Session = Depends(get_session),
 ) -> JobOfferResponse:
+    validate_location(session, request.governorate_code, request.municipality_code)
     offer = JobOffer(
         employer_id=user.id,
         title=request.title,
         description=request.description,
-        location=request.location,
+        location=request.street_address or "",
+        governorate_code=request.governorate_code,
+        municipality_code=request.municipality_code,
+        street_address=request.street_address,
         required_skills=request.required_skills,
         preferred_skills=request.preferred_skills,
         status=request.status,

@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { ArrowUpRight, BriefcaseBusiness, Search, UserPlus } from "lucide-react";
 import { Badge, Button, Card, ChartFrame, DataTable, EmptyState } from "./components/ui";
+import { LocationSelect } from "./components/LocationSelect";
 import {
   ApiError,
   createTrainingCourse,
@@ -89,6 +90,8 @@ const applicationStatusLabels: Record<JobApplicationStatus, string> = {
   interview: "Entretien",
   interview_completed: "Entretien terminé",
   offer_made: "Offre envoyée",
+  interviewed: "Entretien réalisé",
+  offered: "Offre proposée",
   hired: "Recrutée",
   rejected: "Non retenue",
   withdrawn: "Retirée",
@@ -100,6 +103,8 @@ const employerApplicationNextStatuses: Record<JobApplicationStatus, JobApplicati
   shortlisted: ["reviewing", "interview", "hired", "rejected"],
   interview: ["interview_completed", "offer_made", "hired", "rejected"],
   interview_completed: ["offer_made", "hired", "rejected"],
+  interviewed: ["offered", "hired", "rejected"],
+  offered: ["hired", "rejected"],
   offer_made: ["hired", "rejected"],
   hired: [],
   rejected: [],
@@ -374,6 +379,9 @@ type CourseFormValues = {
   skills: string;
   delivery_mode: CourseDeliveryMode;
   location: string;
+  governorate_code: string;
+  municipality_code: string;
+  street_address: string;
   starts_on: string;
   ends_on: string;
   duration_hours: string;
@@ -388,6 +396,9 @@ const emptyCourseForm: CourseFormValues = {
   skills: "",
   delivery_mode: "online",
   location: "",
+  governorate_code: "",
+  municipality_code: "",
+  street_address: "",
   starts_on: "",
   ends_on: "",
   duration_hours: "1",
@@ -403,6 +414,9 @@ function courseDraft(values: CourseFormValues): TrainingCourseDraft {
     skills: values.skills.split(/[,\n]/).map((skill) => skill.trim()).filter(Boolean),
     delivery_mode: values.delivery_mode,
     location: values.location.trim() || null,
+    governorate_code: values.governorate_code || null,
+    municipality_code: values.municipality_code || null,
+    street_address: values.street_address.trim() || null,
     starts_on: values.starts_on || null,
     ends_on: values.ends_on || null,
     duration_hours: Number(values.duration_hours),
@@ -419,6 +433,9 @@ function valuesFromCourse(course: TrainingCourse): CourseFormValues {
     skills: course.skills.join(", "),
     delivery_mode: course.delivery_mode,
     location: course.location ?? "",
+    governorate_code: course.governorate_code ?? "",
+    municipality_code: course.municipality_code ?? "",
+    street_address: course.street_address ?? "",
     starts_on: course.starts_on ?? "",
     ends_on: course.ends_on ?? "",
     duration_hours: String(course.duration_hours),
@@ -591,11 +608,15 @@ export function TrainingProviderDashboardPage({ token }: { token: string }) {
               <option value="hybrid">Hybride</option>
             </select>
           </label>
-          <label className="form-field">
-            <span className="form-field__label">Lieu (obligatoire en présentiel/hybride)</span>
-            <input className="input" maxLength={120} value={form.location}
-              onChange={(event) => setForm({ ...form, location: event.target.value })} />
-          </label>
+          <LocationSelect
+            governorateRequired={form.delivery_mode !== "online"}
+            governorateCode={form.governorate_code}
+            municipalityCode={form.municipality_code}
+            streetAddress={form.street_address}
+            onChange={({ governorateCode, municipalityCode, streetAddress }) =>
+              setForm({ ...form, governorate_code: governorateCode, municipality_code: municipalityCode, street_address: streetAddress, location: streetAddress })
+            }
+          />
           <label className="form-field">
             <span className="form-field__label">Date de début</span>
             <input className="input" type="date" value={form.starts_on}
@@ -1188,8 +1209,4 @@ function RepeatableOrganisationEntries({ title, fields, value, onChange }: { tit
     <button className="button button--secondary" type="button" onClick={() => onChange(entries.filter((_, row) => row !== index))}>Supprimer</button>
   </div>)}<button className="button button--secondary" type="button" onClick={() => onChange([...entries, Object.fromEntries(fields.map((field) => [field.key, ""]))])}>Ajouter</button></section>;
 }
-
-
-
-
 

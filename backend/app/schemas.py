@@ -172,6 +172,10 @@ class CandidateProfileUpdate(BaseModel):
     full_name: str | None = Field(default=None, max_length=200)
     phone: str | None = Field(default=None, max_length=40)
     location: str | None = Field(default=None, max_length=120)
+    birth_year: int | None = Field(default=None, ge=1900, le=2100)
+    governorate_code: str | None = Field(default=None, max_length=80)
+    municipality_code: str | None = Field(default=None, max_length=120)
+    street_address: str | None = Field(default=None, max_length=200)
     education: str | None = Field(default=None, max_length=5000)
     experience: str | None = Field(default=None, max_length=5000)
     education_entries: list[EducationEntry] | None = Field(default=None, max_length=30)
@@ -204,6 +208,12 @@ class CandidateProfileResponse(BaseModel):
     full_name: str | None = None
     phone: str | None = None
     location: str | None = None
+    birth_year: int | None = None
+    profile_completed_at: datetime | None = None
+    last_active_at: datetime | None = None
+    governorate_code: str | None = None
+    municipality_code: str | None = None
+    street_address: str | None = None
     education: str | None = None
     experience: str | None = None
     education_entries: list[EducationEntry] = Field(default_factory=list)
@@ -808,12 +818,14 @@ class PlanningRecommendationUpdateRequest(BaseModel):
 class JobOfferCreate(BaseModel):
     title: str = Field(min_length=2, max_length=160)
     description: str = Field(min_length=10, max_length=5000)
-    location: str = Field(min_length=2, max_length=120)
+    governorate_code: str = Field(min_length=1, max_length=80)
+    municipality_code: str | None = Field(default=None, max_length=120)
+    street_address: str | None = Field(default=None, max_length=200)
     required_skills: list[str] = Field(min_length=1, max_length=30)
     preferred_skills: list[str] = Field(default_factory=list, max_length=30)
     status: JobOfferStatus = JobOfferStatus.PUBLISHED
 
-    @field_validator("title", "description", "location")
+    @field_validator("title", "description")
     @classmethod
     def trim_text(cls, value: str) -> str:
         return value.strip()
@@ -833,7 +845,7 @@ class JobOfferCreate(BaseModel):
 
     @model_validator(mode="after")
     def reject_blank_text(self) -> "JobOfferCreate":
-        if not self.title or not self.description or not self.location:
+        if not self.title or not self.description:
             raise ValueError("Title, description, and location cannot be blank.")
         return self
 
@@ -867,6 +879,9 @@ class JobOfferResponse(BaseModel):
     title: str
     description: str
     location: str
+    governorate_code: str | None = None
+    municipality_code: str | None = None
+    street_address: str | None = None
     required_skills: list[str]
     preferred_skills: list[str] = Field(default_factory=list)
     status: JobOfferStatus = JobOfferStatus.PUBLISHED
@@ -1173,6 +1188,9 @@ class TrainingCourseFields(BaseModel):
     skills: list[str] = Field(min_length=1, max_length=30)
     delivery_mode: CourseDeliveryMode
     location: str | None = Field(default=None, max_length=120)
+    governorate_code: str | None = Field(default=None, max_length=80)
+    municipality_code: str | None = Field(default=None, max_length=120)
+    street_address: str | None = Field(default=None, max_length=200)
     starts_on: date | None = None
     ends_on: date | None = None
     duration_hours: int = Field(ge=1, le=2000)
@@ -1209,8 +1227,11 @@ class TrainingCourseFields(BaseModel):
         if (
             self.delivery_mode in {CourseDeliveryMode.IN_PERSON, CourseDeliveryMode.HYBRID}
             and not self.location
+            and not self.governorate_code
         ):
             raise ValueError("A location is required for in-person or hybrid courses.")
+        if self.governorate_code and not self.location and not self.street_address:
+            return self
         return self
 
 
@@ -1227,6 +1248,9 @@ class TrainingCourseResponse(BaseModel):
     skills: list[str]
     delivery_mode: CourseDeliveryMode
     location: str | None
+    governorate_code: str | None = None
+    municipality_code: str | None = None
+    street_address: str | None = None
     starts_on: date | None
     ends_on: date | None
     duration_hours: int

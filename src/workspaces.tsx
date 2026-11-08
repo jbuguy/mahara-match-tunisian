@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { Badge, Button, Card, Select } from "./components/ui";
 import { ProfileBuilder, type ProfileBuilderValue } from "./components/ProfileBuilder";
+import { LocationSelect } from "./components/LocationSelect";
 import {
   ApiError,
   applyToJob,
@@ -253,6 +254,9 @@ type CandidateProfileForm = {
   full_name: string;
   phone: string;
   location: string;
+  governorate_code: string;
+  municipality_code: string;
+  street_address: string;
   education: string;
   experience: string;
   education_entries: ProfileBuilderValue["education_entries"];
@@ -264,6 +268,9 @@ const emptyCandidateProfile: CandidateProfileForm = {
   full_name: "",
   phone: "",
   location: "",
+  governorate_code: "",
+  municipality_code: "",
+  street_address: "",
   education: "",
   experience: "",
   education_entries: [],
@@ -319,6 +326,9 @@ export function CandidateProfilePage({ token }: { token: string }) {
             full_name: profile.full_name ?? "",
             phone: profile.phone ?? "",
             location: profile.location ?? "",
+            governorate_code: profile.governorate_code ?? "",
+            municipality_code: profile.municipality_code ?? "",
+            street_address: profile.street_address ?? "",
             education: profile.education ?? "",
             experience: profile.experience ?? "",
             education_entries: profile.education_entries?.length ? profile.education_entries : legacyEducation(profile.education),
@@ -377,7 +387,9 @@ export function CandidateProfilePage({ token }: { token: string }) {
       const saved = await updateCandidateProfile(token, {
         full_name: profile.full_name,
         phone: profile.phone,
-        location: profile.location,
+        governorate_code: profile.governorate_code || null,
+        municipality_code: profile.municipality_code || null,
+        street_address: profile.street_address || null,
         education: profile.education,
         experience: profile.experience,
         education_entries: profile.education_entries,
@@ -388,6 +400,9 @@ export function CandidateProfilePage({ token }: { token: string }) {
         full_name: saved.full_name ?? "",
         phone: saved.phone ?? "",
         location: saved.location ?? "",
+        governorate_code: saved.governorate_code ?? "",
+        municipality_code: saved.municipality_code ?? "",
+        street_address: saved.street_address ?? "",
         education: saved.education ?? "",
         experience: saved.experience ?? "",
         education_entries: saved.education_entries?.length ? saved.education_entries : profile.education_entries,
@@ -417,6 +432,9 @@ export function CandidateProfilePage({ token }: { token: string }) {
         full_name: extracted.full_name ?? profile.full_name,
         phone: extracted.phone ?? profile.phone,
         location: extracted.location ?? profile.location,
+        governorate_code: profile.governorate_code ?? "",
+        municipality_code: profile.municipality_code ?? "",
+        street_address: profile.street_address ?? "",
         education: extracted.education ?? profile.education,
         experience: extracted.experience ?? profile.experience,
         education_entries: mergeEntries(profile.education_entries, extracted.education_entries?.length ? extracted.education_entries : legacyEducation(extracted.education)),
@@ -446,7 +464,9 @@ export function CandidateProfilePage({ token }: { token: string }) {
       const saved = await updateCandidateProfile(token, {
         full_name: cvDraft.full_name,
         phone: cvDraft.phone,
-        location: cvDraft.location,
+        governorate_code: cvDraft.governorate_code || null,
+        municipality_code: cvDraft.municipality_code || null,
+        street_address: cvDraft.street_address || null,
         education: cvDraft.education,
         experience: cvDraft.experience,
         education_entries: cvDraft.education_entries,
@@ -457,6 +477,9 @@ export function CandidateProfilePage({ token }: { token: string }) {
         full_name: saved.full_name ?? "",
         phone: saved.phone ?? "",
         location: saved.location ?? "",
+        governorate_code: saved.governorate_code ?? "",
+        municipality_code: saved.municipality_code ?? "",
+        street_address: saved.street_address ?? "",
         education: saved.education ?? "",
         experience: saved.experience ?? "",
         education_entries: saved.education_entries?.length ? saved.education_entries : cvDraft.education_entries,
@@ -689,11 +712,13 @@ export function CandidateProfilePage({ token }: { token: string }) {
                   maxLength={40}
                   onChange={(value) => setProfile({ ...profile, phone: value })}
                 />
-                <ProfileTextField
-                  label="Lieu de résidence"
-                  value={profile.location}
-                  maxLength={120}
-                  onChange={(value) => setProfile({ ...profile, location: value })}
+                <LocationSelect
+                  governorateCode={profile.governorate_code}
+                  municipalityCode={profile.municipality_code}
+                  streetAddress={profile.street_address}
+                  onChange={({ governorateCode, municipalityCode, streetAddress }) =>
+                    setProfile({ ...profile, governorate_code: governorateCode, municipality_code: municipalityCode, street_address: streetAddress })
+                  }
                 />
                 </div>
                 <ProfileBuilder value={profile} onChange={(value) => setProfile({ ...profile, ...value })} />
@@ -2455,6 +2480,9 @@ type OfferForm = {
   title: string;
   description: string;
   location: string;
+  governorate_code: string;
+  municipality_code: string;
+  street_address: string;
   requiredSkills: string;
   preferredSkills: string;
 };
@@ -2463,6 +2491,9 @@ const emptyOffer: OfferForm = {
   title: "",
   description: "",
   location: "",
+  governorate_code: "",
+  municipality_code: "",
+  street_address: "",
   requiredSkills: "",
   preferredSkills: "",
 };
@@ -2499,7 +2530,7 @@ export function EmployerOffersPage({ token }: { token: string }) {
     setIsGenerating(true); setError(""); setNotice("");
     try {
       const draft = await generateEmployerOffer(token, aiPrompt);
-      setForm({ title: draft.title, description: draft.description, location: draft.location, requiredSkills: draft.required_skills.join(", "), preferredSkills: draft.preferred_skills.join(", ") });
+      setForm({ ...emptyOffer, title: draft.title, description: draft.description, location: draft.location, requiredSkills: draft.required_skills.join(", "), preferredSkills: draft.preferred_skills.join(", ") });
       setSuggested(true);
       setNotice("Suggestion générée. Relisez et modifiez chaque champ avant de publier.");
     } catch (cause: unknown) { setError(errorMessage(cause)); }
@@ -2518,13 +2549,15 @@ export function EmployerOffersPage({ token }: { token: string }) {
       const created = await createEmployerOffer(token, {
         title: form.title.trim(),
         description,
-        location: form.location.trim(),
+        governorate_code: form.governorate_code,
+        municipality_code: form.municipality_code || null,
+        street_address: form.street_address.trim() || null,
         required_skills: splitSkills(form.requiredSkills),
         preferred_skills: preferred,
         status: offerStatus,
       });
       setOffers((current) => [created, ...current]);
-      setForm(emptyOffer);
+      setForm({ ...emptyOffer });
       setNotice(offerStatus === "draft" ? "Votre offre a été enregistrée comme brouillon." : "Votre offre est publiée et peut maintenant être proposée aux candidats.");
     } catch (cause: unknown) {
       setError(errorMessage(cause));
@@ -2560,17 +2593,15 @@ export function EmployerOffersPage({ token }: { token: string }) {
               onChange={(event) => setForm({ ...form, title: event.target.value })}
             />
           </label>
-          <label className="form-field">
-            <span className="form-field__label">Lieu</span>
-            <input
-              className="input"
-              required
-              minLength={2}
-              maxLength={120}
-              value={form.location}
-              onChange={(event) => setForm({ ...form, location: event.target.value })}
-            />
-          </label>
+          <LocationSelect
+            governorateRequired
+            governorateCode={form.governorate_code}
+            municipalityCode={form.municipality_code}
+            streetAddress={form.street_address}
+            onChange={({ governorateCode, municipalityCode, streetAddress }) =>
+              setForm({ ...form, governorate_code: governorateCode, municipality_code: municipalityCode, street_address: streetAddress, location: streetAddress })
+            }
+          />
           <label className="form-field">
             <span className="form-field__label">Description</span>
             <textarea
@@ -2770,9 +2801,4 @@ export function RoleAssistant({
     </section>
   );
 }
-
-
-
-
-
 

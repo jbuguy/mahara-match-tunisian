@@ -17,6 +17,12 @@ export type CandidateProfile = {
   full_name: string | null;
   phone: string | null;
   location: string | null;
+  birth_year?: number | null;
+  profile_completed_at?: string | null;
+  last_active_at?: string | null;
+  governorate_code?: string | null;
+  municipality_code?: string | null;
+  street_address?: string | null;
   education: string | null;
   experience: string | null;
   education_entries: EducationEntry[];
@@ -170,6 +176,9 @@ export type JobOffer = {
   title: string;
   description: string;
   location: string;
+  governorate_code?: string | null;
+  municipality_code?: string | null;
+  street_address?: string | null;
   required_skills: string[];
   preferred_skills?: string[];
   status?: "draft" | "published" | "paused" | "closed" | "expired" | "archived";
@@ -282,6 +291,8 @@ export type JobApplicationStatus =
   | "interview"
   | "interview_completed"
   | "offer_made"
+  | "interviewed"
+  | "offered"
   | "hired"
   | "rejected"
   | "withdrawn";
@@ -357,6 +368,9 @@ export type TrainingCourse = {
   skills: string[];
   delivery_mode: CourseDeliveryMode;
   location: string | null;
+  governorate_code?: string | null;
+  municipality_code?: string | null;
+  street_address?: string | null;
   starts_on: string | null;
   ends_on: string | null;
   duration_hours: number;
@@ -1057,8 +1071,8 @@ export function generateEmployerOffer(token: string, prompt: string): Promise<{
 
 export function createEmployerOffer(
   token: string,
-  offer: Pick<JobOffer, "title" | "description" | "location" | "required_skills">
-    & Partial<Pick<JobOffer, "preferred_skills" | "status">>,
+  offer: Pick<JobOffer, "title" | "description" | "governorate_code" | "required_skills">
+    & Partial<Pick<JobOffer, "preferred_skills" | "status" | "municipality_code" | "street_address">>,
 ): Promise<JobOffer> {
   return authenticatedRequest(token, "/employer/offers", {
     method: "POST",

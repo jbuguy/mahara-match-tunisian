@@ -42,6 +42,8 @@ class JobApplicationStatus(str, Enum):
     INTERVIEW = "interview"
     INTERVIEW_COMPLETED = "interview_completed"
     OFFER_MADE = "offer_made"
+    INTERVIEWED = "interviewed"
+    OFFERED = "offered"
     HIRED = "hired"
     REJECTED = "rejected"
     WITHDRAWN = "withdrawn"
@@ -168,6 +170,38 @@ class InterviewTranscriptionStatus(str, Enum):
     PROCESSING = "processing"
     COMPLETED = "completed"
     FAILED = "failed"
+
+
+class Governorate(Base):
+    __tablename__ = "governorates"
+
+    code: Mapped[str] = mapped_column(String(80), primary_key=True)
+    name_fr: Mapped[str] = mapped_column(String(120), nullable=False)
+    name_ar: Mapped[str] = mapped_column(String(120), nullable=False)
+    latitude: Mapped[float] = mapped_column(nullable=False)
+    longitude: Mapped[float] = mapped_column(nullable=False)
+
+
+class Municipality(Base):
+    __tablename__ = "municipalities"
+    __table_args__ = (
+        UniqueConstraint(
+            "governorate_code",
+            "name_fr",
+            name="uq_municipality_governorate_name_fr",
+        ),
+        Index("ix_municipalities_governorate_sort", "governorate_code", "sort_order"),
+    )
+
+    code: Mapped[str] = mapped_column(String(120), primary_key=True)
+    governorate_code: Mapped[str] = mapped_column(
+        ForeignKey("governorates.code", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    name_fr: Mapped[str] = mapped_column(String(160), nullable=False)
+    name_ar: Mapped[str] = mapped_column(String(160), nullable=False)
+    delegation_name_fr: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    sort_order: Mapped[int] = mapped_column(default=0, nullable=False)
 
 
 class User(Base):
@@ -421,6 +455,12 @@ class CandidateProfile(Base):
     full_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
     phone: Mapped[str | None] = mapped_column(String(40), nullable=True)
     location: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    birth_year: Mapped[int | None] = mapped_column(nullable=True)
+    profile_completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_active_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    governorate_code: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    municipality_code: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    street_address: Mapped[str | None] = mapped_column(String(200), nullable=True)
     education: Mapped[str | None] = mapped_column(String(5000), nullable=True)
     experience: Mapped[str | None] = mapped_column(String(5000), nullable=True)
     education_entries: Mapped[list[dict[str, object]]] = mapped_column(JSON, default=list, nullable=False)
@@ -872,6 +912,9 @@ class JobOffer(Base):
     title: Mapped[str] = mapped_column(String(160), nullable=False)
     description: Mapped[str] = mapped_column(String(5000), nullable=False)
     location: Mapped[str] = mapped_column(String(120), nullable=False)
+    governorate_code: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    municipality_code: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    street_address: Mapped[str | None] = mapped_column(String(200), nullable=True)
     required_skills: Mapped[list[str]] = mapped_column(JSON, nullable=False)
     preferred_skills: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
     employment_type: Mapped[str | None] = mapped_column(String(40), nullable=True)
@@ -956,6 +999,36 @@ class JobApplicationStatusHistory(Base):
         SqlEnum(JobApplicationStatus, name="application_history_to_status", native_enum=False, create_constraint=False, values_callable=lambda values: [member.value for member in values]), nullable=False
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+
+
+class ApplicationStatusEvent(Base):
+    __tablename__ = "application_status_events"
+    __table_args__ = (Index("ix_application_status_events_application_changed", "application_id", "changed_at"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    application_id: Mapped[str] = mapped_column(ForeignKey("job_applications.id", ondelete="CASCADE"), nullable=False)
+    from_status: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    to_status: Mapped[str] = mapped_column(String(40), nullable=False)
+    changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    changed_by: Mapped[str] = mapped_column(String(20), nullable=False)
+    backfilled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+
+def record_application_status_event(
+    session,
+    application: "JobApplication",
+    from_status: JobApplicationStatus | None,
+    to_status: JobApplicationStatus,
+    changed_by: str,
+) -> ApplicationStatusEvent:
+    event = ApplicationStatusEvent(
+        application_id=application.id,
+        from_status=from_status.value if isinstance(from_status, JobApplicationStatus) else from_status,
+        to_status=to_status.value if isinstance(to_status, JobApplicationStatus) else to_status,
+        changed_by=changed_by,
+    )
+    session.add(event)
+    return event
 
 
 class ApplicationNote(Base):
@@ -1126,6 +1199,9 @@ class TrainingCourse(Base):
         nullable=False,
     )
     location: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    governorate_code: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    municipality_code: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    street_address: Mapped[str | None] = mapped_column(String(200), nullable=True)
     starts_on: Mapped[date | None] = mapped_column(nullable=True)
     ends_on: Mapped[date | None] = mapped_column(nullable=True)
     duration_hours: Mapped[int] = mapped_column(nullable=False)
@@ -1191,6 +1267,7 @@ class CourseEnrollment(Base):
         onupdate=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class AuditEvent(Base):
