@@ -114,7 +114,7 @@ const roleConfiguration: Record<
   ministry_admin: {
     label: "Administration",
     navigation: [{ label: "Vue dâ€™ensemble", icon: LayoutDashboard },
-      { label: "Vérifications organisations", icon: Building2 },
+      { label: "Verifications organisations", icon: Building2 },
       { label: "Assistant", icon: MessageCircle },
     ],
     dashboardTitle: "Espace administration",
