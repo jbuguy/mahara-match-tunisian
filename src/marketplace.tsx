@@ -1,13 +1,13 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { ArrowUpRight, BriefcaseBusiness, Search, UserPlus } from "lucide-react";
-import { Badge, Button, Card, ChartFrame, DataTable, EmptyState } from "./components/ui";
+import { Badge, Button, Card, DataTable, EmptyState } from "./components/ui";
 import { LocationSelect } from "./components/LocationSelect";
+import { AdminObservatoryDashboard } from "./components/AdminObservatoryDashboard";
 import {
   ApiError,
   createTrainingCourse,
   createEmployerOrganisation,
   enrollInCourse,
-  fetchAdminIndicators,
   fetchCandidateApplications,
   fetchCandidateOfferDecisions,
   respondToJobOffer,
@@ -50,7 +50,6 @@ import {
   fetchPendingOrganisationVerifications,
   reviewOrganisationVerification,
   updateTrainingCourse,
-  type AdminIndicators,
   type CourseDeliveryMode,
   type CourseEnrollment,
   type CourseEnrollmentStatus,
@@ -156,6 +155,9 @@ function MetricCard({
 }
 
 export function AdminDashboardPage({ token }: { token: string }) {
+  return <AdminObservatoryDashboard token={token} />;
+}
+  /*
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [appliedRange, setAppliedRange] = useState({ startDate: "", endDate: "" });
@@ -372,6 +374,8 @@ export function AdminDashboardPage({ token }: { token: string }) {
     </section>
   );
 }
+
+*/
 
 type CourseFormValues = {
   title: string;
@@ -1209,4 +1213,3 @@ function RepeatableOrganisationEntries({ title, fields, value, onChange }: { tit
     <button className="button button--secondary" type="button" onClick={() => onChange(entries.filter((_, row) => row !== index))}>Supprimer</button>
   </div>)}<button className="button button--secondary" type="button" onClick={() => onChange([...entries, Object.fromEntries(fields.map((field) => [field.key, ""]))])}>Ajouter</button></section>;
 }
-

@@ -10,6 +10,7 @@ from sqlalchemy import (
     DateTime,
     Enum as SqlEnum,
     ForeignKey,
+    Float,
     Index,
     Numeric,
     String,
@@ -473,6 +474,42 @@ class CandidateProfile(Base):
         onupdate=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
+
+
+class SkillCatalogue(Base):
+    __tablename__ = "skills_catalogue"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    canonical_name_fr: Mapped[str] = mapped_column(String(120), nullable=False, unique=True)
+    canonical_name_en: Mapped[str] = mapped_column(String(120), nullable=False, unique=True)
+    aliases: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+
+
+class CandidateSkill(Base):
+    __tablename__ = "candidate_skills"
+    user_id: Mapped[str] = mapped_column(ForeignKey("candidate_profiles.user_id", ondelete="CASCADE"), primary_key=True)
+    skill_id: Mapped[str] = mapped_column(ForeignKey("skills_catalogue.id", ondelete="CASCADE"), primary_key=True)
+
+
+class OfferSkill(Base):
+    __tablename__ = "offer_skills"
+    offer_id: Mapped[str] = mapped_column(ForeignKey("job_offers.id", ondelete="CASCADE"), primary_key=True)
+    skill_id: Mapped[str] = mapped_column(ForeignKey("skills_catalogue.id", ondelete="CASCADE"), primary_key=True)
+    skill_type: Mapped[str] = mapped_column(String(10), primary_key=True)
+
+
+class CourseSkill(Base):
+    __tablename__ = "course_skills"
+    course_id: Mapped[str] = mapped_column(ForeignKey("training_courses.id", ondelete="CASCADE"), primary_key=True)
+    skill_id: Mapped[str] = mapped_column(ForeignKey("skills_catalogue.id", ondelete="CASCADE"), primary_key=True)
+
+
+class SkillAliasReview(Base):
+    __tablename__ = "skill_alias_review"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    entity_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    entity_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    raw_skill: Mapped[str] = mapped_column(String(120), nullable=False)
 
 
 class ProfessionalProfile(Base):
@@ -1014,6 +1051,22 @@ class ApplicationStatusEvent(Base):
     backfilled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
 
+class NationalIndicator(Base):
+    __tablename__ = "national_indicators"
+    __table_args__ = (
+        UniqueConstraint("indicator_id", "year", name="uq_national_indicator_year"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    indicator_id: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    year: Mapped[int] = mapped_column(nullable=False)
+    value: Mapped[float] = mapped_column(Float, nullable=False)
+    unit: Mapped[str] = mapped_column(String(40), nullable=False)
+    source_document_id: Mapped[str] = mapped_column(
+        ForeignKey("knowledge_documents.id", ondelete="CASCADE"), nullable=False
+    )
+
+
 def record_application_status_event(
     session,
     application: "JobApplication",
@@ -1029,6 +1082,19 @@ def record_application_status_event(
     )
     session.add(event)
     return event
+
+
+def application_age_group(birth_year: int | None, reference_year: int) -> str | None:
+    if birth_year is None:
+        return None
+    age = reference_year - birth_year
+    if 15 <= age <= 24:
+        return "15-24"
+    if 25 <= age <= 34:
+        return "25-34"
+    if age >= 35:
+        return "35+"
+    return None
 
 
 class ApplicationNote(Base):

@@ -56,6 +56,7 @@ from app.service_requests import router as service_requests_router
 from app.planning import router as planning_router
 from app.locations import router as locations_router
 from app.locations import validate_location
+from app.skill_catalog import recognised_skill_share, sync_candidate_skills, sync_offer_skills
 from app.models import (
     AuditEvent,
     CandidateAssistantSession,
@@ -147,6 +148,11 @@ app = FastAPI(
     description="API for the Mahara Match employment support platform.",
     version="0.1.0",
 )
+
+
+@app.get("/data-quality/skills-recognition", tags=["data quality"])
+def skill_recognition_quality(session: Session = Depends(get_session)) -> dict[str, float]:
+    return {"recognised_skill_share": recognised_skill_share(session)}
 app.include_router(marketplace_router)
 app.include_router(employer_router)
 app.include_router(professional_router)
@@ -579,6 +585,8 @@ def update_candidate_profile(
         if field in {"education_entries", "experience_entries"}:
             value = [entry.model_dump() if hasattr(entry, "model_dump") else entry for entry in value]
         setattr(profile, field, value)
+    if "skills" in updates:
+        profile.skills = sync_candidate_skills(session, user.id, profile.skills)
     if updates.get("employer_discoverable") is False:
         session.execute(delete(TalentPoolMember).where(TalentPoolMember.candidate_id == user.id))
     if "education_entries" in updates:
@@ -2039,6 +2047,9 @@ def create_employer_offer(
     )
     session.add(offer)
     session.flush()
+    offer.required_skills, offer.preferred_skills = sync_offer_skills(
+        session, offer.id, offer.required_skills, offer.preferred_skills
+    )
     record_audit_event(
         session,
         action="employer.job_offer.created",

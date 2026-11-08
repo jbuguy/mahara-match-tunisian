@@ -253,6 +253,7 @@ export function analyzeCommunicationSignals(value: string): {
 type CandidateProfileForm = {
   full_name: string;
   phone: string;
+  birth_year: string;
   location: string;
   governorate_code: string;
   municipality_code: string;
@@ -267,6 +268,7 @@ type CandidateProfileForm = {
 const emptyCandidateProfile: CandidateProfileForm = {
   full_name: "",
   phone: "",
+  birth_year: "",
   location: "",
   governorate_code: "",
   municipality_code: "",
@@ -325,6 +327,7 @@ export function CandidateProfilePage({ token }: { token: string }) {
           const loadedProfile = {
             full_name: profile.full_name ?? "",
             phone: profile.phone ?? "",
+            birth_year: profile.birth_year?.toString() ?? "",
             location: profile.location ?? "",
             governorate_code: profile.governorate_code ?? "",
             municipality_code: profile.municipality_code ?? "",
@@ -387,6 +390,7 @@ export function CandidateProfilePage({ token }: { token: string }) {
       const saved = await updateCandidateProfile(token, {
         full_name: profile.full_name,
         phone: profile.phone,
+        birth_year: profile.birth_year ? Number(profile.birth_year) : null,
         governorate_code: profile.governorate_code || null,
         municipality_code: profile.municipality_code || null,
         street_address: profile.street_address || null,
@@ -399,6 +403,7 @@ export function CandidateProfilePage({ token }: { token: string }) {
       const savedForm = {
         full_name: saved.full_name ?? "",
         phone: saved.phone ?? "",
+        birth_year: saved.birth_year?.toString() ?? "",
         location: saved.location ?? "",
         governorate_code: saved.governorate_code ?? "",
         municipality_code: saved.municipality_code ?? "",
@@ -431,6 +436,7 @@ export function CandidateProfilePage({ token }: { token: string }) {
       setCvDraft({
         full_name: extracted.full_name ?? profile.full_name,
         phone: extracted.phone ?? profile.phone,
+        birth_year: extracted.birth_year?.toString() ?? profile.birth_year,
         location: extracted.location ?? profile.location,
         governorate_code: profile.governorate_code ?? "",
         municipality_code: profile.municipality_code ?? "",
@@ -476,6 +482,7 @@ export function CandidateProfilePage({ token }: { token: string }) {
       const savedForm = {
         full_name: saved.full_name ?? "",
         phone: saved.phone ?? "",
+        birth_year: saved.birth_year?.toString() ?? "",
         location: saved.location ?? "",
         governorate_code: saved.governorate_code ?? "",
         municipality_code: saved.municipality_code ?? "",
@@ -712,6 +719,13 @@ export function CandidateProfilePage({ token }: { token: string }) {
                   maxLength={40}
                   onChange={(value) => setProfile({ ...profile, phone: value })}
                 />
+                <ProfileTextField
+                  label="Année de naissance"
+                  value={profile.birth_year}
+                  maxLength={4}
+                  onChange={(value) => setProfile({ ...profile, birth_year: value })}
+                />
+                <p className="field-help">Votre année de naissance est utilisée uniquement pour produire des statistiques nationales agrégées.</p>
                 <LocationSelect
                   governorateCode={profile.governorate_code}
                   municipalityCode={profile.municipality_code}
@@ -2801,4 +2815,3 @@ export function RoleAssistant({
     </section>
   );
 }
-

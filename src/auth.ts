@@ -1254,6 +1254,32 @@ export function fetchAdminIndicators(
   return authenticatedRequest(token, `/admin/indicators${suffix}`);
 }
 
+export function fetchObservatory(
+  token: string,
+  endpoint: string,
+  filters: { startDate?: string; endDate?: string; governorateCode?: string; sectorCode?: string; ageGroup?: string; youth?: boolean } = {},
+): Promise<Record<string, any>> {
+  const query = new URLSearchParams();
+  if (filters.startDate) query.set("start_date", filters.startDate);
+  if (filters.endDate) query.set("end_date", filters.endDate);
+  if (filters.governorateCode) query.set("governorate_code", filters.governorateCode);
+  if (filters.sectorCode) query.set("sector_code", filters.sectorCode);
+  if (filters.ageGroup) query.set("age_group", filters.ageGroup);
+  if (filters.youth) query.set("youth", "true");
+  const suffix = query.size ? `?${query.toString()}` : "";
+  return authenticatedRequest(token, `/admin/observatory/${endpoint}${suffix}`);
+}
+
+export function logObservatoryExport(
+  token: string,
+  payload: { export_type: "csv" | "pdf"; chart?: string; section?: string; filters: Record<string, string> },
+): Promise<Record<string, string>> {
+  return authenticatedRequest(token, "/admin/observatory/export-audit", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export function fetchTrainingCourses(token: string): Promise<TrainingCourse[]> {
   return authenticatedRequest(token, "/training/courses");
 }
