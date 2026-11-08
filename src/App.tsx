@@ -53,7 +53,6 @@ import {
 } from "./workspaces";
 import {
   ApiError,
-  demoAccounts,
   fetchCurrentUser,
   applyToJob,
   login,
@@ -62,6 +61,7 @@ import {
   type Role,
 } from "./auth";
 import { GuestDiscovery } from "./GuestDiscovery";
+import { GuestAuth } from "./GuestAuth";
 import { ProfessionalServicesPage } from "./ProfessionalServices";
 import { MissionsWorkspace } from "./MissionsWorkspace";
 import { ServiceRequestsWorkspace } from "./ServiceRequestsWorkspace";
@@ -147,6 +147,14 @@ export default function App() {
   const [activePage, setActivePage] = useState("Vue d’ensemble");
   const [menuOpen, setMenuOpen] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [guestPage, setGuestPage] = useState<"discovery" | "auth">(() =>
+    window.location.hash === "#guest-auth" || window.location.hash === "#guest-auth-signup"
+      ? "auth"
+      : "discovery",
+  );
+  const [isRegistering, setIsRegistering] = useState(
+    () => window.location.hash === "#guest-auth-signup",
+  );
   const [accessToken, setAccessToken] = useState<string | null>(() =>
     sessionStorage.getItem("mahara-match-token"),
   );
@@ -154,6 +162,19 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(Boolean(accessToken));
   const [authError, setAuthError] = useState("");
   const isDashboard = activePage === "Vue d’ensemble";
+
+  useEffect(() => {
+    function syncGuestRoute() {
+      const authRoute =
+        window.location.hash === "#guest-auth" ||
+        window.location.hash === "#guest-auth-signup";
+      setGuestPage(authRoute ? "auth" : "discovery");
+      setIsRegistering(window.location.hash === "#guest-auth-signup");
+    }
+
+    window.addEventListener("hashchange", syncGuestRoute);
+    return () => window.removeEventListener("hashchange", syncGuestRoute);
+  }, []);
 
   useEffect(() => {
     if (!accessToken) {
@@ -214,15 +235,20 @@ export default function App() {
         try {
           await applyToJob(result.access_token, pendingOfferId);
           sessionStorage.removeItem("mahara-match-return-job");
+          sessionStorage.removeItem("mahara-match-return-job-title");
           destination = "Mes candidatures";
         } catch (error: unknown) {
-          setAuthError(error instanceof ApiError ? error.message : "Could not resume your application.");
+          setAuthError(error instanceof ApiError ? error.message : "Impossible de reprendre votre candidature.");
           destination = "Mes opportunités";
         }
       } else if (pendingOfferId && result.user.role !== "candidate") {
-        setAuthError("Sign in with a candidate account to apply for this job.");
+        setAuthError("Connectez-vous avec un compte candidat pour postuler à cette offre.");
       }
-      if (sessionStorage.getItem("mahara-match-return-service")) destination = "Mes demandes";
+      if (sessionStorage.getItem("mahara-match-return-service")) {
+        destination = "Mes demandes";
+        sessionStorage.removeItem("mahara-match-return-service");
+        sessionStorage.removeItem("mahara-match-return-service-title");
+      }
       setActivePage(destination);
     } catch (error: unknown) {
       setAuthError(
@@ -252,24 +278,39 @@ export default function App() {
   }
 
   if (!user || !accessToken) {
+    const pendingOfferTitle = sessionStorage.getItem("mahara-match-return-job-title");
+    const pendingServiceTitle = sessionStorage.getItem("mahara-match-return-service-title");
+    const pendingNote = pendingOfferTitle
+      ? `Connectez-vous pour postuler à « ${pendingOfferTitle} »`
+      : pendingServiceTitle
+        ? `Connectez-vous pour demander « ${pendingServiceTitle} »`
+        : "";
     return (
       <div className="app-shell" data-theme={theme}>
-        <GuestDiscovery
-          onApply={(offer) => {
-            sessionStorage.setItem("mahara-match-return-job", offer.id);
-            document.getElementById("guest-auth")?.scrollIntoView({ behavior: "smooth" });
-          }}
-          onRequestService={(service) => {
-            sessionStorage.setItem("mahara-match-return-service", service.id);
-            document.getElementById("guest-auth")?.scrollIntoView({ behavior: "smooth" });
-          }}
-        />
-        <LoginPage
-          error={authError}
-          theme={theme}
-          onToggleTheme={() => setTheme(theme === "light" ? "dark" : "light")}
-          onAuthenticate={handleAuthentication}
-        />
+        {guestPage === "discovery" ? (
+          <GuestDiscovery
+            onApply={(offer) => {
+              sessionStorage.setItem("mahara-match-return-job", offer.id);
+              sessionStorage.setItem("mahara-match-return-job-title", offer.title);
+              window.location.hash = "#guest-auth";
+            }}
+            onRequestService={(service) => {
+              sessionStorage.setItem("mahara-match-return-service", service.id);
+              sessionStorage.setItem("mahara-match-return-service-title", service.title);
+              window.location.hash = "#guest-auth";
+            }}
+          />
+        ) : (
+          <GuestAuth
+            error={authError}
+            isRegistering={isRegistering}
+            pendingNote={pendingNote}
+            onModeChange={(registering) => {
+              window.location.hash = registering ? "#guest-auth-signup" : "#guest-auth";
+            }}
+            onAuthenticate={handleAuthentication}
+          />
+        )}
       </div>
     );
   }
@@ -488,112 +529,6 @@ export default function App() {
       </main>
       <FloatingAssistant token={accessToken} onExpand={() => setActivePage("Assistant")} />
     </div>
-  );
-}
-
-function LoginPage({
-  error,
-  theme,
-  onToggleTheme,
-  onAuthenticate,
-}: {
-  error: string;
-  theme: "light" | "dark";
-  onToggleTheme: () => void;
-  onAuthenticate: (
-    event: FormEvent<HTMLFormElement>,
-    email: string,
-    password: string,
-    isRegistration: boolean,
-  ) => Promise<void>;
-}) {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [isRegistering, setIsRegistering] = useState(false);
-
-  return (
-    <main className="auth-page">
-      <div className="auth-toolbar">
-        <a className="brand" href="#accueil" aria-label="Mahara Match, accueil">
-          <span className="brand__mark" aria-hidden="true">m</span>
-          <span className="brand__name">mahara<span>match</span></span>
-        </a>
-        <button
-          className="icon-button"
-          type="button"
-          aria-label={theme === "light" ? "Activer le thème sombre" : "Activer le thème clair"}
-          onClick={onToggleTheme}
-        >
-          {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
-        </button>
-      </div>
-      <section className="auth-card" id="guest-auth" aria-labelledby="login-title">
-        <Badge tone="accent">Mahara Match</Badge>
-        <h1 id="login-title">
-          {isRegistering ? "Créez votre espace candidat" : "Connectez-vous à votre espace"}
-        </h1>
-        <p>
-          {isRegistering
-            ? "Créez votre compte, puis complétez votre profil avec l’assistant."
-            : "Chaque compte accède uniquement aux fonctions de son rôle."}
-        </p>
-        <form
-          className="auth-form"
-          onSubmit={(event) => void onAuthenticate(event, email, password, isRegistering)}
-        >
-          <label>
-            <span>Adresse e-mail</span>
-            <input
-              autoComplete={isRegistering ? "email" : "username"}
-              type="email"
-              required
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-            />
-          </label>
-          <label>
-            <span>Mot de passe</span>
-            <input
-              autoComplete={isRegistering ? "new-password" : "current-password"}
-              type="password"
-              required
-              minLength={isRegistering ? 12 : undefined}
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-            />
-          </label>
-          {isRegistering && (
-            <p className="auth-password-hint">Utilisez au moins 12 caractères.</p>
-          )}
-          {error && <p className="auth-error" role="alert">{error}</p>}
-          <Button type="submit" className="auth-submit">
-            {isRegistering ? "Créer mon compte" : "Se connecter"}
-          </Button>
-        </form>
-        <button
-          className="auth-mode-toggle"
-          type="button"
-          onClick={() => setIsRegistering(!isRegistering)}
-        >
-          {isRegistering ? "J’ai déjà un compte" : "Créer un compte candidat"}
-        </button>
-        {!isRegistering && <div className="demo-account-list">
-          <strong>Comptes de démonstration</strong>
-          <p>Choisissez un compte pour remplir son adresse e-mail. Le mot de passe est fourni lors du seed local.</p>
-          <div className="demo-account-list__buttons">
-            {demoAccounts.map((account) => (
-              <button
-                key={account.role}
-                type="button"
-                onClick={() => setEmail(account.email)}
-              >
-                {account.label}
-              </button>
-            ))}
-          </div>
-        </div>}
-      </section>
-    </main>
   );
 }
 

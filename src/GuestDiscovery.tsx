@@ -1,10 +1,11 @@
-import { useEffect, useState, type FormEvent } from "react";
-import { Search } from "lucide-react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { ArrowLeft, ArrowRight, MapPin, Search } from "lucide-react";
 import {
   ApiError,
   fetchPublicCourse,
   fetchPublicJob,
   fetchPublicJobs,
+  fetchPublicMission,
   fetchPublicMissions,
   fetchPublicProfessional,
   fetchPublicProfessionals,
@@ -13,262 +14,769 @@ import {
   fetchPublicTraining,
   type JobOffer,
   type PublicCourse,
+  type PublicMission,
   type PublicProfessional,
   type PublicService,
-  type PublicMission,
 } from "./auth";
-import { Button } from "./components/ui";
 
-export function GuestDiscovery({ onApply, onRequestService }: { onApply: (offer: JobOffer) => void; onRequestService: (service: PublicService) => void }) {
+type SearchFilters = { q: string; location: string; limit: number; offset: number };
+type PublicPage<T> = { items: T[]; total: number; limit: number; offset: number };
+type SearchFunction<T> = (filters: SearchFilters) => Promise<PublicPage<T>>;
+type CategoryState<T> = {
+  items: T[];
+  total: number;
+  offset: number;
+  loading: boolean;
+  error: string;
+  loaded: boolean;
+};
+type CategoryKey = "jobs" | "professionals" | "services" | "training" | "missions";
+type GuestTab = "all" | CategoryKey;
+type GuestDetail =
+  | { type: "jobs"; item: JobOffer }
+  | { type: "professionals"; item: PublicProfessional }
+  | { type: "services"; item: PublicService }
+  | { type: "training"; item: PublicCourse }
+  | { type: "missions"; item: PublicMission };
+type GuestCard = {
+  id: string;
+  type: CategoryKey;
+  title: string;
+  location?: string | null;
+  description?: string | null;
+  meta?: string | null;
+  figure?: string | null;
+  skills: string[];
+  action: string;
+  open: () => void;
+};
+
+const categoryLabels: Record<CategoryKey, string> = {
+  jobs: "Emploi",
+  professionals: "Professionnel",
+  services: "Service",
+  training: "Formation",
+  missions: "Mission",
+};
+const tabLabels: Record<GuestTab, string> = {
+  all: "Tout",
+  jobs: "Emplois",
+  professionals: "Professionnels",
+  services: "Services",
+  training: "Formations",
+  missions: "Missions",
+};
+const tabHeadings: Record<GuestTab, string> = {
+  all: "Tout découvrir",
+  jobs: "Offres d’emploi",
+  professionals: "Professionnels",
+  services: "Services",
+  training: "Formations",
+  missions: "Missions et projets",
+};
+const guestValueLabels: Record<string, string> = {
+  remote: "À distance",
+  on_site: "Sur site",
+  hybrid: "Hybride",
+  flexible: "Flexible",
+  online: "À distance",
+  in_person: "En présentiel",
+  fixed: "Forfait",
+  hourly: "À l’heure",
+  starting_at: "À partir de",
+  quote: "Sur devis",
+  negotiable: "Négociable",
+  full_time: "Temps plein",
+  part_time: "Temps partiel",
+  internship: "Stage",
+};
+
+const searchJobs: SearchFunction<JobOffer> = (filters) => fetchPublicJobs(filters);
+const searchProfessionals: SearchFunction<PublicProfessional> = (filters) =>
+  fetchPublicProfessionals(filters);
+const searchServices: SearchFunction<PublicService> = (filters) => fetchPublicServices(filters);
+const searchTraining: SearchFunction<PublicCourse> = (filters) => fetchPublicTraining(filters);
+const searchMissions: SearchFunction<PublicMission> = (filters) => fetchPublicMissions(filters);
+
+function emptyCategory<T>(): CategoryState<T> {
+  return { items: [], total: 0, offset: 0, loading: false, error: "", loaded: false };
+}
+
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof ApiError ? error.message : fallback;
+}
+
+async function loadCategory<T>(
+  search: SearchFunction<T>,
+  query: string,
+  location: string,
+  limit: number,
+  offset = 0,
+  fallback = "Impossible de charger les résultats publics.",
+): Promise<CategoryState<T>> {
+  try {
+    const result = await search({ q: query, location, limit, offset });
+    return {
+      items: Array.isArray(result?.items) ? result.items : [],
+      total: Number.isFinite(result?.total) ? result.total : 0,
+      offset: Number.isFinite(result?.offset) ? result.offset : offset,
+      loading: false,
+      error: "",
+      loaded: true,
+    };
+  } catch (error: unknown) {
+    return { ...emptyCategory<T>(), loading: false, error: errorMessage(error, fallback), loaded: true };
+  }
+}
+
+function formatAmount(value: number | string | null | undefined): string | undefined {
+  if (value === null || value === undefined || value === "") return undefined;
+  return `${value} TND`;
+}
+
+function formatRange(
+  minimum: number | string | null | undefined,
+  maximum: number | string | null | undefined,
+): string | undefined {
+  const min = formatAmount(minimum);
+  const max = formatAmount(maximum);
+  if (min && max) return `${min} – ${max}`;
+  return min || max;
+}
+
+function displayValue(value: string | null | undefined): string | undefined {
+  if (!value) return undefined;
+  return guestValueLabels[value] ?? value.replace(/_/g, " ");
+}
+
+function availabilityText(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "boolean") return value ? "Oui" : "Non";
+  if (typeof value === "string" || typeof value === "number") return String(value);
+  if (Array.isArray(value)) return value.map(availabilityText).filter(Boolean).join(", ");
+  if (typeof value === "object") {
+    return Object.entries(value)
+      .map(([key, item]) => `${key} : ${availabilityText(item)}`)
+      .filter((entry) => !entry.endsWith(" : "))
+      .join(" · ");
+  }
+  return "";
+}
+
+export function GuestDiscovery({
+  onApply,
+  onRequestService,
+}: {
+  onApply: (offer: JobOffer) => void;
+  onRequestService: (service: PublicService) => void;
+}) {
   const [query, setQuery] = useState("");
   const [location, setLocation] = useState("");
-  const [jobs, setJobs] = useState<JobOffer[]>([]);
-  const [total, setTotal] = useState(0);
-  const [offset, setOffset] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [selectedJob, setSelectedJob] = useState<JobOffer | null>(null);
+  const [activeTab, setActiveTab] = useState<GuestTab>("all");
+  const [jobs, setJobs] = useState<CategoryState<JobOffer>>(emptyCategory);
+  const [professionals, setProfessionals] =
+    useState<CategoryState<PublicProfessional>>(emptyCategory);
+  const [services, setServices] = useState<CategoryState<PublicService>>(emptyCategory);
+  const [training, setTraining] = useState<CategoryState<PublicCourse>>(emptyCategory);
+  const [missions, setMissions] = useState<CategoryState<PublicMission>>(emptyCategory);
+  const [detail, setDetail] = useState<GuestDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState("");
-  const [courses, setCourses] = useState<PublicCourse[]>([]);
-  const [missions, setMissions] = useState<PublicMission[]>([]);
-  const [services, setServices] = useState<PublicService[]>([]);
-  const [professionals, setProfessionals] = useState<PublicProfessional[]>([]);
-  const [selectedCourse, setSelectedCourse] = useState<PublicCourse | null>(null);
-  const [selectedService, setSelectedService] = useState<PublicService | null>(null);
-  const [selectedProfessional, setSelectedProfessional] = useState<PublicProfessional | null>(null);
-  const [extraLoading, setExtraLoading] = useState(true);
-  const [extraError, setExtraError] = useState("");
-  const [serviceTotal, setServiceTotal] = useState(0);
-  const [professionalTotal, setProfessionalTotal] = useState(0);
-  const [courseTotal, setCourseTotal] = useState(0);
-  const [missionTotal, setMissionTotal] = useState(0);
-  const [serviceOffset, setServiceOffset] = useState(0);
-  const [professionalOffset, setProfessionalOffset] = useState(0);
-  const [courseOffset, setCourseOffset] = useState(0);
+  const previousScroll = useRef(0);
+  const initialSearchStarted = useRef(false);
 
-  async function search(searchQuery = query, searchLocation = location, searchOffset = 0) {
-    setLoading(true);
-    setError("");
-    try {
-      const result = await fetchPublicJobs({ q: searchQuery, location: searchLocation, offset: searchOffset });
-      setJobs(Array.isArray(result?.items) ? result.items : []);
-      setTotal(Number.isFinite(result?.total) ? result.total : 0);
-      setOffset(Number.isFinite(result?.offset) ? result.offset : searchOffset);
-    } catch (cause: unknown) {
-      setError(cause instanceof ApiError ? cause.message : "Impossible de charger les offres publiques.");
-    } finally {
-      setLoading(false);
-    }
+  async function searchAll(searchQuery: string, searchLocation: string) {
+    setJobs((current) => ({ ...current, loading: true, error: "" }));
+    setProfessionals((current) => ({ ...current, loading: true, error: "" }));
+    setServices((current) => ({ ...current, loading: true, error: "" }));
+    setTraining((current) => ({ ...current, loading: true, error: "" }));
+    setMissions((current) => ({ ...current, loading: true, error: "" }));
+    const [jobResults, professionalResults, serviceResults, trainingResults, missionResults] =
+      await Promise.all([
+        loadCategory(searchJobs, searchQuery, searchLocation, 20, 0, "Impossible de charger les offres publiques."),
+        loadCategory(searchProfessionals, searchQuery, searchLocation, 6, 0, "Impossible de charger les profils publics."),
+        loadCategory(searchServices, searchQuery, searchLocation, 6, 0, "Impossible de charger les services publics."),
+        loadCategory(searchTraining, searchQuery, searchLocation, 6, 0, "Impossible de charger les formations publiques."),
+        loadCategory(searchMissions, searchQuery, searchLocation, 6, 0, "Impossible de charger les missions publiques."),
+      ]);
+    setJobs(jobResults);
+    setProfessionals(professionalResults);
+    setServices(serviceResults);
+    setTraining(trainingResults);
+    setMissions(missionResults);
   }
 
   useEffect(() => {
-    void search("", "");
-    void searchMore("", "");
+    if (initialSearchStarted.current) return;
+    initialSearchStarted.current = true;
+    void searchAll("", "");
   }, []);
-
-  async function searchMore(searchQuery = query, searchLocation = location) {
-    setExtraLoading(true);
-    setExtraError("");
-    try {
-      const [serviceResults, professionalResults, courseResults, missionResults] = await Promise.all([
-        fetchPublicServices({ q: searchQuery, location: searchLocation, limit: 6 }),
-        fetchPublicProfessionals({ q: searchQuery, location: searchLocation, limit: 6 }),
-        fetchPublicTraining({ q: searchQuery, location: searchLocation, limit: 6 }),
-        fetchPublicMissions({ q: searchQuery, location: searchLocation, limit: 6 }),
-      ]);
-      setServices(Array.isArray(serviceResults?.items) ? serviceResults.items : []);
-      setProfessionals(Array.isArray(professionalResults?.items) ? professionalResults.items : []);
-      setCourses(Array.isArray(courseResults?.items) ? courseResults.items : []);
-      setMissions(Array.isArray(missionResults?.items) ? missionResults.items : []);
-      setServiceTotal(Number.isFinite(serviceResults?.total) ? serviceResults.total : 0);
-      setProfessionalTotal(Number.isFinite(professionalResults?.total) ? professionalResults.total : 0);
-      setCourseTotal(Number.isFinite(courseResults?.total) ? courseResults.total : 0);
-      setMissionTotal(Number.isFinite(missionResults?.total) ? missionResults.total : 0);
-      setServiceOffset(Number.isFinite(serviceResults?.offset) ? serviceResults.offset : 0);
-      setProfessionalOffset(Number.isFinite(professionalResults?.offset) ? professionalResults.offset : 0);
-      setCourseOffset(Number.isFinite(courseResults?.offset) ? courseResults.offset : 0);
-    } catch (cause: unknown) {
-      setExtraError(cause instanceof ApiError ? cause.message : "Impossible de charger les autres contenus publics.");
-    } finally {
-      setExtraLoading(false);
-    }
-  }
 
   function submitSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setSelectedJob(null);
-    void search();
-    void searchMore();
+    setDetail(null);
+    void searchAll(query, location);
   }
 
-  async function openJob(offer: JobOffer) {
-    setSelectedJob(offer);
+  async function openDetail(item: GuestDetail) {
+    previousScroll.current = window.scrollY;
+    setDetail(item);
     setDetailLoading(true);
     setDetailError("");
     try {
-      setSelectedJob(await fetchPublicJob(offer.id));
-    } catch (cause: unknown) {
-      setDetailError(cause instanceof ApiError ? cause.message : "Impossible de charger cette offre.");
+      const loaded: GuestDetail =
+        item.type === "jobs"
+          ? { type: "jobs", item: await fetchPublicJob(item.item.id) }
+          : item.type === "professionals"
+            ? { type: "professionals", item: await fetchPublicProfessional(item.item.id) }
+            : item.type === "services"
+              ? { type: "services", item: await fetchPublicService(item.item.id) }
+              : item.type === "training"
+                ? { type: "training", item: await fetchPublicCourse(item.item.id) }
+                : { type: "missions", item: await fetchPublicMission(item.item.id) };
+      setDetail(loaded);
+    } catch (error: unknown) {
+      setDetailError(errorMessage(error, "Impossible de charger ce contenu."));
     } finally {
       setDetailLoading(false);
     }
   }
 
-  async function openService(service: PublicService) {
-    setDetailLoading(true); setDetailError("");
-    try { setSelectedService(await fetchPublicService(service.id)); }
-    catch (cause: unknown) { setDetailError(cause instanceof ApiError ? cause.message : "Impossible de charger ce service."); }
-    finally { setDetailLoading(false); }
+  function returnToResults() {
+    setDetail(null);
+    window.requestAnimationFrame(() => window.scrollTo(0, previousScroll.current));
   }
 
-  async function openProfessional(profile: PublicProfessional) {
-    setDetailLoading(true); setDetailError("");
-    try { setSelectedProfessional(await fetchPublicProfessional(profile.id)); }
-    catch (cause: unknown) { setDetailError(cause instanceof ApiError ? cause.message : "Impossible de charger ce profil."); }
-    finally { setDetailLoading(false); }
+  async function loadMore(category: Exclude<CategoryKey, "jobs">) {
+    const settings = { q: query, location, limit: 6 };
+    if (category === "professionals") {
+      setProfessionals((current) => ({ ...current, loading: true, error: "" }));
+      const result = await loadCategory(
+        searchProfessionals,
+        settings.q,
+        settings.location,
+        settings.limit,
+        professionals.offset + 6,
+        "Impossible de charger les profils suivants.",
+      );
+      setProfessionals((current) => result.error
+        ? { ...current, loading: false, error: result.error, loaded: true }
+        : { ...result, items: [...current.items, ...result.items] });
+    } else if (category === "services") {
+      setServices((current) => ({ ...current, loading: true, error: "" }));
+      const result = await loadCategory(
+        searchServices,
+        settings.q,
+        settings.location,
+        settings.limit,
+        services.offset + 6,
+        "Impossible de charger les services suivants.",
+      );
+      setServices((current) => result.error
+        ? { ...current, loading: false, error: result.error, loaded: true }
+        : { ...result, items: [...current.items, ...result.items] });
+    } else if (category === "training") {
+      setTraining((current) => ({ ...current, loading: true, error: "" }));
+      const result = await loadCategory(
+        searchTraining,
+        settings.q,
+        settings.location,
+        settings.limit,
+        training.offset + 6,
+        "Impossible de charger les formations suivantes.",
+      );
+      setTraining((current) => result.error
+        ? { ...current, loading: false, error: result.error, loaded: true }
+        : { ...result, items: [...current.items, ...result.items] });
+    } else {
+      setMissions((current) => ({ ...current, loading: true, error: "" }));
+      const result = await loadCategory(
+        searchMissions,
+        settings.q,
+        settings.location,
+        settings.limit,
+        missions.offset + 6,
+        "Impossible de charger les missions suivantes.",
+      );
+      setMissions((current) => result.error
+        ? { ...current, loading: false, error: result.error, loaded: true }
+        : { ...result, items: [...current.items, ...result.items] });
+    }
   }
 
-  async function openCourse(course: PublicCourse) {
-    setDetailLoading(true); setDetailError("");
-    try { setSelectedCourse(await fetchPublicCourse(course.id)); }
-    catch (cause: unknown) { setDetailError(cause instanceof ApiError ? cause.message : "Impossible de charger cette formation."); }
-    finally { setDetailLoading(false); }
+  async function changeJobPage(nextOffset: number) {
+    setJobs((current) => ({ ...current, loading: true, error: "" }));
+    const result = await loadCategory(
+      searchJobs,
+      query,
+      location,
+      20,
+      nextOffset,
+      "Impossible de charger les offres publiques.",
+    );
+    setJobs((current) => result.error
+      ? { ...current, loading: false, error: result.error, loaded: true }
+      : result);
   }
 
-  async function loadMore(category: "services" | "professionals" | "training" | "missions") {
-    setExtraLoading(true); setExtraError("");
-    try {
-      if (category === "services") {
-        const offset = serviceOffset + 6;
-        const result = await fetchPublicServices({ q: query, location, limit: 6, offset });
-        setServices((current) => [...current, ...(Array.isArray(result?.items) ? result.items : [])]); setServiceOffset(Number.isFinite(result?.offset) ? result.offset : offset);
-      } else if (category === "professionals") {
-        const offset = professionalOffset + 6;
-        const result = await fetchPublicProfessionals({ q: query, location, limit: 6, offset });
-        setProfessionals((current) => [...current, ...(Array.isArray(result?.items) ? result.items : [])]); setProfessionalOffset(Number.isFinite(result?.offset) ? result.offset : offset);
-      } else if (category === "training") {
-        const offset = courseOffset + 6;
-        const result = await fetchPublicTraining({ q: query, location, limit: 6, offset });
-        setCourses((current) => [...current, ...(Array.isArray(result?.items) ? result.items : [])]); setCourseOffset(Number.isFinite(result?.offset) ? result.offset : offset);
-      } else {
-        const offset = missions.length;
-        const result = await fetchPublicMissions({ q: query, location, limit: 6, offset });
-        setMissions((current) => [...current, ...(Array.isArray(result?.items) ? result.items : [])]);
-      }
-    } catch (cause: unknown) {
-      setExtraError(cause instanceof ApiError ? cause.message : "Impossible de charger la page suivante.");
-    } finally { setExtraLoading(false); }
+  const cardGroups: { type: CategoryKey; cards: GuestCard[]; state: CategoryState<unknown> }[] = [
+    {
+      type: "jobs",
+      state: jobs,
+      cards: jobs.items.map((item) => ({
+        id: item.id,
+        type: "jobs",
+        title: item.title,
+        location: item.location,
+        description: item.description,
+        meta: displayValue(item.employment_type),
+        figure: formatRange(item.salary_min, item.salary_max),
+        skills: item.required_skills,
+        action: "Voir l’offre",
+        open: () => void openDetail({ type: "jobs", item }),
+      })),
+    },
+    {
+      type: "professionals",
+      state: professionals,
+      cards: professionals.items.map((item) => ({
+        id: item.id,
+        type: "professionals",
+        title: item.display_name,
+        location: item.location,
+        description: item.introduction,
+        meta: item.available ? "Disponible" : "Indisponible",
+        figure: item.accepting_requests
+          ? "Accepte de nouvelles demandes"
+          : item.service_area.join(", ") || undefined,
+        skills: item.skills,
+        action: "Voir le profil",
+        open: () => void openDetail({ type: "professionals", item }),
+      })),
+    },
+    {
+      type: "services",
+      state: services,
+      cards: services.items.map((item) => ({
+        id: item.id,
+        type: "services",
+        title: item.title,
+        location: item.location,
+        description: item.description,
+        meta: displayValue(item.price_type),
+        figure: item.price_min ? `À partir de ${formatAmount(item.price_min)}` : undefined,
+        skills: item.skills,
+        action: "Voir le service",
+        open: () => void openDetail({ type: "services", item }),
+      })),
+    },
+    {
+      type: "training",
+      state: training,
+      cards: training.items.map((item) => ({
+        id: item.id,
+        type: "training",
+        title: item.title,
+        location: item.location,
+        description: item.summary,
+        meta: displayValue(item.delivery_mode),
+        figure:
+          item.duration_hours !== null && item.duration_hours !== undefined
+            ? `${item.duration_hours} h`
+            : undefined,
+        skills: item.skills,
+        action: "Voir la formation",
+        open: () => void openDetail({ type: "training", item }),
+      })),
+    },
+    {
+      type: "missions",
+      state: missions,
+      cards: missions.items.map((item) => ({
+        id: item.id,
+        type: "missions",
+        title: item.title,
+        location: item.location,
+        description: item.description,
+        meta: [displayValue(item.work_mode), displayValue(item.budget_type)].filter(Boolean).join(" · "),
+        figure: formatRange(item.budget_min, item.budget_max),
+        skills: item.required_skills,
+        action: "Voir la mission",
+        open: () => void openDetail({ type: "missions", item }),
+      })),
+    },
+  ];
+
+  const counts: Record<CategoryKey, number> = {
+    jobs: jobs.total,
+    professionals: professionals.total,
+    services: services.total,
+    training: training.total,
+    missions: missions.total,
+  };
+  const states: Record<CategoryKey, CategoryState<unknown>> = {
+    jobs,
+    professionals,
+    services,
+    training,
+    missions,
+  };
+  const activeCount =
+    activeTab === "all" ? Object.values(counts).reduce((sum, count) => sum + count, 0) : counts[activeTab];
+  const activeState =
+    activeTab === "all" ? null : states[activeTab];
+  const activeCards =
+    activeTab === "all"
+      ? cardGroups.flatMap((group) => group.cards.slice(0, 6))
+      : cardGroups.find((group) => group.type === activeTab)?.cards ?? [];
+  const anyLoading = activeTab === "all"
+    ? cardGroups.some((group) => group.state.loading)
+    : activeState?.loading ?? false;
+  const activeErrors = activeTab === "all"
+    ? cardGroups.filter((group) => group.state.error)
+    : cardGroups.filter((group) => group.type === activeTab && group.state.error);
+
+  function renderCard(card: GuestCard) {
+    return (
+      <article className={`guest-card guest-card--${card.type}`} key={`${card.type}-${card.id}`}>
+        <div className="guest-card__topline">
+          <span className="guest-type-chip">
+            <span className="guest-type-chip__dot" aria-hidden="true" />
+            {categoryLabels[card.type]}
+          </span>
+          {card.meta && <span className="guest-card__meta">{card.meta}</span>}
+        </div>
+        <h3>{card.title}</h3>
+        <p className="guest-card__location">
+          <MapPin size={16} aria-hidden="true" />
+          <span>{card.location || "À distance"}</span>
+        </p>
+        {card.description && <p className="guest-card__description">{card.description}</p>}
+        {card.skills.length > 0 && (
+          <ul className="guest-card__skills" aria-label="Compétences">
+            {card.skills.slice(0, 5).map((skill) => <li key={skill}>{skill}</li>)}
+          </ul>
+        )}
+        <footer className="guest-card__footer">
+          {card.figure && <strong>{card.figure}</strong>}
+          <button type="button" className="guest-button guest-button--dark" onClick={card.open}>
+            {card.action}
+            <ArrowRight size={16} aria-hidden="true" />
+          </button>
+        </footer>
+      </article>
+    );
   }
 
   return (
-    <main className="guest-home">
-      <header className="guest-home__header">
-        <a className="brand" href="#accueil" aria-label="Mahara Match home">
-          <span className="brand__mark" aria-hidden="true">m</span>
-          <span className="brand__name">mahara<span>match</span></span>
-        </a>
-        <nav aria-label="Public navigation">
-          <a href="#guest-jobs">Emplois</a>
-          <a href="#guest-services">Services</a>
-          <a href="#guest-professionals">Professionnels</a>
-          <a href="#guest-training">Formations</a>
-          <a href="#guest-auth">Se connecter</a>
-          <a href="#guest-auth">Créer un compte</a>
-        </nav>
-      </header>
-      <section className="guest-home__hero">
-        <div className="eyebrow">MAHARA MATCH</div>
-        <h1>Qu’est-ce que vous recherchez&nbsp;?</h1>
-        <p>Trouvez un emploi qui correspond à vos compétences et à votre région.</p>
-        <form className="guest-home__search" onSubmit={submitSearch}>
-          <label>
-            <span>Métier, compétence ou mot-clé</span>
-            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Ex. développeur Python" />
-          </label>
-          <label>
-            <span>Ville ou gouvernorat</span>
-            <input value={location} onChange={(event) => setLocation(event.target.value)} placeholder="Ex. Tunis" />
-          </label>
-          <Button type="submit"><Search size={17} aria-hidden="true" /> Rechercher</Button>
-        </form>
-      </section>
-      <section className="guest-home__results" id="guest-jobs" aria-labelledby="guest-jobs-title">
-        {(selectedService || selectedProfessional || selectedCourse) && (
-          <article className="guest-job-detail" aria-live="polite">
-            <Button variant="secondary" onClick={() => { setSelectedService(null); setSelectedProfessional(null); setSelectedCourse(null); }}>Retour à la découverte</Button>
-            {detailLoading ? <p>Chargement…</p> : detailError ? <p className="auth-error" role="alert">{detailError}</p> : selectedService ? (
-              <><div className="eyebrow">{selectedService.category}</div><h2>{selectedService.title}</h2><p>{selectedService.location || "À distance"}</p><p>{selectedService.description}</p><p>Tarif : {selectedService.price_type}{selectedService.price_min ? ` · ${selectedService.price_min} TND` : ""}</p>{selectedService.portfolio_items.map((item) => <p key={item.url}><a href={item.url} target="_blank" rel="noreferrer">{item.title}</a></p>)}<Button onClick={() => onRequestService(selectedService)}>Demander ce service</Button></>
-            ) : selectedProfessional ? (
-              <><h2>{selectedProfessional.display_name}</h2><h3>{selectedProfessional.headline}</h3><p>{selectedProfessional.location}</p><p>{selectedProfessional.introduction}</p><p>{selectedProfessional.skills.join(" · ")}</p>{selectedProfessional.service_area.length > 0 && <p>Zones desservies : {selectedProfessional.service_area.join(" · ")}</p>}<p>{selectedProfessional.available ? "Disponible" : "Indisponible"}{selectedProfessional.accepting_requests ? " · Accepte de nouvelles demandes" : ""}</p>{Object.keys(selectedProfessional.availability).length > 0 && <p>Disponibilités : {JSON.stringify(selectedProfessional.availability)}</p>}{selectedProfessional.portfolio_items.map((item) => <p key={item.url}><a href={item.url} target="_blank" rel="noreferrer">{item.title}</a></p>)}<h3>Services publiés</h3>{selectedProfessional.services.map((item) => <p key={item.id}>{item.title} — {item.category}</p>)}</>
-            ) : selectedCourse ? (
-              <><div className="eyebrow">FORMATION</div><h2>{selectedCourse.title}</h2><p>{selectedCourse.summary}</p><p>{selectedCourse.location || "À distance"} · {selectedCourse.duration_hours} h</p><p>{selectedCourse.skills.join(" · ")}</p></>
-            ) : null}
-          </article>
-        )}
-        {selectedJob && (
-          <article className="guest-job-detail" aria-labelledby="guest-job-detail-title">
-            <Button variant="secondary" onClick={() => setSelectedJob(null)}>Retour aux offres</Button>
-            {detailLoading ? <p aria-live="polite">Chargement de l’offre…</p> : detailError ? (
-              <p className="auth-error" role="alert">{detailError}</p>
-            ) : (
-              <>
-                <div className="eyebrow">{selectedJob.employment_type || "Emploi"}</div>
-                <h2 id="guest-job-detail-title">{selectedJob.title}</h2>
-                <p className="guest-job-card__location">{selectedJob.location}{selectedJob.workplace_arrangement ? ` · ${selectedJob.workplace_arrangement}` : ""}</p>
-                {selectedJob.salary_min !== null && selectedJob.salary_min !== undefined && (
-                  <p className="guest-job-detail__salary">Salaire : {selectedJob.salary_min}{selectedJob.salary_max !== null && selectedJob.salary_max !== undefined ? ` – ${selectedJob.salary_max}` : ""} TND</p>
-                )}
-                <p className="guest-job-detail__description">{selectedJob.description}</p>
-                {selectedJob.required_skills.length > 0 && (
-                  <div><h3>Compétences demandées</h3><ul>{selectedJob.required_skills.map((skill) => <li key={skill}>{skill}</li>)}</ul></div>
-                )}
-                <Button onClick={() => onApply(selectedJob)}>Se connecter pour postuler</Button>
-              </>
-            )}
-          </article>
-        )}
-        {!selectedJob && <>
-        <div className="guest-home__results-heading">
-          <div><div className="eyebrow">OFFRES PUBLIÉES</div><h2 id="guest-jobs-title">Explorez les emplois</h2></div>
-          {!loading && <span>{total} offre{total === 1 ? "" : "s"}</span>}
+    <main className="guest-experience">
+      <section className="guest-hero-band">
+        <header className="guest-header guest-content">
+          <a className="guest-brand" href="#accueil" aria-label="Mahara Match, accueil">
+            <span className="guest-brand__mark" aria-hidden="true">m</span>
+            <span>mahara<span>match</span></span>
+          </a>
+          <nav className="guest-header__links" aria-label="Compte">
+            <a href="#guest-auth">Se connecter</a>
+            <a className="guest-button guest-button--light" href="#guest-auth-signup">Créer un compte</a>
+          </nav>
+        </header>
+        <div className="guest-hero guest-content">
+          <p className="guest-eyebrow">MAHARA MATCH · LES OPPORTUNITÉS EN TUNISIE</p>
+          <h1>Qu’est-ce que vous recherchez&nbsp;?</h1>
+          <p className="guest-hero__subtitle">
+            Emplois, professionnels, services, formations et missions : trouvez votre prochaine opportunité.
+          </p>
+          <form className="guest-search" onSubmit={submitSearch}>
+            <label>
+              <span>Métier, compétence ou mot-clé</span>
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Ex. développeur Python"
+              />
+            </label>
+            <label>
+              <span>Ville ou gouvernorat</span>
+              <input
+                value={location}
+                onChange={(event) => setLocation(event.target.value)}
+                placeholder="Ex. Tunis"
+              />
+            </label>
+            <button type="submit" className="guest-button guest-button--terracotta">
+              <Search size={18} aria-hidden="true" />
+              Rechercher
+            </button>
+          </form>
         </div>
-        {loading ? <p aria-live="polite">Chargement des offres…</p> : error ? (
-          <p className="auth-error" role="alert">{error}</p>
-        ) : jobs.length === 0 ? (
-          <p className="guest-home__empty">Aucune offre publiée ne correspond à cette recherche.</p>
-        ) : (
-          <div className="guest-home__job-grid">
-            {jobs.map((offer) => (
-              <article className="guest-job-card" key={offer.id}>
-                <div className="eyebrow">{offer.employment_type || "Emploi"}</div>
-                <h3>{offer.title}</h3>
-                <p className="guest-job-card__location">{offer.location}{offer.workplace_arrangement ? ` · ${offer.workplace_arrangement}` : ""}</p>
-                <p className="guest-job-card__description">{offer.description}</p>
-                {offer.required_skills.length > 0 && <ul aria-label="Compétences demandées">{offer.required_skills.slice(0, 5).map((skill) => <li key={skill}>{skill}</li>)}</ul>}
-                <Button variant="secondary" onClick={() => void openJob(offer)}>Voir l’offre</Button>
-                <Button variant="secondary" onClick={() => onApply(offer)}>Se connecter pour postuler</Button>
+      </section>
+
+      <div className="guest-content guest-main">
+        {detail ? (
+          <section className="guest-detail" aria-live="polite">
+            <button type="button" className="guest-back-link" onClick={returnToResults}>
+              <ArrowLeft size={17} aria-hidden="true" />
+              Retour aux résultats
+            </button>
+            {detailLoading ? (
+              <p className="guest-loading" aria-live="polite">Chargement du détail…</p>
+            ) : detailError ? (
+              <p className="guest-error" role="alert">{detailError}</p>
+            ) : detail.type === "jobs" ? (
+              <article aria-labelledby="guest-detail-title">
+                <p className="guest-eyebrow">OFFRE D’EMPLOI</p>
+                <h2 id="guest-detail-title">{detail.item.title}</h2>
+                <div className="guest-detail__columns">
+                  <div className="guest-detail__primary">
+                    <h3>Description du poste</h3>
+                    <p className="guest-detail__prose">{detail.item.description}</p>
+                    {detail.item.required_skills.length > 0 && (
+                      <div>
+                        <h3>Compétences demandées</h3>
+                        <ul className="guest-detail__skills">
+                          {detail.item.required_skills.map((skill) => <li key={skill}>{skill}</li>)}
+                        </ul>
+                      </div>
+                    )}
+                    {detail.item.preferred_skills && detail.item.preferred_skills.length > 0 && (
+                      <div>
+                        <h3>Compétences appréciées</h3>
+                        <ul className="guest-detail__skills">
+                          {detail.item.preferred_skills.map((skill) => <li key={skill}>{skill}</li>)}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                  <aside className="guest-detail__aside" aria-label="Informations sur l’offre">
+                    {formatRange(detail.item.salary_min, detail.item.salary_max) && (
+                      <div><span>Salaire</span><strong>{formatRange(detail.item.salary_min, detail.item.salary_max)}</strong></div>
+                    )}
+                    {detail.item.employment_type && (
+                      <div><span>Type de contrat</span><strong>{detail.item.employment_type}</strong></div>
+                    )}
+                    <div><span>Lieu</span><strong>{detail.item.location || "À distance"}</strong></div>
+                    {detail.item.workplace_arrangement && (
+                      <div><span>Organisation du travail</span><strong>{detail.item.workplace_arrangement}</strong></div>
+                    )}
+                    <button
+                      type="button"
+                      className="guest-button guest-button--dark guest-detail__apply"
+                      onClick={() => onApply(detail.item)}
+                    >
+                      Se connecter pour postuler
+                    </button>
+                  </aside>
+                </div>
               </article>
-            ))}
-          </div>
+            ) : detail.type === "services" ? (
+              <article className="guest-detail__panel">
+                <p className="guest-eyebrow">{detail.item.category}</p>
+                <h2 id="guest-detail-title">{detail.item.title}</h2>
+                <p className="guest-card__location"><MapPin size={16} aria-hidden="true" />{detail.item.location || "À distance"}</p>
+                <p className="guest-detail__prose">{detail.item.description}</p>
+                <ul className="guest-detail__skills">{detail.item.skills.map((skill) => <li key={skill}>{skill}</li>)}</ul>
+                <p className="guest-detail__fact">
+                  Tarif : {displayValue(detail.item.price_type)}
+                  {formatRange(detail.item.price_min, detail.item.price_max) && ` · ${formatRange(detail.item.price_min, detail.item.price_max)}`}
+                </p>
+                {detail.item.portfolio_items.map((item) => (
+                  <p key={item.url}><a href={item.url} target="_blank" rel="noreferrer">{item.title}</a></p>
+                ))}
+                <button type="button" className="guest-button guest-button--dark" onClick={() => onRequestService(detail.item)}>
+                  Se connecter pour demander ce service
+                </button>
+              </article>
+            ) : detail.type === "professionals" ? (
+              <article className="guest-detail__panel">
+                <p className="guest-eyebrow">PROFESSIONNEL</p>
+                <h2 id="guest-detail-title">{detail.item.display_name}</h2>
+                <h3>{detail.item.headline}</h3>
+                <p className="guest-card__location"><MapPin size={16} aria-hidden="true" />{detail.item.location || "À distance"}</p>
+                <p className="guest-detail__prose">{detail.item.introduction}</p>
+                <p>{detail.item.skills.join(" · ")}</p>
+                {detail.item.service_area.length > 0 && <p>Zones desservies : {detail.item.service_area.join(" · ")}</p>}
+                <p>{detail.item.available ? "Disponible" : "Indisponible"}{detail.item.accepting_requests ? " · Accepte de nouvelles demandes" : ""}</p>
+                {Object.keys(detail.item.availability).length > 0 && (
+                  <div><h3>Disponibilités</h3><ul className="guest-detail__availability">
+                    {Object.entries(detail.item.availability).map(([key, value]) => (
+                      <li key={key}><strong>{key}</strong>{availabilityText(value) && ` : ${availabilityText(value)}`}</li>
+                    ))}
+                  </ul></div>
+                )}
+                {detail.item.portfolio_items.map((item) => (
+                  <p key={item.url}><a href={item.url} target="_blank" rel="noreferrer">{item.title}</a></p>
+                ))}
+                {detail.item.services.length > 0 && (
+                  <div><h3>Services publiés</h3>{detail.item.services.map((item) => <p key={item.id}>{item.title} — {item.category}</p>)}</div>
+                )}
+              </article>
+            ) : detail.type === "training" ? (
+              <article className="guest-detail__panel">
+                <p className="guest-eyebrow">FORMATION</p>
+                <h2 id="guest-detail-title">{detail.item.title}</h2>
+                <p className="guest-detail__prose">{detail.item.summary}</p>
+                <p className="guest-card__location"><MapPin size={16} aria-hidden="true" />{detail.item.location || "À distance"}</p>
+                {detail.item.duration_hours !== null && detail.item.duration_hours !== undefined && <p>Durée : {detail.item.duration_hours} h</p>}
+                {detail.item.delivery_mode && <p>Modalité : {displayValue(detail.item.delivery_mode)}</p>}
+                {detail.item.price_tnd !== null && detail.item.price_tnd !== undefined && <p>Prix : {detail.item.price_tnd} TND</p>}
+                <ul className="guest-detail__skills">{detail.item.skills.map((skill) => <li key={skill}>{skill}</li>)}</ul>
+              </article>
+            ) : (
+              <article className="guest-detail__panel">
+                <p className="guest-eyebrow">MISSION · {detail.item.category}</p>
+                <h2 id="guest-detail-title">{detail.item.title}</h2>
+                <p className="guest-card__location"><MapPin size={16} aria-hidden="true" />{detail.item.location || "À distance"}</p>
+                <p className="guest-detail__prose">{detail.item.description}</p>
+                <ul className="guest-detail__skills">{detail.item.required_skills.map((skill) => <li key={skill}>{skill}</li>)}</ul>
+                {formatRange(detail.item.budget_min, detail.item.budget_max) && <p>Budget : {formatRange(detail.item.budget_min, detail.item.budget_max)}</p>}
+                <p>{[displayValue(detail.item.work_mode), displayValue(detail.item.budget_type), detail.item.duration].filter(Boolean).join(" · ")}</p>
+              </article>
+            )}
+          </section>
+        ) : (
+          <>
+            <div className="guest-tabs" role="tablist" aria-label="Catégories de résultats">
+              {(Object.keys(tabLabels) as GuestTab[]).map((tab) => (
+                <button
+                  type="button"
+                  role="tab"
+                  key={tab}
+                  id={`guest-tab-${tab}`}
+                  aria-selected={activeTab === tab}
+                  aria-controls="guest-results-panel"
+                  tabIndex={activeTab === tab ? 0 : -1}
+                  className={activeTab === tab ? "guest-tab guest-tab--active" : "guest-tab"}
+                  onClick={() => setActiveTab(tab)}
+                  onKeyDown={(event) => {
+                    const tabs = Object.keys(tabLabels) as GuestTab[];
+                    const current = tabs.indexOf(tab);
+                    const nextIndex =
+                      event.key === "ArrowRight"
+                        ? (current + 1) % tabs.length
+                        : event.key === "ArrowLeft"
+                          ? (current - 1 + tabs.length) % tabs.length
+                          : event.key === "Home"
+                            ? 0
+                            : event.key === "End"
+                              ? tabs.length - 1
+                              : current;
+                    if (nextIndex !== current) {
+                      event.preventDefault();
+                      const nextTab = tabs[nextIndex];
+                      setActiveTab(nextTab);
+                      document.getElementById(`guest-tab-${nextTab}`)?.focus();
+                    }
+                  }}
+                >
+                  {tabLabels[tab]}
+                  <span>{tab === "all" ? Object.values(counts).reduce((sum, count) => sum + count, 0) : counts[tab]}</span>
+                </button>
+              ))}
+            </div>
+
+            <section id="guest-results-panel" role="tabpanel" aria-labelledby={`guest-tab-${activeTab}`} className="guest-results">
+              <header className="guest-results__heading">
+                <div>
+                  <p className="guest-eyebrow">VOTRE PROCHAINE OPPORTUNITÉ</p>
+                  <h2>{tabHeadings[activeTab]}</h2>
+                </div>
+                <span className="guest-results__count" aria-live="polite">
+                  {activeCount} résultat{activeCount === 1 ? "" : "s"}
+                </span>
+              </header>
+
+              {activeErrors.map((group) => (
+                <p className="guest-error" role="alert" key={group.type}>
+                  {group.state.error}
+                </p>
+              ))}
+              {anyLoading && (
+                <p className="guest-loading" aria-live="polite">
+                  {activeCards.length === 0 ? "Chargement des résultats…" : "Actualisation des résultats…"}
+                </p>
+              )}
+              {activeTab === "all" && activeCards.length > 0 ? (
+                <div className="guest-card-grid" aria-label="Résultats de toutes les catégories">
+                  {cardGroups.map((group) => group.cards.length > 0 && (
+                    <div className="guest-card-grid__group" key={group.type}>
+                      <h3>
+                        {tabLabels[group.type]}
+                        <button type="button" onClick={() => setActiveTab(group.type)}>Voir tout <ArrowRight size={15} aria-hidden="true" /></button>
+                      </h3>
+                      {group.cards.slice(0, 6).map(renderCard)}
+                    </div>
+                  ))}
+                </div>
+              ) : activeTab !== "all" && activeCards.length > 0 ? (
+                <div className="guest-card-grid">
+                  {activeCards.map(renderCard)}
+                </div>
+              ) : null}
+              {!anyLoading && activeCards.length === 0 && activeErrors.length === 0 && (
+                <div className="guest-empty">
+                  <h3>Aucun résultat pour cette recherche</h3>
+                  <p>Essayez un autre mot-clé, une autre ville ou une autre catégorie.</p>
+                </div>
+              )}
+
+              {activeTab === "jobs" && jobs.total > 20 && (
+                <div className="guest-pagination" aria-label="Pagination des offres">
+                  <button
+                    type="button"
+                    className="guest-button guest-button--outline"
+                    disabled={jobs.loading || jobs.offset === 0}
+                    onClick={() => void changeJobPage(Math.max(0, jobs.offset - 20))}
+                  >
+                    <ArrowLeft size={16} aria-hidden="true" /> Précédent
+                  </button>
+                  <span>{jobs.items.length ? jobs.offset + 1 : 0}–{Math.min(jobs.offset + jobs.items.length, jobs.total)} sur {jobs.total}</span>
+                  <button
+                    type="button"
+                    className="guest-button guest-button--outline"
+                    disabled={jobs.loading || jobs.offset + jobs.items.length >= jobs.total}
+                    onClick={() => void changeJobPage(jobs.offset + 20)}
+                  >
+                    Suivant <ArrowRight size={16} aria-hidden="true" />
+                  </button>
+                </div>
+              )}
+              {activeTab !== "all" && activeTab !== "jobs" && activeState && activeState.items.length < activeState.total && (
+                <div className="guest-load-more">
+                  <button
+                    type="button"
+                    className="guest-button guest-button--outline"
+                    disabled={activeState.loading}
+                    onClick={() => void loadMore(activeTab)}
+                  >
+                    {activeState.loading ? "Chargement…" : "Afficher plus de résultats"}
+                  </button>
+                </div>
+              )}
+            </section>
+          </>
         )}
-        {!loading && !error && total > 20 && (
-          <div className="guest-home__pagination" aria-label="Pagination des offres">
-            <Button variant="secondary" disabled={offset === 0} onClick={() => void search(query, location, Math.max(0, offset - 20))}>Précédent</Button>
-            <span>{offset + 1}–{Math.min(offset + jobs.length, total)} sur {total}</span>
-            <Button variant="secondary" disabled={offset + jobs.length >= total} onClick={() => void search(query, location, offset + 20)}>Suivant</Button>
-          </div>
-        )}
-        </>}
-      </section>
-      {!selectedJob && !selectedService && !selectedProfessional && !selectedCourse && (
-        <div className="guest-home__extra-sections">
-          {extraError && <p className="auth-error" role="alert">{extraError}</p>}
-          <section id="guest-missions" aria-labelledby="guest-missions-title"><div className="guest-home__results-heading"><div><div className="eyebrow">MISSIONS</div><h2 id="guest-missions-title">Missions et projets</h2></div></div>{extraLoading && missions.length === 0 ? <p>Chargement…</p> : missions.length ? <div className="guest-home__job-grid">{missions.map((item) => <article className="guest-job-card" key={item.id}><div className="eyebrow">{item.category}</div><h3>{item.title}</h3><p className="guest-job-card__location">{item.location || "À distance"} · {item.work_mode}</p><p className="guest-job-card__description">{item.description}</p><p>{item.required_skills.join(" · ")}</p><p>Budget : {item.budget_type}{item.budget_min ? ` · ${item.budget_min} TND` : ""}{item.budget_max ? ` – ${item.budget_max} TND` : ""}</p></article>)}</div> : <p className="guest-home__empty">Aucune mission publiée pour le moment.</p>}{missions.length < missionTotal && <Button variant="secondary" onClick={() => void loadMore("missions")} disabled={extraLoading}>Afficher plus de missions</Button>}</section>
-          <section id="guest-services" aria-labelledby="guest-services-title"><div className="guest-home__results-heading"><div><div className="eyebrow">SERVICES</div><h2 id="guest-services-title">Services près de chez vous</h2></div></div>{extraLoading && services.length === 0 ? <p>Chargement…</p> : services.length ? <div className="guest-home__job-grid">{services.map((item) => <article className="guest-job-card" key={item.id}><div className="eyebrow">{item.category}</div><h3>{item.title}</h3><p className="guest-job-card__location">{item.location || "À distance"}</p><p className="guest-job-card__description">{item.description}</p><Button variant="secondary" onClick={() => void openService(item)}>Voir le service</Button></article>)}</div> : <p className="guest-home__empty">Aucun service public pour le moment.</p>}{services.length < serviceTotal && <Button variant="secondary" onClick={() => void loadMore("services")} disabled={extraLoading}>Afficher plus de services</Button>}</section>
-          <section id="guest-professionals" aria-labelledby="guest-professionals-title"><div className="guest-home__results-heading"><div><div className="eyebrow">PROFESSIONNELS</div><h2 id="guest-professionals-title">Découvrez des professionnels</h2></div></div>{extraLoading && professionals.length === 0 ? <p>Chargement…</p> : professionals.length ? <div className="guest-home__job-grid">{professionals.map((profile) => <article className="guest-job-card" key={profile.id}><div className="eyebrow">{profile.available ? "Disponible" : "Indisponible"}</div><h3>{profile.display_name}</h3><p className="guest-job-card__location">{profile.headline} · {profile.location}</p><p className="guest-job-card__description">{profile.introduction}</p><Button variant="secondary" onClick={() => void openProfessional(profile)}>Voir le profil</Button></article>)}</div> : <p className="guest-home__empty">Aucun profil public pour le moment.</p>}{professionals.length < professionalTotal && <Button variant="secondary" onClick={() => void loadMore("professionals")} disabled={extraLoading}>Afficher plus de professionnels</Button>}</section>
-          <section id="guest-training" aria-labelledby="guest-training-title"><div className="guest-home__results-heading"><div><div className="eyebrow">FORMATION</div><h2 id="guest-training-title">Formations recommandées</h2></div></div>{extraLoading && courses.length === 0 ? <p>Chargement…</p> : courses.length ? <div className="guest-home__job-grid">{courses.map((course) => <article className="guest-job-card" key={course.id}><div className="eyebrow">{course.delivery_mode}</div><h3>{course.title}</h3><p className="guest-job-card__location">{course.location || "À distance"} · {course.duration_hours} h</p><p className="guest-job-card__description">{course.summary}</p><Button variant="secondary" onClick={() => void openCourse(course)}>Voir la formation</Button></article>)}</div> : <p className="guest-home__empty">Aucune formation publiée pour le moment.</p>}{courses.length < courseTotal && <Button variant="secondary" onClick={() => void loadMore("training")} disabled={extraLoading}>Afficher plus de formations</Button>}</section>
-        </div>
+      </div>
+
+      {!detail && (
+        <>
+          <section className="guest-bottom-cta">
+            <div className="guest-content">
+              <div>
+                <p className="guest-eyebrow">PRÊT·E À PASSER À L’ACTION ?</p>
+                <h2>Créez votre compte pour postuler, publier ou vous former</h2>
+              </div>
+              <a className="guest-button guest-button--terracotta" href="#guest-auth-signup">Créer un compte</a>
+            </div>
+          </section>
+          <footer className="guest-footer guest-content">
+            <a className="guest-brand" href="#accueil" aria-label="Mahara Match, accueil">
+              <span className="guest-brand__mark" aria-hidden="true">m</span>
+              <span>mahara<span>match</span></span>
+            </a>
+            <span>Les opportunités prennent forme ensemble.</span>
+          </footer>
+        </>
       )}
     </main>
   );

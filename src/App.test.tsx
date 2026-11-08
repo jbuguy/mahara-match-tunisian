@@ -57,6 +57,7 @@ describe("role-aware app shell", () => {
   beforeEach(() => {
     sessionStorage.clear();
     vi.unstubAllGlobals();
+    window.history.replaceState(null, "", "/");
   });
 
   it("shows a real candidate empty state instead of fabricated opportunity data", async () => {
@@ -1091,6 +1092,7 @@ describe("role-aware app shell", () => {
       return { ok: true, status: 200, json: async () => [] };
     });
     vi.stubGlobal("fetch", fetchMock);
+    window.location.hash = "#guest-auth";
     render(<App />);
 
     fireEvent.click(screen.getByRole("button", { name: "Candidat" }));
@@ -1114,6 +1116,7 @@ describe("role-aware app shell", () => {
         ? { ok: true, status: 200, json: async () => ({ items: [], total: 0, limit: 20, offset: 0 }) }
         : { ok: false, status: 401, json: async () => ({ detail: "Email or password is incorrect." }) }),
     );
+    window.location.hash = "#guest-auth";
     render(<App />);
     fireEvent.change(screen.getByLabelText("Adresse e-mail"), {
       target: { value: "candidate@demo.maharamatch.test" },
@@ -1185,16 +1188,17 @@ describe("role-aware app shell", () => {
       },
     );
     vi.stubGlobal("fetch", fetchMock);
+    window.location.hash = "#guest-auth";
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Créer un compte candidat" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Créer un compte" }));
     fireEvent.change(screen.getByLabelText("Adresse e-mail"), {
       target: { value: "amira@example.test" },
     });
     fireEvent.change(screen.getByLabelText("Mot de passe"), {
       target: { value: "A-Secure-Local-Passphrase-123" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Créer mon compte" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Créer mon compte" }));
 
     expect(await screen.findByRole("heading", {
       name: "Mon profil professionnel",
