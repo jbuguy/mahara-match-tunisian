@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { Maximize2, MessageCircle, Minus, Plus, Send, Sparkles, X } from "lucide-react";
+import { Maximize2, Mic, MessageCircle, Minus, Plus, Send, Sparkles, X } from "lucide-react";
 import { createCandidateAssistantSession, fetchCandidateAssistantSession, fetchCandidateAssistantSessions, sendCandidateAssistantSessionMessage, type CandidateAssistantSession } from "../auth";
 
 export function FloatingAssistant({ token, onExpand }: { token: string; onExpand: () => void }) {
@@ -44,6 +44,20 @@ export function FloatingAssistant({ token, onExpand }: { token: string; onExpand
     finally { setBusy(false); }
   }
 
+  function startVoiceInput() {
+    const Constructor = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!Constructor) return;
+    const recognition = new Constructor();
+    recognition.lang = navigator.language || "fr-FR";
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.onresult = (event) => {
+      const transcript = event.results[0]?.[0]?.transcript ?? "";
+      setText((current) => `${current}${current ? " " : ""}${transcript}`);
+    };
+    recognition.start();
+  }
+
   return <div className="floating-assistant">
     {open ? <section className="floating-assistant__panel" aria-label="Assistant carrière">
       <header className="floating-assistant__header"><span className="assistant-workspace__icon"><Sparkles size={17} /></span><div><strong>Assistant carrière</strong><small>Disponible pour vous aider</small></div>
@@ -53,7 +67,7 @@ export function FloatingAssistant({ token, onExpand }: { token: string; onExpand
         <button className="icon-button" aria-label="Fermer" onClick={() => setOpen(false)}><X size={17}/></button>
       </header>
       <div className="floating-assistant__messages" aria-live="polite">{busy && !session ? <p>Chargement…</p> : session?.messages.length ? session.messages.map((m, i) => <p className={`profile-assistant__message profile-assistant__message--${m.role}`} key={`${i}-${m.role}`}>{m.content}</p>) : <p className="profile-assistant__message profile-assistant__message--assistant">Aslema ! Comment puis-je vous accompagner aujourd’hui ?</p>}{busy && session && <p className="profile-assistant__pending">L’assistant prépare sa réponse…</p>}{error && <p className="career-assistant-error" role="alert">{error}</p>}</div>
-      <form className="floating-assistant__composer" onSubmit={(e) => void send(e)}><textarea aria-label="Votre message" value={text} onChange={(e) => setText(e.target.value)} placeholder="Écrivez votre message…" maxLength={3000} disabled={busy || !session}/><button className="button button--primary" aria-label="Envoyer" disabled={busy || !text.trim()}><Send size={17}/></button></form>
+      <form className="floating-assistant__composer" onSubmit={(e) => void send(e)}><textarea aria-label="Votre message" value={text} onChange={(e) => setText(e.target.value)} placeholder="Écrivez votre message…" maxLength={3000} disabled={busy || !session}/><button type="button" className="button button--secondary" aria-label="Dicter un message" title={window.SpeechRecognition || window.webkitSpeechRecognition ? "Dicter un message" : "Reconnaissance vocale non disponible"} disabled={!(window.SpeechRecognition || window.webkitSpeechRecognition)} onClick={startVoiceInput}><Mic size={17}/></button><button className="button button--primary" aria-label="Envoyer" disabled={busy || !text.trim()}><Send size={17}/></button></form>
     </section> : <button className="floating-assistant__launcher" aria-label="Ouvrir l’assistant" onClick={() => { const remembered = sessionStorage.getItem("mahara-assistant-session"); if (remembered && session?.id !== remembered) setSession(null); setOpen(true); }}><MessageCircle size={22}/><span>Assistant</span><i aria-hidden="true"/></button>}
   </div>;
 }

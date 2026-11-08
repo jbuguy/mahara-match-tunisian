@@ -44,7 +44,6 @@ import {
   TrainingProviderDashboardPage,
 } from "./marketplace";
 import {
-  CandidateAssistantPage,
   CandidateInterviewPreparationPage,
   CandidateMatchesPage,
   CandidateProfilePage,
@@ -65,7 +64,7 @@ import { GuestAuth } from "./GuestAuth";
 import { ProfessionalServicesPage } from "./ProfessionalServices";
 import { MissionsWorkspace } from "./MissionsWorkspace";
 import { ServiceRequestsWorkspace } from "./ServiceRequestsWorkspace";
-import { EmployerPlanningWorkspace } from "./EmployerPlanningWorkspace";
+import { UnifiedAssistantWorkspace } from "./UnifiedAssistantWorkspace";
 
 const roleConfiguration: Record<
   Role,
@@ -104,7 +103,6 @@ const roleConfiguration: Record<
       { label: "Entretiens", icon: CalendarClock },
       { label: "Notifications", icon: Bell },
       { label: "Statistiques", icon: ChartNoAxesCombined },
-      { label: "Planification RH avec l\u2019IA", icon: Sparkles },
       { label: "Assistant", icon: MessageCircle },
       { label: "Mon organisation", icon: Building2 },
     ],
@@ -114,7 +112,7 @@ const roleConfiguration: Record<
   ministry_admin: {
     label: "Administration",
     navigation: [{ label: "Vue d’ensemble", icon: LayoutDashboard },
-      { label: "Verifications organisations", icon: Building2 },
+      { label: "Vérifications organisations", icon: Building2 },
       { label: "Assistant", icon: MessageCircle },
     ],
     dashboardTitle: "Espace administration",
@@ -175,6 +173,25 @@ export default function App() {
     window.addEventListener("hashchange", syncGuestRoute);
     return () => window.removeEventListener("hashchange", syncGuestRoute);
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    const syncAssistantRoute = () => {
+      const hash = window.location.hash;
+      const projectMatch = hash.match(/^#assistant\/project\/([^/?#]+)/);
+      if (projectMatch) {
+        if (user.role !== "employer") {
+          window.location.hash = "#assistant";
+        }
+        setActivePage("Assistant");
+      } else if (hash === "#assistant") {
+        setActivePage("Assistant");
+      }
+    };
+    syncAssistantRoute();
+    window.addEventListener("hashchange", syncAssistantRoute);
+    return () => window.removeEventListener("hashchange", syncAssistantRoute);
+  }, [user]);
 
   useEffect(() => {
     if (!accessToken) {
@@ -317,9 +334,12 @@ export default function App() {
 
   const configuration = roleConfiguration[user.role];
   const isCandidate = user.role === "candidate";
+  const assistantRoute = window.location.hash.match(/^#assistant(?:\/project\/([^/?#]+))?/);
+  const assistantProjectId = assistantRoute?.[1];
+
 
   return (
-    <div className="app-shell" data-theme={theme}>
+    <div className={`app-shell ${activePage === "Assistant" ? "app-shell--assistant" : ""}`} data-theme={theme}>
       <aside className={`sidebar ${menuOpen ? "sidebar--open" : ""}`}>
         <div className="brand-row">
           <a
@@ -357,6 +377,7 @@ export default function App() {
               onClick={() => {
                 setActivePage(label);
                 setMenuOpen(false);
+                if (label === "Assistant") window.location.hash = "#assistant";
               }}
             >
               <Icon size={19} strokeWidth={1.8} aria-hidden="true" />
@@ -480,7 +501,7 @@ export default function App() {
           ) : isCandidate && activePage === "Préparer un entretien" ? (
             <CandidateInterviewPreparationPage token={accessToken} onNavigate={setActivePage} />
           ) : activePage === "Assistant" ? (
-            <CandidateAssistantPage token={accessToken} onNavigate={setActivePage} role={user.role} />
+            <UnifiedAssistantWorkspace token={accessToken} role={user.role} projectId={assistantProjectId} />
           ) : isCandidate && activePage === "Formations" ? (
             <CandidateCoursesPage token={accessToken} />
           ) : isCandidate && activePage === "Mes candidatures" ? (
@@ -493,8 +514,6 @@ export default function App() {
             <EmployerApplicationsPage token={accessToken} onNavigate={setActivePage} />
           ) : user.role === "employer" && activePage === "Mon organisation" ? (
             <EmployerOrganisationPage token={accessToken} />
-          ) : user.role === "employer" && activePage === "Planification RH avec l\u2019IA" ? (
-            <EmployerPlanningWorkspace token={accessToken} />
           ) : user.role === "employer" && activePage === "Trouver des candidats" ? (
             <EmployerCandidatesPage token={accessToken} />
           ) : user.role === "employer" && activePage === "Talents sauvegardés" ? (
@@ -527,7 +546,15 @@ export default function App() {
           )}
         </div>
       </main>
-      <FloatingAssistant token={accessToken} onExpand={() => setActivePage("Assistant")} />
+      {activePage !== "Assistant" && (
+        <FloatingAssistant
+          token={accessToken}
+          onExpand={() => {
+            window.location.hash = "#assistant";
+            setActivePage("Assistant");
+          }}
+        />
+      )}
     </div>
   );
 }

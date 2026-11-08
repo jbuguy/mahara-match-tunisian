@@ -93,6 +93,78 @@ export function deleteEmployerPlanningSession(token: string, sessionId: string):
   });
 }
 
+export type PlanningMessage = {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  created_at: string;
+};
+
+export function fetchEmployerPlanningMessages(
+  token: string,
+  sessionId: string,
+): Promise<PlanningMessage[]> {
+  return authenticatedRequest(token, `/employer/planning-sessions/${encodeURIComponent(sessionId)}/messages`);
+}
+
+export function sendEmployerPlanningMessage(
+  token: string,
+  sessionId: string,
+  content: string,
+): Promise<PlanningMessage[]> {
+  return authenticatedRequest(token, `/employer/planning-sessions/${encodeURIComponent(sessionId)}/messages`, {
+    method: "POST",
+    body: JSON.stringify({ content }),
+  });
+}
+
+export type PlanningDocument = {
+  id: string;
+  filename: string;
+  content_type: string;
+  size_bytes: number;
+  processing_status: string;
+  created_at: string;
+};
+
+export type PlanningRecommendation = {
+  id: string;
+  recommendation_type: string;
+  title: string;
+  rationale: string;
+  skills: string[];
+  priority: string;
+  status: string;
+  sources: Array<Record<string, unknown>>;
+  uncertainty: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export function fetchPlanningDocuments(token: string, sessionId: string): Promise<PlanningDocument[]> {
+  return authenticatedRequest(token, `/employer/planning-sessions/${encodeURIComponent(sessionId)}/documents`);
+}
+
+export function addPlanningDocument(token: string, sessionId: string, request: { filename: string; content_type: string; content: string }): Promise<PlanningDocument> {
+  return authenticatedRequest(token, `/employer/planning-sessions/${encodeURIComponent(sessionId)}/documents`, { method: "POST", body: JSON.stringify(request) });
+}
+
+export function fetchPlanningRecommendations(token: string, sessionId: string): Promise<PlanningRecommendation[]> {
+  return authenticatedRequest(token, `/employer/planning-sessions/${encodeURIComponent(sessionId)}/recommendations`);
+}
+
+export function analyzePlanningSession(token: string, sessionId: string): Promise<PlanningRecommendation[]> {
+  return authenticatedRequest(token, `/employer/planning-sessions/${encodeURIComponent(sessionId)}/analysis`, { method: "POST" });
+}
+
+export function updatePlanningRecommendation(token: string, sessionId: string, recommendationId: string, changes: Partial<Pick<PlanningRecommendation, "title" | "rationale" | "skills" | "priority" | "status">>): Promise<PlanningRecommendation> {
+  return authenticatedRequest(token, `/employer/planning-sessions/${encodeURIComponent(sessionId)}/recommendations/${encodeURIComponent(recommendationId)}`, { method: "PATCH", body: JSON.stringify(changes) });
+}
+
+export function createPlanningDraftOffer(token: string, sessionId: string, recommendationId: string): Promise<{ id: string; status: string; created: boolean }> {
+  return authenticatedRequest(token, `/employer/planning-sessions/${encodeURIComponent(sessionId)}/recommendations/${encodeURIComponent(recommendationId)}/draft-offer`, { method: "POST" });
+}
+
 export type JobOffer = {
   id: string;
   title: string;

@@ -115,7 +115,7 @@ describe("role-aware app shell", () => {
         "Mon profil",
       ],
     ],
-    ["employer", ["Vue d’ensemble", "Mes offres", "Candidatures", "Assistant", "Mon organisation", "Planification RH avec l\u2019IA"]],
+    ["employer", ["Vue d’ensemble", "Mes offres", "Candidatures", "Assistant", "Mon organisation"]],
     [
       "ministry_admin",
       ["Vue d’ensemble", "Assistant"],
@@ -136,7 +136,7 @@ describe("role-aware app shell", () => {
     if (role !== "employer" && role !== "ministry_admin" && role !== "candidate") {
       expect(navigation.getAllByRole("button")).toHaveLength(allowedItems.length);
     } else {
-      expect(navigation.getAllByRole("button")).toHaveLength(role === "employer" ? 12 : role === "candidate" ? 9 : 3);
+      expect(navigation.getAllByRole("button")).toHaveLength(role === "employer" ? 11 : role === "candidate" ? 9 : 3);
     }
     for (const label of allowedItems) {
       expect(navigation.getByRole("button", { name: label })).toBeVisible();

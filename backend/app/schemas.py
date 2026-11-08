@@ -747,6 +747,64 @@ class PlanningSessionResponse(BaseModel):
     updated_at: datetime
 
 
+class PlanningMessageRequest(BaseModel):
+    content: str = Field(min_length=1, max_length=3000)
+
+
+class PlanningMessageResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    role: str
+    content: str
+    created_at: datetime
+
+
+class PlanningSummaryUpdateRequest(BaseModel):
+    project_summary: dict[str, object] = Field(max_length=100)
+
+
+class PlanningDocumentCreateRequest(BaseModel):
+    filename: str = Field(min_length=1, max_length=255)
+    content_type: str = Field(default="text/plain", max_length=120)
+    content: str = Field(min_length=1, max_length=200000)
+
+
+class PlanningDocumentResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    filename: str
+    content_type: str
+    size_bytes: int
+    processing_status: str
+    created_at: datetime
+
+
+class PlanningRecommendationResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    recommendation_type: str
+    title: str
+    rationale: str
+    skills: list[str]
+    priority: str
+    status: str
+    sources: list[dict[str, object]]
+    uncertainty: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class PlanningRecommendationUpdateRequest(BaseModel):
+    title: str | None = Field(default=None, min_length=2, max_length=160)
+    rationale: str | None = Field(default=None, min_length=3, max_length=5000)
+    skills: list[str] | None = Field(default=None, max_length=30)
+    priority: str | None = None
+    status: str | None = None
+
+
 class JobOfferCreate(BaseModel):
     title: str = Field(min_length=2, max_length=160)
     description: str = Field(min_length=10, max_length=5000)

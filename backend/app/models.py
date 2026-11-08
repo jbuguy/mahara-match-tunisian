@@ -13,6 +13,7 @@ from sqlalchemy import (
     Index,
     Numeric,
     String,
+    Text,
     UniqueConstraint,
     event,
 )
@@ -312,6 +313,84 @@ class EmployerPlanningSession(Base):
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc), nullable=False
     )
+
+    messages: Mapped[list["EmployerPlanningMessage"]] = relationship(
+        back_populates="planning_session", cascade="all, delete-orphan"
+    )
+    documents: Mapped[list["EmployerPlanningDocument"]] = relationship(
+        back_populates="planning_session", cascade="all, delete-orphan"
+    )
+    recommendations: Mapped[list["EmployerPlanningRecommendation"]] = relationship(
+        back_populates="planning_session", cascade="all, delete-orphan"
+    )
+
+
+class EmployerPlanningMessage(Base):
+    __tablename__ = "employer_planning_messages"
+    __table_args__ = (
+        Index("ix_planning_messages_session_created", "planning_session_id", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    planning_session_id: Mapped[str] = mapped_column(
+        ForeignKey("employer_planning_sessions.id", ondelete="CASCADE"), nullable=False
+    )
+    role: Mapped[str] = mapped_column(String(20), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+
+    planning_session: Mapped[EmployerPlanningSession] = relationship(back_populates="messages")
+
+
+class EmployerPlanningDocument(Base):
+    __tablename__ = "employer_planning_documents"
+    __table_args__ = (
+        Index("ix_planning_documents_session_created", "planning_session_id", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    planning_session_id: Mapped[str] = mapped_column(
+        ForeignKey("employer_planning_sessions.id", ondelete="CASCADE"), nullable=False
+    )
+    filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    content_type: Mapped[str] = mapped_column(String(120), nullable=False)
+    size_bytes: Mapped[int] = mapped_column(nullable=False)
+    extracted_text: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    processing_status: Mapped[str] = mapped_column(String(20), default="completed", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    planning_session: Mapped[EmployerPlanningSession] = relationship(back_populates="documents")
+
+
+class EmployerPlanningRecommendation(Base):
+    __tablename__ = "employer_planning_recommendations"
+    __table_args__ = (
+        Index("ix_planning_recommendations_session_created", "planning_session_id", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    planning_session_id: Mapped[str] = mapped_column(
+        ForeignKey("employer_planning_sessions.id", ondelete="CASCADE"), nullable=False
+    )
+    recommendation_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    title: Mapped[str] = mapped_column(String(160), nullable=False)
+    rationale: Mapped[str] = mapped_column(Text, nullable=False)
+    skills: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    priority: Mapped[str] = mapped_column(String(20), default="medium", nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False)
+    sources: Mapped[list[dict[str, object]]] = mapped_column(JSON, default=list, nullable=False)
+    uncertainty: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    planning_session: Mapped[EmployerPlanningSession] = relationship(back_populates="recommendations")
 
 
 class OrganisationVerificationRequest(Base):
@@ -801,6 +880,12 @@ class JobOffer(Base):
     salary_min: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     salary_max: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     application_deadline: Mapped[date | None] = mapped_column(nullable=True)
+    planning_session_id: Mapped[str | None] = mapped_column(
+        ForeignKey("employer_planning_sessions.id", ondelete="SET NULL"), nullable=True
+    )
+    planning_recommendation_id: Mapped[str | None] = mapped_column(
+        ForeignKey("employer_planning_recommendations.id", ondelete="SET NULL"), nullable=True
+    )
     status: Mapped[JobOfferStatus] = mapped_column(
         SqlEnum(
             JobOfferStatus,

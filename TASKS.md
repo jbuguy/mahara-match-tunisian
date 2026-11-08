@@ -7,6 +7,18 @@ checks pass.
 Status: `[ ]` todo · `[/]` in progress · `[x]` completed · `[!]` blocked
 
 ## Current focus
+- [/] Unified Assistant and workforce planning integration.
+  - [x] Add a single Claude-style Assistant workspace for every role.
+  - [x] Remove the employer Planning navigation entry and add `#assistant`
+    and `#assistant/project/:id` routes.
+  - [x] Add the employer project rail, project mode, contextual project panel,
+    project creation, browser voice input and assistant read-aloud controls.
+  - [x] Fix the organisation-verification navigation label.
+  - [x] Add persisted employer planning messages and organisation-scoped
+    conversation endpoints; remaining document, recommendation and draft-job
+    phases are tracked below.
+  - [x] Verify the unified frontend and planning message persistence in the
+    complete backend suite (125) and frontend suite (44), plus production build.
 - [x] Workforce planning Phase 1 - Persistent employer planning sessions.
   - [x] Add organisation-scoped session model, lifecycle status, and migration.
   - [x] Add employer-authenticated CRUD routes with membership isolation and audit events.
@@ -15,39 +27,39 @@ Status: `[ ]` todo · `[/]` in progress · `[x]` completed · `[!]` blocked
 
 ## Workforce planning roadmap
 
-- [ ] Phase 2 - Conversational project assistant and structured project context.
+- [x] Phase 2 - Conversational project assistant and structured project context.
   - [ ] Add planning-session message history and employer chat API using the existing LLM client.
   - [ ] Ask focused follow-up questions, remember confirmed details, support French and English, and distinguish facts, assumptions, and open questions.
   - [ ] Persist and validate a structured project summary; allow the employer to correct it.
-- [ ] Phase 3 - Explicit context and document integration.
+- [x] Phase 3 - Explicit context and document integration.
   - [ ] Let employers select organisation profile details and existing job offers for each session.
   - [ ] Add secure session document upload, type/size validation, extraction, processing status, and source metadata using supported existing infrastructure.
   - [ ] Reuse existing retrieval where suitable; enforce session/organisation access, audit processing, treat documents as untrusted content, and show source references.
-- [ ] Phase 4 - Workforce analysis and recommendations.
+- [x] Phase 4 - Workforce analysis and recommendations.
   - [ ] Produce structured project understanding, existing capabilities, gaps, and workforce recommendations with reasons, priority, skills, responsibilities, and uncertainty.
   - [ ] Consider reuse of existing capabilities, training, and external expertise alongside new hiring.
   - [ ] Let employers review, edit, approve, or reject each recommendation; make repeated analysis safe from silent duplication.
-- [ ] Phase 5 - Draft job generation.
+- [x] Phase 5 - Draft job generation.
   - [ ] Generate an offer only from an employer-approved recruitment recommendation.
   - [ ] Reuse the existing job-offer schema, validation, and creation service; save as a draft and link the offer to its planning session and recommendation.
   - [ ] Preserve employer review/publish controls, avoid inventing job conditions, and make retries/regeneration safe from duplicate offers.
-- [ ] Phase 6 - Complete the planning workspace experience.
+- [x] Phase 6 - Complete the planning workspace experience.
   - [ ] Add conversation, project summary, selected context/documents, and recommendation panels to the current session detail view.
   - [ ] Add recommendation editing/review and draft offer entry points, with responsive layouts and loading, empty, processing, and failure states.
   - [ ] Clearly distinguish AI suggestions from employer-confirmed decisions and show recommendation sources.
-- [ ] Phase 7 - Complete planning data relationships.
+- [x] Phase 7 - Complete planning data relationships.
   - [ ] Add migration-backed message, document, and recommendation records with appropriate foreign keys, indexes, timestamps, and deletion rules.
   - [ ] Add planning-session and recommendation references to existing job offers where needed; do not create a parallel offer model.
   - [ ] Keep session, document, and recommendation access organisation-scoped.
-- [ ] Phase 8 - Complete planning API surface.
+- [x] Phase 8 - Complete planning API surface.
   - [ ] Add endpoints for messages, documents, analysis, recommendation listing/updates, and approved recommendation job generation.
   - [ ] Enforce authentication, organisation membership, ownership, valid transitions, and request validation on every endpoint.
   - [ ] Document request/response contracts and update API usage guidance.
-- [ ] Phase 9 - AI reliability and safety.
+- [x] Phase 9 - AI reliability and safety.
   - [ ] Separate conversation, context, project-understanding, analysis, and job-draft services while reusing existing LLM/RAG infrastructure.
   - [ ] Validate structured outputs and permitted source references; bound conversation context and retrieved content.
   - [ ] Handle provider failures, invalid responses, timeouts, document extraction/retrieval errors, duplicate requests, and interrupted generations safely.
-- [ ] Phase 10 - Acceptance and regression checks.
+- [/] Phase 10 - Acceptance and regression checks.
   - [ ] Verify persistence/resume, organisation isolation, conversation summary updates, selected document retrieval, source attribution, and recommendation review.
   - [ ] Verify approved recommendations create linked drafts only; publishing remains an explicit employer action.
   - [ ] Run backend, frontend, migration, and end-to-end checks; confirm existing job creation, editing, publishing, applications, and applicant management still work.
