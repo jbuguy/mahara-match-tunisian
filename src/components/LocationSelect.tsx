@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useState } from "react";
+import { API_BASE_URL } from "../auth";
 
 export type Governorate = {
   code: string;
@@ -23,11 +24,108 @@ function normalize(value: string): string {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("fr");
 }
 
+function PlaceCombobox({
+  label,
+  id,
+  items,
+  selectedCode,
+  disabled = false,
+  required = false,
+  placeholder,
+  emptyLabel,
+  onSelect,
+}: {
+  label: string;
+  id: string;
+  items: Array<{ code: string; name_fr: string; name_ar: string }>;
+  selectedCode: string;
+  disabled?: boolean;
+  required?: boolean;
+  placeholder: string;
+  emptyLabel?: string;
+  onSelect: (code: string) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const selected = items.find((item) => item.code === selectedCode);
+
+  useEffect(() => {
+    setQuery(selected ? `${selected.name_fr}${selected.name_ar ? ` — ${selected.name_ar}` : ""}` : "");
+    setOpen(false);
+  }, [selectedCode, selected?.name_fr, selected?.name_ar]);
+
+  const matches = useMemo(() => {
+    const normalizedQuery = normalize(query);
+    return items.filter((item) => normalize(`${item.name_fr} ${item.name_ar}`).includes(normalizedQuery));
+  }, [items, query]);
+
+  const choose = (code: string) => {
+    const item = items.find((entry) => entry.code === code);
+    setQuery(item ? `${item.name_fr}${item.name_ar ? ` — ${item.name_ar}` : ""}` : "");
+    setOpen(false);
+    onSelect(code);
+  };
+
+  return (
+    <div className="place-combobox">
+      <label className="form-field__label" htmlFor={id}>{label}</label>
+      <div className="place-combobox__control">
+        <input
+          id={id}
+          className="input"
+          role="combobox"
+          aria-expanded={open}
+          aria-controls={`${id}-options`}
+          aria-autocomplete="list"
+          autoComplete="off"
+          required={required}
+          disabled={disabled}
+          value={query}
+          placeholder={placeholder}
+          onFocus={() => { if (!disabled) setOpen(true); }}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setOpen(true);
+            if (!event.target.value && selectedCode) onSelect("");
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") setOpen(false);
+            if (event.key === "Enter" && open && matches.length === 1) {
+              event.preventDefault();
+              choose(matches[0].code);
+            }
+            if (event.key === "ArrowDown") {
+              event.preventDefault();
+              setOpen(true);
+            }
+          }}
+          onBlur={() => window.setTimeout(() => setOpen(false), 100)}
+        />
+        {open && !disabled ? (
+          <div id={`${id}-options`} className="place-combobox__options" role="listbox" aria-label={label}>
+            {matches.length ? matches.map((item) => (
+              <button key={item.code} type="button" role="option" aria-selected={item.code === selectedCode}
+                onClick={() => choose(item.code)}>
+                <span>{item.name_fr}</span>
+                {item.name_ar && <small>{item.name_ar}</small>}
+              </button>
+            )) : <p>{emptyLabel ?? "Aucun résultat"}</p>}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 async function readJson<T>(url: string, key: string): Promise<T[]> {
   const cached = cache.get(key) as T[] | undefined;
   if (cached) return cached;
   const response = await fetch(url);
   if (!response.ok) throw new Error("Impossible de charger les zones géographiques.");
+  const contentType = response.headers.get("content-type") ?? "";
+  if (contentType.includes("text/html")) {
+    throw new Error("Le serveur de localisation est indisponible.");
+  }
   const data = await response.json() as T[];
   cache.set(key, data as Governorate[] | Municipality[]);
   return data;
@@ -53,39 +151,34 @@ export function LocationSelect({
   const addressId = useId();
   const [governorates, setGovernorates] = useState<Governorate[]>([]);
   const [municipalities, setMunicipalities] = useState<Municipality[]>([]);
-  const [governorateSearch, setGovernorateSearch] = useState("");
-  const [municipalitySearch, setMunicipalitySearch] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
-    void readJson<Governorate>("/locations/governorates", "governorates")
+    const baseUrl = API_BASE_URL.replace(/\/$/, "");
+    void readJson<Governorate>(`${baseUrl}/locations/governorates`, "governorates")
       .then(setGovernorates)
       .catch((cause: Error) => setError(cause.message));
   }, []);
 
   useEffect(() => {
     setMunicipalities([]);
-    setMunicipalitySearch("");
     if (!governorateCode) return;
+    const baseUrl = API_BASE_URL.replace(/\/$/, "");
     void readJson<Municipality>(
-      `/locations/governorates/${encodeURIComponent(governorateCode)}/municipalities`,
+      `${baseUrl}/locations/governorates/${encodeURIComponent(governorateCode)}/municipalities`,
       `municipalities:${governorateCode}`,
     ).then(setMunicipalities).catch((cause: Error) => setError(cause.message));
   }, [governorateCode]);
 
-  const filteredGovernorates = useMemo(() => {
-    const query = normalize(governorateSearch);
-    return governorates
-      .filter((item) => !query || `${normalize(item.name_fr)} ${item.name_ar}`.includes(query))
+  const sortedGovernorates = useMemo(() => {
+    return [...governorates]
       .sort((left, right) => left.name_fr.localeCompare(right.name_fr, "fr"));
-  }, [governorates, governorateSearch]);
+  }, [governorates]);
 
-  const filteredMunicipalities = useMemo(() => {
-    const query = normalize(municipalitySearch);
-    return municipalities
-      .filter((item) => !query || `${normalize(item.name_fr)} ${normalize(item.name_ar)}`.includes(query))
+  const sortedMunicipalities = useMemo(() => {
+    return [...municipalities]
       .sort((left, right) => left.name_fr.localeCompare(right.name_fr, "fr"));
-  }, [municipalities, municipalitySearch]);
+  }, [municipalities]);
 
   return (
     <fieldset className="location-select">
@@ -93,33 +186,26 @@ export function LocationSelect({
       {error && <p role="alert">{error}</p>}
       {!governorateCode && <p role="status">Veuillez choisir votre gouvernorat.</p>}
       <div className="location-select__grid">
-        <div className="form-field">
-          <label className="form-field__label" htmlFor={`${governorateId}-search`}>Gouvernorat</label>
-          <input id={`${governorateId}-search`} className="input" value={governorateSearch}
-            onChange={(event) => setGovernorateSearch(event.target.value)} placeholder="Rechercher" />
-          <select id={`${governorateId}-select`} className="select" required={governorateRequired}
-            aria-label="Gouvernorat" value={governorateCode}
-            onChange={(event) => onChange({ governorateCode: event.target.value, municipalityCode: "", streetAddress })}>
-            <option value="">Sélectionner</option>
-            {filteredGovernorates.map((item) => (
-              <option key={item.code} value={item.code}>{item.name_fr} — {item.name_ar}</option>
-            ))}
-          </select>
-        </div>
-        <div className="form-field">
-          <label className="form-field__label" htmlFor={`${municipalityId}-search`}>Municipalité</label>
-          <input id={`${municipalityId}-search`} className="input" value={municipalitySearch}
-            disabled={!governorateCode} onChange={(event) => setMunicipalitySearch(event.target.value)}
-            placeholder="Rechercher" />
-          <select id={`${municipalityId}-select`} className="select" disabled={!governorateCode}
-            required={!municipalityOptional} aria-label="Municipalité" value={municipalityCode}
-            onChange={(event) => onChange({ governorateCode, municipalityCode: event.target.value, streetAddress })}>
-            <option value="">{municipalityOptional ? "Non renseignée" : "Sélectionner"}</option>
-            {filteredMunicipalities.map((item) => (
-              <option key={item.code} value={item.code}>{item.name_fr}{item.name_ar ? ` — ${item.name_ar}` : ""}</option>
-            ))}
-          </select>
-        </div>
+        <PlaceCombobox
+          id={`${governorateId}-input`}
+          label="Gouvernorat"
+          items={sortedGovernorates}
+          selectedCode={governorateCode}
+          required={governorateRequired}
+          placeholder="Rechercher un gouvernorat"
+          onSelect={(code) => onChange({ governorateCode: code, municipalityCode: "", streetAddress })}
+        />
+        <PlaceCombobox
+          id={`${municipalityId}-input`}
+          label="Municipalité"
+          items={sortedMunicipalities}
+          selectedCode={municipalityCode}
+          disabled={!governorateCode}
+          required={!municipalityOptional}
+          placeholder={governorateCode ? "Rechercher une municipalité" : "Choisissez un gouvernorat"}
+          emptyLabel="Aucune municipalité ne correspond."
+          onSelect={(code) => onChange({ governorateCode, municipalityCode: code, streetAddress })}
+        />
       </div>
       <label className="form-field" htmlFor={addressId}>
         <span className="form-field__label">Adresse / quartier</span>

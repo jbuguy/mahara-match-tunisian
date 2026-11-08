@@ -1,10 +1,20 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import {
-  Bot, ChevronRight, Copy, FileText, Menu, MoreHorizontal,
+  Bot, Check, ChevronRight, Copy, FileText, Menu, MoreHorizontal,
   Mic, MicOff, Paperclip, Pause, Pencil, Plus, RefreshCcw,
   Search, Send, Square, Trash2, Volume2, X,
 } from "lucide-react";
 import {
+  createCandidateRoadmapProject,
+  decideCandidateRoadmapProposal,
+  enrollInCourse,
+  fetchCandidateEnrollments,
+  fetchCandidateMatches,
+  fetchCandidateRoadmap,
+  fetchCandidateRoadmapAssessments,
+  fetchCandidateRoadmapProjects,
+  fetchCandidateRoadmapProposals,
+  fetchPublishedCourses,
   createCandidateAssistantSession,
   createEmployerPlanningSession,
   deleteCandidateAssistantSession,
@@ -22,9 +32,20 @@ import {
   fetchPlanningDocuments,
   fetchPlanningRecommendations,
   updatePlanningRecommendation,
+  updateCandidateRoadmapGoal,
+  updateCandidateRoadmapStep,
+  updateCandidateRoadmapProjectStatus,
   type CandidateAssistantMessage,
   type CandidateAssistantSession,
   type CandidateAssistantSessionSummary,
+  type CandidateRoadmap,
+  type CandidateRoadmapAssessment,
+  type CandidateRoadmapGoalUpdate,
+  type CandidateRoadmapProject,
+  type CandidateRoadmapProposal,
+  type CourseEnrollment,
+  type JobMatch,
+  type TrainingCourse,
   type EmployerPlanningSession,
   type PlanningMessage,
   type PlanningDocument,
@@ -70,8 +91,8 @@ const prompts: Record<Role, string[]> = {
 };
 
 export function UnifiedAssistantWorkspace({
-  token, role, projectId,
-}: { token: string; role: Role; projectId?: string }) {
+  token, role, projectId, onNavigate,
+}: { token: string; role: Role; projectId?: string; onNavigate?: (page: string) => void }) {
   const [sessions, setSessions] = useState<CandidateAssistantSessionSummary[]>([]);
   const [activeSession, setActiveSession] = useState<CandidateAssistantSession | null>(null);
   const [projects, setProjects] = useState<EmployerPlanningSession[]>([]);
@@ -85,9 +106,12 @@ export function UnifiedAssistantWorkspace({
   const [error, setError] = useState("");
   const [railOpen, setRailOpen] = useState(false);
   const [panelOpen, setPanelOpen] = useState(() => localStorage.getItem("mahara-project-panel") !== "closed");
+  const [roadmapOpen, setRoadmapOpen] = useState(false);
   const [panelTab, setPanelTab] = useState<"resume" | "context" | "recommendations">("resume");
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [projectMenu, setProjectMenu] = useState<string | null>(null);
+  const [editingConversationId, setEditingConversationId] = useState<string | null>(null);
+  const [conversationTitleDraft, setConversationTitleDraft] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -208,13 +232,25 @@ export function UnifiedAssistantWorkspace({
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Impossible de créer la conversation."); }
   }
 
+  function startRenamingConversation(session: CandidateAssistantSessionSummary) {
+    setEditingConversationId(session.id);
+    setConversationTitleDraft(session.title);
+  }
+
   async function renameConversation(session: CandidateAssistantSessionSummary) {
-    const title = window.prompt("Nouveau titre", session.title);
-    if (!title?.trim()) return;
+    const title = conversationTitleDraft.trim();
+    if (!title) return;
     try {
       await renameCandidateAssistantSession(token, session.id, title.trim());
       setSessions((current) => current.map((item) => item.id === session.id ? { ...item, title: title.trim() } : item));
+      setEditingConversationId(null);
+      setConversationTitleDraft("");
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Impossible de renommer la conversation."); }
+  }
+
+  function cancelRenamingConversation() {
+    setEditingConversationId(null);
+    setConversationTitleDraft("");
   }
 
   async function removeConversation(sessionId: string) {
@@ -278,9 +314,31 @@ export function UnifiedAssistantWorkspace({
       <div className="assistant-section__heading"><span>CONVERSATIONS</span></div>
       <nav className="assistant-conversation-list" aria-label="Conversations">
         {visibleSessions.map((session) => <div className={`assistant-conversation-row ${activeSession?.id === session.id ? "is-active" : ""}`} key={session.id}>
-          <button className="assistant-conversation-title" onClick={() => void openSession(session.id)}>{session.title}</button>
-          <button className="icon-button" aria-label={`Options pour ${session.title}`} onClick={() => void renameConversation(session)}><Pencil size={14}/></button>
-          <button className="icon-button" aria-label={`Supprimer ${session.title}`} onClick={() => void removeConversation(session.id)}><Trash2 size={14}/></button>
+          {editingConversationId === session.id ? <>
+            <input
+              className="assistant-conversation-title-input"
+              aria-label={`Renommer ${session.title}`}
+              value={conversationTitleDraft}
+              onChange={(event) => setConversationTitleDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") void renameConversation(session);
+                if (event.key === "Escape") cancelRenamingConversation();
+              }}
+              autoFocus
+            />
+            <button className="icon-button assistant-conversation-confirm" aria-label="Valider le nouveau titre" disabled={!conversationTitleDraft.trim()} onClick={() => void renameConversation(session)}><Check size={14}/></button>
+            <button className="icon-button" aria-label="Annuler le renommage" onClick={cancelRenamingConversation}><X size={14}/></button>
+          </> : <>
+            <button
+              className="assistant-conversation-title"
+              title={session.title}
+              onClick={() => void openSession(session.id)}
+            >
+              {session.title}
+            </button>
+            <button className="icon-button" aria-label={`Renommer ${session.title}`} onClick={() => startRenamingConversation(session)}><Pencil size={14}/></button>
+            <button className="icon-button" aria-label={`Supprimer ${session.title}`} onClick={() => void removeConversation(session.id)}><Trash2 size={14}/></button>
+          </>}
         </div>)}
       </nav>
     </aside>
@@ -288,6 +346,7 @@ export function UnifiedAssistantWorkspace({
       <header className="assistant-chat__header">
         <h1 className="sr-only">{role === "candidate" ? "Votre assistant carrière" : role === "employer" ? "Votre assistant recrutement" : "Votre assistant"}</h1>
         <div><strong>{isProjectMode ? activeProject?.title : activeSession?.title || "Assistant"}</strong>{isProjectMode && <><span className="assistant-project-type">{projectTypes[activeProject!.project_type]}</span><span className="status-badge">En cours</span></>}</div>
+        {role === "candidate" && <button className="button button--secondary button--small" aria-expanded={roadmapOpen} onClick={() => setRoadmapOpen((current) => !current)}>Mon parcours</button>}
         {isProjectMode && <button className="button button--secondary button--small" onClick={() => { setPanelOpen((current) => { localStorage.setItem("mahara-project-panel", current ? "closed" : "open"); return !current; }); }}>Panneau du projet</button>}
       </header>
       <div className="assistant-chat__messages" aria-live="polite">
@@ -314,6 +373,7 @@ export function UnifiedAssistantWorkspace({
       </form>
     </main>
     {isProjectMode && activeProject && panelOpen && <ProjectPanel token={token} project={activeProject} activeTab={panelTab} onTabChange={setPanelTab} onClose={() => setPanelOpen(false)}/>}
+    {role === "candidate" && roadmapOpen && <RoadmapPanel token={token} onClose={() => setRoadmapOpen(false)} onNavigate={onNavigate}/>}
     {newProjectOpen && <NewProjectDialog token={token} onClose={() => setNewProjectOpen(false)} onCreated={(project) => { setProjects((current) => [project, ...current]); setNewProjectOpen(false); window.location.hash = `#assistant/project/${project.id}`; }}/>}
   </section>;
 }
@@ -415,4 +475,179 @@ function NewProjectDialog({ token, onClose, onCreated }: { token: string; onClos
       <div className="assistant-dialog-actions"><button type="button" className="button button--secondary" onClick={onClose}>Annuler</button><button className="button button--primary" disabled={busy || title.trim().length < 2}>{busy ? "Création…" : "Créer le projet"}</button></div>
     </form>
   </div>;
+}
+
+function RoadmapPanel({ token, onClose, onNavigate }: { token: string; onClose: () => void; onNavigate?: (page: string) => void }) {
+  const [roadmap, setRoadmap] = useState<CandidateRoadmap | null>(null);
+  const [matches, setMatches] = useState<JobMatch[]>([]);
+  const [courses, setCourses] = useState<TrainingCourse[]>([]);
+  const [enrollments, setEnrollments] = useState<CourseEnrollment[]>([]);
+  const [projects, setProjects] = useState<CandidateRoadmapProject[]>([]);
+  const [assessments, setAssessments] = useState<CandidateRoadmapAssessment[]>([]);
+  const [proposals, setProposals] = useState<CandidateRoadmapProposal[]>([]);
+  const [projectSkill, setProjectSkill] = useState("");
+  const [projectTitle, setProjectTitle] = useState("");
+  const [projectDescription, setProjectDescription] = useState("");
+  const [goalType, setGoalType] = useState<CandidateRoadmapGoalUpdate["goal_type"]>("target_job");
+  const [targetOfferId, setTargetOfferId] = useState("");
+  const [goalTitle, setGoalTitle] = useState("");
+  const [skillText, setSkillText] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    void Promise.all([fetchCandidateRoadmap(token), fetchCandidateMatches(token), fetchPublishedCourses(token), fetchCandidateEnrollments(token), fetchCandidateRoadmapProjects(token), fetchCandidateRoadmapAssessments(token), fetchCandidateRoadmapProposals(token)])
+      .then(([currentRoadmap, currentMatches, currentCourses, currentEnrollments, currentProjects, currentAssessments, currentProposals]) => {
+        if (cancelled) return;
+        setRoadmap(currentRoadmap);
+        setMatches(currentMatches);
+        setCourses(currentCourses);
+        setEnrollments(currentEnrollments);
+        setProjects(currentProjects);
+        setAssessments(currentAssessments);
+        setProposals(currentProposals);
+        if (currentRoadmap.goal_type) setGoalType(currentRoadmap.goal_type);
+        setTargetOfferId(currentRoadmap.target_offer_id ?? currentMatches[0]?.id ?? "");
+        setGoalTitle(currentRoadmap.goal_title ?? currentMatches[0]?.title ?? "");
+        setSkillText((currentRoadmap.selected_skills ?? []).join(", "));
+      })
+      .catch((cause) => { if (!cancelled) setError(cause instanceof Error ? cause.message : "Impossible de charger le parcours."); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [token]);
+
+  async function saveGoal(event: FormEvent) {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    const goal: CandidateRoadmapGoalUpdate = goalType === "target_job"
+      ? { goal_type: goalType, title: goalTitle.trim(), target_offer_id: targetOfferId, skills: [] }
+      : { goal_type: goalType, title: goalTitle.trim(), skills: skillText.split(",").map((skill) => skill.trim()).filter(Boolean) };
+    try { setRoadmap(await updateCandidateRoadmapGoal(token, goal)); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : "Impossible d’enregistrer cet objectif."); }
+    finally { setBusy(false); }
+  }
+
+  async function toggleStep(skill: string, completed: boolean) {
+    setBusy(true);
+    setError("");
+    try { setRoadmap(await updateCandidateRoadmapStep(token, skill, completed)); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : "Impossible d’enregistrer la progression."); }
+    finally { setBusy(false); }
+  }
+
+  async function enroll(courseId: string) {
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      const enrollment = await enrollInCourse(token, courseId);
+      setEnrollments((current) => [...current.filter((item) => item.id !== enrollment.id), enrollment]);
+      setNotice("Inscription ajoutée à vos formations.");
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Impossible de s’inscrire."); }
+    finally { setBusy(false); }
+  }
+
+  async function addProject(event: FormEvent) {
+    event.preventDefault();
+    if (!projectSkill || projectTitle.trim().length < 2) return;
+    setBusy(true);
+    setError("");
+    try {
+      const project = await createCandidateRoadmapProject(token, { skill: projectSkill, title: projectTitle.trim(), description: projectDescription.trim() });
+      setProjects((current) => [project, ...current]);
+      setProjectSkill("");
+      setProjectTitle("");
+      setProjectDescription("");
+      setNotice("Projet pratique ajouté au parcours.");
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Impossible d’ajouter le projet."); }
+    finally { setBusy(false); }
+  }
+
+  async function changeProjectStatus(project: CandidateRoadmapProject, nextStatus: CandidateRoadmapProject["status"]) {
+    setBusy(true);
+    try {
+      const updated = await updateCandidateRoadmapProjectStatus(token, project.id, nextStatus);
+      setProjects((current) => current.map((item) => item.id === updated.id ? updated : item));
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Impossible de mettre à jour le projet."); }
+    finally { setBusy(false); }
+  }
+
+  async function decideProposal(proposal: CandidateRoadmapProposal, decision: "accepted" | "rejected") {
+    setBusy(true);
+    setError("");
+    try {
+      await decideCandidateRoadmapProposal(token, proposal.id, decision);
+      setProposals((current) => current.filter((item) => item.id !== proposal.id));
+      if (decision === "accepted") setRoadmap(await fetchCandidateRoadmap(token));
+      setNotice(decision === "accepted" ? "Proposition appliquée au parcours." : "Proposition rejetée.");
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Impossible de traiter la proposition."); }
+    finally { setBusy(false); }
+  }
+
+  const missingKeys = new Set((roadmap?.steps ?? []).filter((step) => !step.completed).map((step) => step.skill_key));
+  const recommendedCourses = courses.filter((course) => course.skills.some((skill) => missingKeys.has(skill.trim().toLocaleLowerCase()))).slice(0, 5);
+
+  return <aside className="assistant-roadmap-panel" aria-label="Mon parcours professionnel">
+    <header><div><strong>Mon parcours</strong><small>{roadmap?.progress_percent ?? 0}% de progression</small></div><button className="icon-button" aria-label="Fermer le parcours" onClick={onClose}><X size={17}/></button></header>
+    <div className="assistant-roadmap-panel__body">
+      {loading ? <p role="status">Chargement du parcours…</p> : <>
+        <form className="assistant-roadmap-goal" onSubmit={(event) => void saveGoal(event)}>
+          <h3>Votre objectif</h3>
+          <label><span>Type d’objectif</span><select className="input" value={goalType} onChange={(event) => setGoalType(event.target.value as CandidateRoadmapGoalUpdate["goal_type"])}><option value="target_job">Un emploi publié</option><option value="skill_exploration">Explorer des compétences</option></select></label>
+          {goalType === "target_job" ? <>
+            <label><span>Emploi cible</span><select className="input" required value={targetOfferId} onChange={(event) => { setTargetOfferId(event.target.value); setGoalTitle(matches.find((match) => match.id === event.target.value)?.title ?? ""); }}><option value="">Choisir une offre publiée</option>{matches.map((match) => <option key={match.id} value={match.id}>{match.title} · {match.location}</option>)}</select></label>
+            {!matches.length && <p className="assistant-roadmap-note">Aucune offre publiée n’est disponible pour le moment.</p>}
+          </> : <>
+            <label><span>Compétences à travailler (séparées par des virgules)</span><input className="input" required value={skillText} onChange={(event) => setSkillText(event.target.value)} placeholder="Python, SQL, communication"/></label>
+            <label><span>Nom du parcours</span><input className="input" required minLength={2} maxLength={160} value={goalTitle} onChange={(event) => setGoalTitle(event.target.value)} placeholder="Ex. Renforcer mes compétences data"/></label>
+          </>}
+          <button className="button button--primary" disabled={busy || loading || (goalType === "target_job" && !targetOfferId)}>{busy ? "Enregistrement…" : "Mettre à jour le parcours"}</button>
+        </form>
+        {roadmap?.goal_title && <p className="assistant-roadmap-note">Parcours calculé à partir de {roadmap.goal_type === "target_job" ? "cette offre réelle publiée" : "vos compétences sélectionnées"}. La progression indique l’apprentissage déclaré, pas une maîtrise validée.</p>}
+        {roadmap && <>
+          {proposals.map((proposal) => <section className="assistant-roadmap-section" key={proposal.id} aria-label="Proposition de mise à jour">
+            <h3>Proposition à examiner</h3><strong>{proposal.title}</strong><p>{proposal.explanation}</p>
+            {proposal.target_offer_id && <small>Offre publiée · {proposal.target_offer_id}</small>}
+            {proposal.skills.length > 0 && <small>Compétences proposées : {proposal.skills.join(", ")}</small>}
+            <div className="assistant-dialog-actions"><button className="button button--primary" disabled={busy} onClick={() => void decideProposal(proposal, "accepted")}>Accepter</button><button className="button button--secondary" disabled={busy} onClick={() => void decideProposal(proposal, "rejected")}>Rejeter</button></div>
+          </section>)}
+          <section className="assistant-roadmap-section"><h3>Compétences prioritaires</h3>
+            {roadmap.target_offer_id && onNavigate && <button className="button button--secondary button--small" onClick={() => onNavigate("PrÃ©parer un entretien")}>Explorer les évaluations disponibles</button>}
+            {roadmap.steps.length ? roadmap.steps.map((step) => <article className="assistant-roadmap-step" key={step.skill_key}>
+              <div><strong>{step.skill}</strong><small>{step.required_by.length ? `Demandée par ${step.required_by.join(", ")}` : "Compétence choisie pour votre objectif"}</small></div>
+              <label><input type="checkbox" checked={step.completed} disabled={busy} onChange={(event) => void toggleStep(step.skill, event.target.checked)}/> Apprentissage terminé</label>
+            </article>) : <p className="assistant-roadmap-note">Aucune compétence manquante n’a été trouvée pour cet objectif.</p>}
+          </section>
+          <section className="assistant-roadmap-section"><h3>Projets pratiques</h3>
+            {roadmap.steps.length > 0 && <form className="assistant-roadmap-goal" onSubmit={(event) => void addProject(event)}>
+              <label><span>Compétence</span><select className="input" required value={projectSkill} onChange={(event) => setProjectSkill(event.target.value)}><option value="">Choisir une compétence</option>{roadmap.steps.map((step) => <option key={step.skill_key} value={step.skill}>{step.skill}</option>)}</select></label>
+              <label><span>Nom du projet</span><input className="input" required minLength={2} maxLength={160} value={projectTitle} onChange={(event) => setProjectTitle(event.target.value)} /></label>
+              <label><span>Description ou résultat attendu</span><textarea className="input" required maxLength={3000} value={projectDescription} onChange={(event) => setProjectDescription(event.target.value)} /></label>
+              <button className="button button--primary" disabled={busy || !projectSkill}>Ajouter le projet</button>
+            </form>}
+            {projects.map((project) => <article className="assistant-roadmap-step" key={project.id}><div><strong>{project.title}</strong><small>{project.skill} · {project.description}</small></div><select className="input" aria-label={`État de ${project.title}`} value={project.status} disabled={busy} onChange={(event) => void changeProjectStatus(project, event.target.value as CandidateRoadmapProject["status"])}><option value="planned">À commencer</option><option value="in_progress">En cours</option><option value="submitted">Soumis pour validation</option></select></article>)}
+            {!projects.length && <p className="assistant-roadmap-note">Aucun projet pratique pour le moment.</p>}
+            <p className="assistant-roadmap-note">Un projet soumis reste en attente de validation; son statut ne confirme pas une maîtrise.</p>
+          </section>
+          <section className="assistant-roadmap-section"><h3>Évaluations</h3>
+            {assessments.length ? assessments.map((assessment) => <article className="assistant-roadmap-step" key={assessment.assessment_id}><div><strong>{assessment.skill}</strong><small>{assessment.assessment_type === "technical" ? "Technique" : "Comportementale"} · {assessment.status === "completed" ? "Terminée" : "En cours"} · Score {assessment.score}/{assessment.max_score}</small></div></article>) : <p className="assistant-roadmap-note">Aucune évaluation commencée. Les résultats s’afficheront ici.</p>}
+            {roadmap.target_offer_id && onNavigate && <button className="button button--secondary button--small" onClick={() => onNavigate("PrÃƒÂ©parer un entretien")}>Ouvrir les évaluations</button>}
+            <p className="assistant-roadmap-note">Les résultats viennent des évaluations existantes et ne confirment pas automatiquement une maîtrise.</p>
+          </section>
+          <section className="assistant-roadmap-section"><h3>Formations du catalogue</h3>
+            {recommendedCourses.length ? recommendedCourses.map((course) => {
+              const enrollment = enrollments.find((item) => item.course_id === course.id && item.status !== "withdrawn");
+              return <article className="assistant-roadmap-step" key={course.id}><div><strong>{course.title}</strong><small>{course.skills.join(" · ")}</small></div><button className="button button--secondary button--small" disabled={busy || Boolean(enrollment)} onClick={() => void enroll(course.id)}>{enrollment?.status === "completed" ? "Terminée" : enrollment ? "Inscrit" : "S’inscrire"}</button></article>;
+            }) : <p className="assistant-roadmap-note">Aucune formation publiée ne correspond aux compétences restantes.</p>}
+          </section>
+        </>}
+        {notice && <p className="assistant-roadmap-note" role="status">{notice}</p>}
+        {error && <p className="workspace-error" role="alert">{error}</p>}
+      </>}
+    </div>
+  </aside>;
 }

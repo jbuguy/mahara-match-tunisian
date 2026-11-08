@@ -1344,6 +1344,41 @@ class CandidateRoadmapResponse(BaseModel):
     completed_steps: int
     total_steps: int
     progress_percent: int
+    goal_type: Literal["target_job", "skill_exploration"] | None = None
+    goal_title: str | None = None
+    target_offer_id: str | None = None
+    selected_skills: list[str] = Field(default_factory=list)
+
+
+class CandidateRoadmapGoalUpdate(BaseModel):
+    goal_type: Literal["target_job", "skill_exploration"]
+    title: str = Field(min_length=2, max_length=160)
+    target_offer_id: str | None = None
+    skills: list[str] = Field(default_factory=list, max_length=30)
+
+    @field_validator("title")
+    @classmethod
+    def trim_title(cls, value: str) -> str:
+        clean = value.strip()
+        if len(clean) < 2:
+            raise ValueError("Goal title must contain at least two characters.")
+        return clean
+
+    @field_validator("skills")
+    @classmethod
+    def normalize_goal_skills(cls, value: list[str]) -> list[str]:
+        return normalize_skills(value)
+
+    @model_validator(mode="after")
+    def validate_goal_shape(self) -> "CandidateRoadmapGoalUpdate":
+        if self.goal_type == "target_job":
+            if not self.target_offer_id:
+                raise ValueError("A target job must reference a published offer.")
+            if self.skills:
+                raise ValueError("Target-job goals cannot include manually selected skills.")
+        elif self.target_offer_id is not None or not self.skills:
+            raise ValueError("Skill exploration requires skills and cannot reference a job.")
+        return self
 
 
 class CandidateRoadmapStepUpdate(BaseModel):
@@ -1357,6 +1392,63 @@ class CandidateRoadmapStepUpdate(BaseModel):
         if not clean:
             raise ValueError("Skill cannot be blank.")
         return clean
+
+
+class CandidateRoadmapProjectCreate(BaseModel):
+    skill: str = Field(min_length=1, max_length=60)
+    title: str = Field(min_length=2, max_length=160)
+    description: str = Field(min_length=1, max_length=3000)
+
+    @field_validator("skill", "title", "description")
+    @classmethod
+    def trim_project_fields(cls, value: str) -> str:
+        clean = value.strip()
+        if not clean:
+            raise ValueError("This field cannot be blank.")
+        return clean
+
+
+class CandidateRoadmapProjectStatusUpdate(BaseModel):
+    status: Literal["planned", "in_progress", "submitted"]
+
+
+class CandidateRoadmapProjectResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    skill: str
+    skill_key: str
+    title: str
+    description: str
+    status: Literal["planned", "in_progress", "submitted"]
+    created_at: datetime
+    updated_at: datetime
+
+
+class CandidateRoadmapAssessmentResponse(BaseModel):
+    assessment_type: Literal["technical", "behavioral"]
+    assessment_id: str
+    skill: str
+    status: Literal["in_progress", "completed"]
+    score: int
+    max_score: int
+
+
+class CandidateRoadmapProposalResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    goal_type: Literal["target_job", "skill_exploration"]
+    target_offer_id: str | None
+    title: str
+    skills: list[str]
+    explanation: str
+    status: Literal["pending", "accepted", "rejected"]
+    created_at: datetime
+
+
+class CandidateRoadmapProposalDecision(BaseModel):
+    decision: Literal["accepted", "rejected"]
 
 
 class CandidateInterviewRoleResponse(BaseModel):

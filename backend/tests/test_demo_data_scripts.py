@@ -1,7 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import CandidateProfile, CourseEnrollment, JobApplication, JobOffer, Role, User
+from app.models import CandidateProfile, CourseEnrollment, JobApplication, JobOffer, NationalIndicator, Role, User
 from scripts.reset_demo_database import reset_demo_database
 from scripts.seed_demo_data import seed_demo_data
 
@@ -28,11 +28,15 @@ def test_seed_demo_data_is_idempotent_and_populates_dataset(session: Session) ->
     assert first["job_offers"] >= 20
     assert first["applications"] >= 10
     assert first["training_courses"] == 3
+    assert first["synthetic_offers"] == 20
+    assert first["ministry_indicators"] == 6
     assert session.query(User).filter(User.role == "candidate").count() >= 10
     assert session.query(JobOffer).count() >= 20
     assert session.query(JobApplication).count() >= 10
     assert session.query(CandidateProfile).count() >= 10
     assert session.query(CourseEnrollment).count() >= 3
+    assert session.query(JobOffer).filter(JobOffer.title.like("Synthetic demo:%")).count() == 20
+    assert session.query(NationalIndicator).filter(NationalIndicator.indicator_id.like("synthetic_demo_%")).count() == 6
 
 
 def test_reset_demo_database_clears_tables_without_dropping_schema(session: Session) -> None:

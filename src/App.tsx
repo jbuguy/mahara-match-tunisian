@@ -501,7 +501,7 @@ export default function App() {
           ) : isCandidate && activePage === "Préparer un entretien" ? (
             <CandidateInterviewPreparationPage token={accessToken} onNavigate={setActivePage} />
           ) : activePage === "Assistant" ? (
-            <UnifiedAssistantWorkspace token={accessToken} role={user.role} projectId={assistantProjectId} />
+            <UnifiedAssistantWorkspace token={accessToken} role={user.role} projectId={assistantProjectId} onNavigate={setActivePage} />
           ) : isCandidate && activePage === "Formations" ? (
             <CandidateCoursesPage token={accessToken} />
           ) : isCandidate && activePage === "Mes candidatures" ? (

@@ -39,6 +39,12 @@ exports[`GovernorateMap > renders the accessible controls snapshot 1`] = `
       class="governorate-map-layout"
     >
       <div>
+        <div
+          class="map-loading"
+          role="status"
+        >
+          Chargement de la carte…
+        </div>
         <button
           type="button"
         >

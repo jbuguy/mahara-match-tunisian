@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+import re
 from datetime import datetime, timezone
 
 from fastapi import (
@@ -65,6 +66,9 @@ from app.models import (
     CandidateInterviewTranscription,
     CandidateProfile,
     CourseStatus,
+    CandidateRoadmapGoal,
+    CandidateRoadmapProject,
+    CandidateRoadmapProposal,
     CandidateRoadmapStep,
     CandidateTechnicalAssessment,
     CandidateTechnicalAssessmentAnswer,
@@ -98,8 +102,15 @@ from app.schemas import (
     CandidateInterviewRoleResponse,
     CandidateTechnicalAssessmentResponse,
     CandidateRoadmapResponse,
+    CandidateRoadmapGoalUpdate,
     CandidateRoadmapStepResponse,
     CandidateRoadmapStepUpdate,
+    CandidateRoadmapProjectCreate,
+    CandidateRoadmapProjectResponse,
+    CandidateRoadmapProjectStatusUpdate,
+    CandidateRoadmapAssessmentResponse,
+    CandidateRoadmapProposalDecision,
+    CandidateRoadmapProposalResponse,
     CandidateProfileDraft,
     CandidateProfileResponse,
     CandidateProfileUpdate,
@@ -778,6 +789,98 @@ def rename_candidate_assistant_session(
     return CandidateAssistantSessionResponse.model_validate(chat_session)
 
 
+def _draft_roadmap_proposal(
+    session: Session,
+    user: User,
+    message: str,
+) -> CandidateRoadmapProposal | None:
+    if user.role != Role.CANDIDATE or session.scalar(
+        select(CandidateRoadmapProposal.id).where(
+            CandidateRoadmapProposal.user_id == user.id,
+            CandidateRoadmapProposal.status == "pending",
+        )
+    ) is not None:
+        return None
+
+    clean_message = re.sub(r"\s+", " ", message).strip()
+    folded = clean_message.casefold()
+    skill_prefixes = (
+        "i want to learn ", "i'd like to learn ", "i would like to learn ",
+        "i want to improve ", "i want to add skill ", "je veux apprendre ",
+        "je souhaite apprendre ", "je voudrais apprendre ", "je veux améliorer ",
+        "nheb net3allem ",
+    )
+    for prefix in skill_prefixes:
+        if folded.startswith(prefix):
+            requested_skills = [
+                value.strip(" .!?;:")
+                for value in re.split(r"\s*(?:,|\band\b|\bet\b|&)\s*", clean_message[len(prefix):], flags=re.IGNORECASE)
+                if value.strip(" .!?;:")
+            ]
+            if not requested_skills or len(requested_skills) > 30 or any(len(skill) > 60 for skill in requested_skills):
+                return None
+            goal = session.get(CandidateRoadmapGoal, user.id)
+            skills = list(goal.skills) if goal and goal.goal_type == "skill_exploration" else []
+            seen = {existing.casefold() for existing in skills}
+            additions = []
+            for skill in requested_skills:
+                if skill.casefold() not in seen:
+                    additions.append(skill)
+                    seen.add(skill.casefold())
+            if not additions:
+                return None
+            skills.extend(additions)
+            previous = goal.title if goal is not None else None
+            explanation = (
+                f"You asked to work on {', '.join(additions)}. This proposal creates a skill-exploration goal"
+                + (f" in place of “{previous}”." if previous else ".")
+            )
+            proposal = CandidateRoadmapProposal(
+                user_id=user.id,
+                goal_type="skill_exploration",
+                target_offer_id=None,
+                title=f"Explore {', '.join(skills[:3])}"[:160],
+                skills=skills[:30],
+                explanation=explanation[:1000],
+            )
+            session.add(proposal)
+            session.flush()
+            return proposal
+
+    role_prefixes = (
+        "i want to become ", "i'd like to become ", "i would like to become ",
+        "je veux devenir ", "je souhaite devenir ", "je voudrais devenir ",
+    )
+    for prefix in role_prefixes:
+        if folded.startswith(prefix):
+            requested_title = clean_message[len(prefix):].strip(" .!?;:")
+            if not requested_title:
+                return None
+            offer = next((
+                item for item in session.scalars(
+                    select(JobOffer).where(JobOffer.status == JobOfferStatus.PUBLISHED)
+                )
+                if item.title.casefold() == requested_title.casefold()
+            ), None)
+            if offer is None:
+                return None
+            goal = session.get(CandidateRoadmapGoal, user.id)
+            if goal and goal.goal_type == "target_job" and goal.target_offer_id == offer.id:
+                return None
+            proposal = CandidateRoadmapProposal(
+                user_id=user.id,
+                goal_type="target_job",
+                target_offer_id=offer.id,
+                title=offer.title,
+                skills=[],
+                explanation=f"You asked to work toward this role. It matches the published offer “{offer.title}”.",
+            )
+            session.add(proposal)
+            session.flush()
+            return proposal
+    return None
+
+
 @app.post(
     "/candidate/assistant/sessions/{session_id}/messages",
     response_model=CandidateAssistantSessionResponse,
@@ -895,7 +998,11 @@ async def send_candidate_assistant_session_message(
         "local data is missing or stale, and cite retrieved evidence using its "
         "[S#] source marker. When referring to an application job offer, use its "
         "exact database ID and title. Historical training specialties do not "
-        "prove a course is currently available."
+        "prove a course is currently available. For candidate career-development requests, "
+        "explain roadmap information from verified application records and distinguish it "
+        "from suggestions. Never claim that a roadmap changed because of this chat. A "
+        "proposed goal is only a proposal until the candidate explicitly accepts it in "
+        "the roadmap panel; do not imply that approval happened."
         f"{employer_context}"
     )
     model_messages = [
@@ -919,6 +1026,21 @@ async def send_candidate_assistant_session_message(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="The assistant returned an invalid message. Please retry.",
         ) from error
+
+    proposal = _draft_roadmap_proposal(session, user, request.content)
+    if proposal is not None:
+        french_request = request.content.casefold().startswith((
+            "je veux", "je souhaite", "je voudrais",
+        ))
+        proposal_notice = (
+            "J’ai préparé une proposition pour votre parcours. Consultez Mon parcours; elle ne sera appliquée qu’après votre accord."
+            if french_request
+            else "I prepared a roadmap-change proposal. Review it in My Roadmap; it will apply only if you accept it."
+        )
+        reply = AssistantMessage(
+            role="assistant",
+            content=reply[: 3000 - len(proposal_notice) - 2].rstrip() + "\n\n" + proposal_notice,
+        ).content
 
     stored_messages = [
         *chat_session.messages,
@@ -1174,9 +1296,8 @@ def candidate_roadmap(
     session: Session = Depends(get_session),
 ) -> CandidateRoadmapResponse:
     profile = session.get(CandidateProfile, user.id)
-    offers = list(
-        session.scalars(select(JobOffer).where(JobOffer.status == JobOfferStatus.PUBLISHED))
-    )
+    goal = session.get(CandidateRoadmapGoal, user.id)
+    offers, target_skills = _roadmap_inputs(goal, session)
     saved_steps = session.scalars(
         select(CandidateRoadmapStep).where(CandidateRoadmapStep.user_id == user.id)
     )
@@ -1185,6 +1306,7 @@ def candidate_roadmap(
         offers,
         profile.skills if profile else [],
         completed_by_skill,
+        target_skills=target_skills,
     )
     record_sensitive_read(
         session,
@@ -1193,7 +1315,62 @@ def candidate_roadmap(
         resource_id=user.id,
     )
     session.commit()
-    return roadmap_response(steps)
+    return roadmap_response(steps, goal)
+
+
+@app.put(
+    "/candidate/roadmap/goal",
+    response_model=CandidateRoadmapResponse,
+    tags=["candidate"],
+)
+def update_candidate_roadmap_goal(
+    request: CandidateRoadmapGoalUpdate,
+    user: User = Depends(require_permission(Permission.ROADMAP_MANAGE_OWN)),
+    session: Session = Depends(get_session),
+) -> CandidateRoadmapResponse:
+    offer = None
+    if request.goal_type == "target_job":
+        offer = session.scalar(
+            select(JobOffer).where(
+                JobOffer.id == request.target_offer_id,
+                JobOffer.status == JobOfferStatus.PUBLISHED,
+            )
+        )
+        if offer is None:
+            raise HTTPException(status_code=404, detail="Published target job not found.")
+
+    goal = session.get(CandidateRoadmapGoal, user.id)
+    if goal is None:
+        goal = CandidateRoadmapGoal(user_id=user.id)
+        session.add(goal)
+    goal.goal_type = request.goal_type
+    goal.title = request.title
+    goal.target_offer_id = request.target_offer_id
+    goal.skills = request.skills
+    record_audit_event(
+        session,
+        action="candidate.roadmap.goal.updated",
+        actor=user,
+        resource_type="candidate_roadmap_goal",
+        resource_id=user.id,
+        details={"goal_type": request.goal_type},
+    )
+    session.flush()
+    profile = session.get(CandidateProfile, user.id)
+    offers, target_skills = _roadmap_inputs(goal, session)
+    saved_steps = list(
+        session.scalars(
+            select(CandidateRoadmapStep).where(CandidateRoadmapStep.user_id == user.id)
+        )
+    )
+    steps = build_career_roadmap(
+        offers,
+        profile.skills if profile else [],
+        {step.skill_key: step.completed for step in saved_steps},
+        target_skills=target_skills,
+    )
+    session.commit()
+    return roadmap_response(steps, goal)
 
 
 @app.put(
@@ -1207,9 +1384,8 @@ def update_candidate_roadmap_step(
     session: Session = Depends(get_session),
 ) -> CandidateRoadmapResponse:
     profile = session.get(CandidateProfile, user.id)
-    offers = list(
-        session.scalars(select(JobOffer).where(JobOffer.status == JobOfferStatus.PUBLISHED))
-    )
+    goal = session.get(CandidateRoadmapGoal, user.id)
+    offers, target_skills = _roadmap_inputs(goal, session)
     saved_steps = list(
         session.scalars(
             select(CandidateRoadmapStep).where(CandidateRoadmapStep.user_id == user.id)
@@ -1220,6 +1396,7 @@ def update_candidate_roadmap_step(
         offers,
         profile.skills if profile else [],
         completed_by_skill,
+        target_skills=target_skills,
     )
     skill_key = request.skill.casefold()
     if not any(step.skill_key == skill_key for step in roadmap):
@@ -1261,11 +1438,255 @@ def update_candidate_roadmap_step(
         offers,
         profile.skills if profile else [],
         completed_by_skill,
+        target_skills=target_skills,
     )
-    return roadmap_response(updated_steps)
+    return roadmap_response(updated_steps, goal)
 
 
-def roadmap_response(steps: list[RoadmapStep]) -> CandidateRoadmapResponse:
+@app.get(
+    "/candidate/roadmap/projects",
+    response_model=list[CandidateRoadmapProjectResponse],
+    tags=["candidate"],
+)
+def list_candidate_roadmap_projects(
+    user: User = Depends(require_permission(Permission.ROADMAP_MANAGE_OWN)),
+    session: Session = Depends(get_session),
+) -> list[CandidateRoadmapProjectResponse]:
+    projects = session.scalars(
+        select(CandidateRoadmapProject)
+        .where(CandidateRoadmapProject.user_id == user.id)
+        .order_by(CandidateRoadmapProject.created_at.desc())
+    )
+    return [CandidateRoadmapProjectResponse.model_validate(project) for project in projects]
+
+
+@app.post(
+    "/candidate/roadmap/projects",
+    response_model=CandidateRoadmapProjectResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=["candidate"],
+)
+def create_candidate_roadmap_project(
+    request: CandidateRoadmapProjectCreate,
+    user: User = Depends(require_permission(Permission.ROADMAP_MANAGE_OWN)),
+    session: Session = Depends(get_session),
+) -> CandidateRoadmapProjectResponse:
+    profile = session.get(CandidateProfile, user.id)
+    goal = session.get(CandidateRoadmapGoal, user.id)
+    offers, target_skills = _roadmap_inputs(goal, session)
+    saved_steps = session.scalars(
+        select(CandidateRoadmapStep).where(CandidateRoadmapStep.user_id == user.id)
+    )
+    steps = build_career_roadmap(
+        offers,
+        profile.skills if profile else [],
+        {step.skill_key: step.completed for step in saved_steps},
+        target_skills=target_skills,
+    )
+    skill_key = request.skill.casefold()
+    roadmap_step = next((step for step in steps if step.skill_key == skill_key), None)
+    if roadmap_step is None:
+        raise HTTPException(status_code=404, detail="This skill is not part of your current roadmap.")
+    project = CandidateRoadmapProject(
+        user_id=user.id,
+        skill_key=skill_key,
+        skill=roadmap_step.skill,
+        title=request.title,
+        description=request.description,
+    )
+    session.add(project)
+    record_audit_event(
+        session,
+        action="candidate.roadmap.project.created",
+        actor=user,
+        resource_type="candidate_roadmap_project",
+        details={"skill_key": skill_key},
+    )
+    session.commit()
+    session.refresh(project)
+    return CandidateRoadmapProjectResponse.model_validate(project)
+
+
+@app.patch(
+    "/candidate/roadmap/projects/{project_id}",
+    response_model=CandidateRoadmapProjectResponse,
+    tags=["candidate"],
+)
+def update_candidate_roadmap_project_status(
+    project_id: str,
+    request: CandidateRoadmapProjectStatusUpdate,
+    user: User = Depends(require_permission(Permission.ROADMAP_MANAGE_OWN)),
+    session: Session = Depends(get_session),
+) -> CandidateRoadmapProjectResponse:
+    project = session.scalar(
+        select(CandidateRoadmapProject).where(
+            CandidateRoadmapProject.id == project_id,
+            CandidateRoadmapProject.user_id == user.id,
+        )
+    )
+    if project is None:
+        raise HTTPException(status_code=404, detail="This project could not be found.")
+    project.status = request.status
+    record_audit_event(
+        session,
+        action="candidate.roadmap.project.status.updated",
+        actor=user,
+        resource_type="candidate_roadmap_project",
+        resource_id=project.id,
+        details={"status": request.status},
+    )
+    session.commit()
+    session.refresh(project)
+    return CandidateRoadmapProjectResponse.model_validate(project)
+
+
+@app.get(
+    "/candidate/roadmap/assessments",
+    response_model=list[CandidateRoadmapAssessmentResponse],
+    tags=["candidate"],
+)
+def list_candidate_roadmap_assessments(
+    user: User = Depends(require_permission(Permission.ROADMAP_MANAGE_OWN)),
+    session: Session = Depends(get_session),
+) -> list[CandidateRoadmapAssessmentResponse]:
+    items: list[CandidateRoadmapAssessmentResponse] = []
+    technical = session.scalars(
+        select(CandidateTechnicalAssessment).where(
+            CandidateTechnicalAssessment.candidate_id == user.id
+        )
+    )
+    for assessment in technical:
+        answers = list(session.scalars(
+            select(CandidateTechnicalAssessmentAnswer).where(
+                CandidateTechnicalAssessmentAnswer.assessment_id == assessment.id
+            )
+        ))
+        items.append(CandidateRoadmapAssessmentResponse(
+            assessment_type="technical",
+            assessment_id=assessment.id,
+            skill=assessment.skill,
+            status=assessment.status.value,
+            score=sum(int(answer.evaluation.get("score", 0)) for answer in answers),
+            max_score=sum(int(answer.evaluation.get("max_score", 0)) for answer in answers),
+        ))
+    behavioral = session.scalars(
+        select(CandidateBehavioralAssessment).where(
+            CandidateBehavioralAssessment.candidate_id == user.id
+        )
+    )
+    for assessment in behavioral:
+        answers = list(session.scalars(
+            select(CandidateBehavioralAssessmentAnswer).where(
+                CandidateBehavioralAssessmentAnswer.assessment_id == assessment.id
+            )
+        ))
+        items.append(CandidateRoadmapAssessmentResponse(
+            assessment_type="behavioral",
+            assessment_id=assessment.id,
+            skill=assessment.competency_name,
+            status=assessment.status.value,
+            score=sum(int(answer.evaluation.get("score", 0)) for answer in answers),
+            max_score=sum(int(answer.evaluation.get("max_score", 0)) for answer in answers),
+        ))
+    return items
+
+
+@app.get(
+    "/candidate/roadmap/proposals",
+    response_model=list[CandidateRoadmapProposalResponse],
+    tags=["candidate"],
+)
+def list_candidate_roadmap_proposals(
+    user: User = Depends(require_permission(Permission.ROADMAP_MANAGE_OWN)),
+    session: Session = Depends(get_session),
+) -> list[CandidateRoadmapProposalResponse]:
+    proposals = session.scalars(
+        select(CandidateRoadmapProposal)
+        .where(
+            CandidateRoadmapProposal.user_id == user.id,
+            CandidateRoadmapProposal.status == "pending",
+        )
+        .order_by(CandidateRoadmapProposal.created_at.desc())
+    )
+    return [CandidateRoadmapProposalResponse.model_validate(item) for item in proposals]
+
+
+@app.patch(
+    "/candidate/roadmap/proposals/{proposal_id}",
+    response_model=CandidateRoadmapProposalResponse,
+    tags=["candidate"],
+)
+def decide_candidate_roadmap_proposal(
+    proposal_id: str,
+    request: CandidateRoadmapProposalDecision,
+    user: User = Depends(require_permission(Permission.ROADMAP_MANAGE_OWN)),
+    session: Session = Depends(get_session),
+) -> CandidateRoadmapProposalResponse:
+    proposal = session.scalar(
+        select(CandidateRoadmapProposal).where(
+            CandidateRoadmapProposal.id == proposal_id,
+            CandidateRoadmapProposal.user_id == user.id,
+        )
+    )
+    if proposal is None:
+        raise HTTPException(status_code=404, detail="This roadmap proposal could not be found.")
+    if proposal.status != "pending":
+        raise HTTPException(status_code=409, detail="This roadmap proposal has already been decided.")
+    if request.decision == "accepted":
+        if proposal.goal_type == "target_job":
+            offer = session.scalar(
+                select(JobOffer).where(
+                    JobOffer.id == proposal.target_offer_id,
+                    JobOffer.status == JobOfferStatus.PUBLISHED,
+                )
+            )
+            if offer is None:
+                raise HTTPException(status_code=409, detail="The proposed job offer is no longer published.")
+        goal = session.get(CandidateRoadmapGoal, user.id)
+        if goal is None:
+            goal = CandidateRoadmapGoal(user_id=user.id)
+            session.add(goal)
+        goal.goal_type = proposal.goal_type
+        goal.target_offer_id = proposal.target_offer_id
+        goal.title = proposal.title
+        goal.skills = proposal.skills
+    proposal.status = request.decision
+    record_audit_event(
+        session,
+        action=f"candidate.roadmap.proposal.{request.decision}",
+        actor=user,
+        resource_type="candidate_roadmap_proposal",
+        resource_id=proposal.id,
+        details={"goal_type": proposal.goal_type},
+    )
+    session.commit()
+    session.refresh(proposal)
+    return CandidateRoadmapProposalResponse.model_validate(proposal)
+
+
+def _roadmap_inputs(
+    goal: CandidateRoadmapGoal | None,
+    session: Session,
+) -> tuple[list[JobOffer], list[str]]:
+    if goal is not None and goal.goal_type == "skill_exploration":
+        return [], list(goal.skills)
+    if goal is not None and goal.goal_type == "target_job" and goal.target_offer_id:
+        offer = session.scalar(
+            select(JobOffer).where(
+                JobOffer.id == goal.target_offer_id,
+                JobOffer.status == JobOfferStatus.PUBLISHED,
+            )
+        )
+        return ([offer] if offer is not None else []), []
+    return list(
+        session.scalars(select(JobOffer).where(JobOffer.status == JobOfferStatus.PUBLISHED))
+    ), []
+
+
+def roadmap_response(
+    steps: list[RoadmapStep],
+    goal: CandidateRoadmapGoal | None = None,
+) -> CandidateRoadmapResponse:
     responses = [
         CandidateRoadmapStepResponse(
             skill=step.skill,
@@ -1283,6 +1704,10 @@ def roadmap_response(steps: list[RoadmapStep]) -> CandidateRoadmapResponse:
         completed_steps=completed_steps,
         total_steps=total_steps,
         progress_percent=round(100 * completed_steps / total_steps) if total_steps else 0,
+        goal_type=goal.goal_type if goal is not None else None,
+        goal_title=goal.title if goal is not None else None,
+        target_offer_id=goal.target_offer_id if goal is not None else None,
+        selected_skills=goal.skills if goal is not None else [],
     )
 
 

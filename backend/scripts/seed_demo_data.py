@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import re
+import hashlib
 from datetime import date, timedelta
 from typing import Any
 
@@ -9,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
+from app.knowledge_base import KnowledgeDocument
 from app.models import (
     CandidateProfile,
     CourseEnrollment,
@@ -17,6 +19,7 @@ from app.models import (
     JobApplication,
     JobApplicationStatus,
     JobOffer,
+    NationalIndicator,
     Organisation,
     OrganisationMembership,
     OrganisationType,
@@ -25,6 +28,7 @@ from app.models import (
     User,
 )
 from app.security import hash_password
+from app.synthetic_data import generate_synthetic_offers
 
 DEMO_BASE_PASSWORD = "LocalDemoPassword2026!"
 
@@ -407,6 +411,85 @@ def _ensure_course(session: Session, provider_id: str, payload: dict[str, Any]) 
     return course
 
 
+def _ensure_synthetic_offers(session: Session, employer: User, count: int = 20) -> int:
+    for record in generate_synthetic_offers(seed=2026, count=count):
+        title = f"Synthetic demo: {record['title']} ({record['id']})"
+        offer = session.scalar(
+            select(JobOffer).where(JobOffer.employer_id == employer.id, JobOffer.title == title)
+        )
+        if offer is None:
+            offer = JobOffer(
+                employer_id=employer.id,
+                title=title,
+                description=f"{record['description']} Secteur: {record['sector']}.",
+                location=str(record["location"]),
+                required_skills=list(record["required_skills"]),
+            )
+            session.add(offer)
+            session.flush()
+    return count
+
+
+def _ensure_synthetic_ministry_indicators(session: Session) -> int:
+    content = (
+        "Synthetic Mahara Match ministry dataset: aggregate illustrative observations only; "
+        "not official statistics."
+    )
+    content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
+    document = session.scalar(
+        select(KnowledgeDocument).where(
+            KnowledgeDocument.external_id == "synthetic-demo-ministry-indicators"
+        )
+    )
+    if document is None:
+        document = KnowledgeDocument(
+            external_id="synthetic-demo-ministry-indicators",
+            title="Synthetic ministry observatory indicators",
+            content=content,
+            source="Mahara Match synthetic demo",
+            source_url="/demo/synthetic",
+            category="labour-market",
+            country="TN",
+            language="fr",
+            document_metadata={
+                "is_synthetic": True,
+                "source": "synthetic",
+                "data_type": "illustrative_ministry_observatory",
+            },
+            content_sha256=content_hash,
+            status="published",
+        )
+        session.add(document)
+        session.flush()
+
+    indicators = (
+        ("synthetic_demo_registered_candidates", 2024, 120, "people"),
+        ("synthetic_demo_registered_candidates", 2025, 168, "people"),
+        ("synthetic_demo_open_positions", 2024, 34, "positions"),
+        ("synthetic_demo_open_positions", 2025, 52, "positions"),
+        ("synthetic_demo_training_enrollments", 2024, 48, "enrollments"),
+        ("synthetic_demo_training_enrollments", 2025, 71, "enrollments"),
+    )
+    created = 0
+    for indicator_id, year, value, unit in indicators:
+        indicator = session.scalar(
+            select(NationalIndicator).where(
+                NationalIndicator.indicator_id == indicator_id,
+                NationalIndicator.year == year,
+            )
+        )
+        if indicator is None:
+            session.add(NationalIndicator(
+                indicator_id=indicator_id,
+                year=year,
+                value=value,
+                unit=unit,
+                source_document_id=document.id,
+            ))
+            created += 1
+    return created
+
+
 def _ensure_course_enrollment(session: Session, candidate_id: str, course_id: str) -> None:
     enrollment = session.scalar(
         select(CourseEnrollment).where(
@@ -415,13 +498,11 @@ def _ensure_course_enrollment(session: Session, candidate_id: str, course_id: st
         )
     )
     if enrollment is None:
-        session.add(
-            CourseEnrollment(
-                candidate_id=candidate_id,
-                course_id=course_id,
-                status=CourseEnrollmentStatus.ENROLLED,
-            )
-        )
+        session.add(CourseEnrollment(
+            candidate_id=candidate_id,
+            course_id=course_id,
+            status=CourseEnrollmentStatus.ENROLLED,
+        ))
 
 
 def seed_demo_data(session: Session, password: str | None = None) -> dict[str, int]:
@@ -441,6 +522,20 @@ def seed_demo_data(session: Session, password: str | None = None) -> dict[str, i
     )
     for email, role in base_users:
         _get_or_create_user(session, email, role, configured_password)
+
+    synthetic_employer_user = _get_or_create_user(
+        session,
+        "synthetic@demo.maharamatch.test",
+        Role.EMPLOYER,
+        configured_password,
+    )
+    synthetic_organisation = _ensure_organisation(
+        session,
+        "Synthetic Demo Employers",
+        OrganisationType.EMPLOYER,
+    )
+    _ensure_membership(session, synthetic_employer_user.id, synthetic_organisation.id)
+    synthetic_offers_created = _ensure_synthetic_offers(session, synthetic_employer_user, count=20)
 
     user_by_email: dict[str, User] = {}
     for candidate in DEMO_CANDIDATES:
@@ -519,6 +614,8 @@ def seed_demo_data(session: Session, password: str | None = None) -> dict[str, i
             elif index == 2 and candidate.email.startswith("mariem"):
                 _ensure_course_enrollment(session, candidate.id, created_course.id)
 
+    _ensure_synthetic_ministry_indicators(session)
+
     session.commit()
     return {
         "candidates": len(DEMO_CANDIDATES),
@@ -526,6 +623,10 @@ def seed_demo_data(session: Session, password: str | None = None) -> dict[str, i
         "job_offers": len(DEMO_JOB_OFFERS),
         "applications": session.query(JobApplication).count(),
         "training_courses": len(DEMO_TRAINING_COURSES),
+        "synthetic_offers": synthetic_offers_created,
+        "ministry_indicators": session.query(NationalIndicator)
+        .filter(NationalIndicator.indicator_id.like("synthetic_demo_%"))
+        .count(),
     }
 
 
@@ -539,7 +640,9 @@ def main() -> None:
         "Seeded demo dataset: "
         f"{result['candidates']} candidates, {result['employers']} employers, "
         f"{result['job_offers']} offers, {result['applications']} applications, "
-        f"{result['training_courses']} training courses."
+        f"{result['training_courses']} training courses, "
+        f"{result['synthetic_offers']} new synthetic offers, and "
+        f"{result['ministry_indicators']} ministry indicators."
     )
 
 

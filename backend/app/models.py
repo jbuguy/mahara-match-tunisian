@@ -728,6 +728,93 @@ class CandidateRoadmapStep(Base):
     )
 
 
+class CandidateRoadmapGoal(Base):
+    __tablename__ = "candidate_roadmap_goals"
+
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    goal_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    target_offer_id: Mapped[str | None] = mapped_column(
+        ForeignKey("job_offers.id", ondelete="SET NULL"), nullable=True
+    )
+    title: Mapped[str] = mapped_column(String(160), nullable=False)
+    skills: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+
+class CandidateRoadmapProject(Base):
+    __tablename__ = "candidate_roadmap_projects"
+    __table_args__ = (
+        Index("ix_candidate_roadmap_projects_user_skill", "user_id", "skill_key"),
+        CheckConstraint(
+            "status IN ('planned', 'in_progress', 'submitted')",
+            name="ck_candidate_roadmap_projects_status",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    skill_key: Mapped[str] = mapped_column(String(60), nullable=False)
+    skill: Mapped[str] = mapped_column(String(60), nullable=False)
+    title: Mapped[str] = mapped_column(String(160), nullable=False)
+    description: Mapped[str] = mapped_column(String(3000), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="planned", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+
+class CandidateRoadmapProposal(Base):
+    __tablename__ = "candidate_roadmap_proposals"
+    __table_args__ = (
+        Index("ix_candidate_roadmap_proposals_user_status", "user_id", "status"),
+        CheckConstraint(
+            "status IN ('pending', 'accepted', 'rejected')",
+            name="ck_candidate_roadmap_proposals_status",
+        ),
+        CheckConstraint(
+            "goal_type IN ('target_job', 'skill_exploration')",
+            name="ck_candidate_roadmap_proposals_goal_type",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    goal_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    target_offer_id: Mapped[str | None] = mapped_column(
+        ForeignKey("job_offers.id", ondelete="SET NULL"), nullable=True
+    )
+    title: Mapped[str] = mapped_column(String(160), nullable=False)
+    skills: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    explanation: Mapped[str] = mapped_column(String(1000), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+
 class CandidateAssistantSession(Base):
     __tablename__ = "candidate_assistant_sessions"
     __table_args__ = (

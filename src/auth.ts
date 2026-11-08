@@ -433,6 +433,48 @@ export type CandidateRoadmap = {
   completed_steps: number;
   total_steps: number;
   progress_percent: number;
+  goal_type?: "target_job" | "skill_exploration" | null;
+  goal_title?: string | null;
+  target_offer_id?: string | null;
+  selected_skills?: string[];
+};
+
+export type CandidateRoadmapProject = {
+  id: string;
+  skill: string;
+  skill_key: string;
+  title: string;
+  description: string;
+  status: "planned" | "in_progress" | "submitted";
+  created_at: string;
+  updated_at: string;
+};
+
+export type CandidateRoadmapAssessment = {
+  assessment_type: "technical" | "behavioral";
+  assessment_id: string;
+  skill: string;
+  status: "in_progress" | "completed";
+  score: number;
+  max_score: number;
+};
+
+export type CandidateRoadmapProposal = {
+  id: string;
+  goal_type: "target_job" | "skill_exploration";
+  target_offer_id: string | null;
+  title: string;
+  skills: string[];
+  explanation: string;
+  status: "pending" | "accepted" | "rejected";
+  created_at: string;
+};
+
+export type CandidateRoadmapGoalUpdate = {
+  goal_type: "target_job" | "skill_exploration";
+  title: string;
+  target_offer_id?: string;
+  skills?: string[];
 };
 
 export type CandidateInterviewRole = Pick<
@@ -556,7 +598,7 @@ type LoginResponse = {
   user: AuthUser;
 };
 
-const API_BASE_URL =
+export const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000";
 
 export const demoAccounts: { role: Role; label: string; email: string }[] = [
@@ -931,6 +973,60 @@ export function updateCandidateRoadmapStep(
   return authenticatedRequest(token, "/candidate/roadmap/steps", {
     method: "PUT",
     body: JSON.stringify({ skill, completed }),
+  });
+}
+
+export function updateCandidateRoadmapGoal(
+  token: string,
+  goal: CandidateRoadmapGoalUpdate,
+): Promise<CandidateRoadmap> {
+  return authenticatedRequest(token, "/candidate/roadmap/goal", {
+    method: "PUT",
+    body: JSON.stringify(goal),
+  });
+}
+
+export function fetchCandidateRoadmapProjects(token: string): Promise<CandidateRoadmapProject[]> {
+  return authenticatedRequest(token, "/candidate/roadmap/projects");
+}
+
+export function fetchCandidateRoadmapAssessments(token: string): Promise<CandidateRoadmapAssessment[]> {
+  return authenticatedRequest(token, "/candidate/roadmap/assessments");
+}
+
+export function fetchCandidateRoadmapProposals(token: string): Promise<CandidateRoadmapProposal[]> {
+  return authenticatedRequest(token, "/candidate/roadmap/proposals");
+}
+
+export function decideCandidateRoadmapProposal(
+  token: string,
+  proposalId: string,
+  decision: "accepted" | "rejected",
+): Promise<CandidateRoadmapProposal> {
+  return authenticatedRequest(token, `/candidate/roadmap/proposals/${proposalId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ decision }),
+  });
+}
+
+export function createCandidateRoadmapProject(
+  token: string,
+  project: Pick<CandidateRoadmapProject, "skill" | "title" | "description">,
+): Promise<CandidateRoadmapProject> {
+  return authenticatedRequest(token, "/candidate/roadmap/projects", {
+    method: "POST",
+    body: JSON.stringify(project),
+  });
+}
+
+export function updateCandidateRoadmapProjectStatus(
+  token: string,
+  projectId: string,
+  status: CandidateRoadmapProject["status"],
+): Promise<CandidateRoadmapProject> {
+  return authenticatedRequest(token, `/candidate/roadmap/projects/${projectId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
   });
 }
 

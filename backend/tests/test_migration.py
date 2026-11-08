@@ -25,6 +25,7 @@ def test_sqlite_migration_enforces_append_only_audit_log(
         "job_offers",
         "candidate_assistant_sessions",
         "candidate_roadmap_steps",
+        "candidate_roadmap_goals",
         "job_applications",
         "training_courses",
         "course_enrollments",

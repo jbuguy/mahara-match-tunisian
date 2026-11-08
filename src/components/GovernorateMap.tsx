@@ -38,12 +38,21 @@ export function GovernorateMap({
   meta?: { source?: string; period?: object; methodology?: string; retrieved_at?: string };
 }) {
   const [geojson, setGeojson] = useState<FeatureCollection | null>(null);
+  const [mapError, setMapError] = useState(false);
   const [selectedMetric, setSelectedMetric] = useState(metric);
   const [table, setTable] = useState(false);
   const [tooltip, setTooltip] = useState<{ x: number; y: number; text: string } | null>(null);
   const rows = data ?? [];
   useEffect(() => {
-    fetch("/data/tunisia-governorates.geojson").then((response) => response.json()).then(setGeojson).catch(() => setGeojson(null));
+    const dataUrl = `${import.meta.env.BASE_URL}data/tunisia-governorates.geojson`;
+    setMapError(false);
+    fetch(dataUrl)
+      .then((response) => {
+        if (!response.ok) throw new Error(`GeoJSON request failed: ${response.status}`);
+        return response.json();
+      })
+      .then((collection: FeatureCollection) => setGeojson(collection))
+      .catch(() => setMapError(true));
   }, []);
 
   const path = useMemo(() => {
@@ -88,6 +97,8 @@ export function GovernorateMap({
       </div>
       <div className="governorate-map-layout">
         <div>
+          {!table && !geojson && !mapError ? <div className="map-loading" role="status">Chargement de la carte…</div> : null}
+          {!table && mapError ? <div className="map-error" role="alert">La carte administrative n’a pas pu être chargée.</div> : null}
           {!table && geojson && path ? <svg viewBox="0 0 620 520" role="img" aria-label="Carte des gouvernorats tunisiens">
             <defs><pattern id="suppressed-hatch" width="6" height="6" patternUnits="userSpaceOnUse"><path d="M0 6L6 0" stroke="#777" strokeWidth="1" /></pattern></defs>
             {geojson.features.map((feature) => {
@@ -100,7 +111,11 @@ export function GovernorateMap({
                 aria-label={row ? accessibleText(row) : `${feature.properties.name_fr}: donnée indisponible`}
                 onMouseMove={(event) => setTooltip({ x: event.clientX, y: event.clientY, text: row ? accessibleText(row) : feature.properties.name_fr })}
                 onMouseLeave={() => setTooltip(null)}
-                onFocus={() => setTooltip({ x: 0, y: 0, text: row ? accessibleText(row) : feature.properties.name_fr })}
+                onFocus={(event) => {
+                  const bounds = event.currentTarget.getBoundingClientRect();
+                  setTooltip({ x: bounds.left + bounds.width / 2, y: bounds.top, text: row ? accessibleText(row) : feature.properties.name_fr });
+                }}
+                onBlur={() => setTooltip(null)}
                 onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSelect(code); } }}
                 onClick={() => onSelect(code)} />;
             })}
@@ -126,7 +141,7 @@ export function GovernorateMap({
         Source : {meta?.source ?? "Mahara Match platform"} · {String(meta?.period ?? "")} · {meta?.methodology} · récupéré le {meta?.retrieved_at}
         <div>Limites administratives : geoBoundaries TUN ADM1, ODbL 1.0 ; © OpenStreetMap contributors.</div>
       </footer>
-      {tooltip ? <div role="tooltip" className="map-tooltip">{tooltip.text}</div> : null}
+      {tooltip ? <div role="tooltip" className="map-tooltip" style={{ left: tooltip.x, top: tooltip.y }}>{tooltip.text}</div> : null}
     </section>
   );
 }

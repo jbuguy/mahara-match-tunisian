@@ -20,7 +20,7 @@ describe("LocationSelect", () => {
       "fetch",
       vi.fn(async (input: RequestInfo | URL) => {
         const url = String(input);
-        if (url === "/locations/governorates") {
+        if (url.endsWith("/locations/governorates")) {
           return new Response(JSON.stringify([
             { code: "tunis", name_fr: "Tunis", name_ar: "تونس", latitude: 36.8, longitude: 10.2 },
             { code: "sfax", name_fr: "Sfax", name_ar: "صفاقس", latitude: 34.7, longitude: 10.3 },
@@ -40,20 +40,17 @@ describe("LocationSelect", () => {
     const municipality = screen.getByRole("combobox", { name: "Municipalité" });
     expect(municipality).toBeDisabled();
 
-    await waitFor(() => expect(screen.getByRole("option", { name: /Tunis/ })).toBeInTheDocument());
-    fireEvent.change(screen.getByRole("combobox", { name: "Gouvernorat" }), {
-      target: { value: "tunis" },
-    });
+    const governorate = screen.getByRole("combobox", { name: "Gouvernorat" });
+    fireEvent.change(governorate, { target: { value: "Tun" } });
+    fireEvent.click(await screen.findByRole("option", { name: /Tunis/ }));
 
     await waitFor(() => expect(municipality).not.toBeDisabled());
-    await waitFor(() => expect(screen.getByRole("option", { name: /Centre-Ville/ })).toBeInTheDocument());
+    fireEvent.change(municipality, { target: { value: "Centre" } });
+    fireEvent.click(await screen.findByRole("option", { name: /Centre-Ville/ }));
+    expect(municipality).toHaveValue("Centre-Ville — وسط المدينة");
 
-    fireEvent.change(municipality, { target: { value: "tunis-centre-ville" } });
-    expect(municipality).toHaveValue("tunis-centre-ville");
-
-    fireEvent.change(screen.getByRole("combobox", { name: "Gouvernorat" }), {
-      target: { value: "sfax" },
-    });
-    expect(municipality).toHaveValue("");
+    fireEvent.change(governorate, { target: { value: "Sfa" } });
+    fireEvent.click(await screen.findByRole("option", { name: /Sfax/ }));
+    await waitFor(() => expect(municipality).toHaveValue(""));
   });
 });

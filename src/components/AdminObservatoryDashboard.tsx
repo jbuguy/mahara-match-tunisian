@@ -219,7 +219,7 @@ export function AdminObservatoryDashboard({ token }: Props) {
     <header className="observatory-header">
       <div><div className="observatory-eyebrow">OBSERVATOIRE DE L’EMPLOI · MAHARA MATCH</div><h1>Tableau de bord du ministère</h1>
       <p>Le marché du travail évolue-t-il ? La plateforme aide-t-elle vraiment à trouver un emploi ? Où faut-il agir ? Données agrégées, aucun profil individuel.</p></div>
-      <div className="observatory-actions"><button className="button button-secondary" onClick={exportCsv}>Exporter les données (CSV)</button><button className="button button-primary" onClick={exportPdf}>Exporter le tableau de bord (PDF)</button></div>
+      <div className="observatory-actions"><button className="button button--secondary" onClick={exportCsv}>Exporter les données (CSV)</button><button className="button button--primary" onClick={exportPdf}>Exporter le tableau de bord (PDF)</button></div>
     </header>
 
     <section className="observatory-filter-card" aria-label="Filtres du tableau de bord">
@@ -298,7 +298,7 @@ export function AdminObservatoryDashboard({ token }: Props) {
         const candidates = unwrap(row.youth_candidates);
         const hires = unwrap(row.youth_hires);
         return <div className="youth-bar-row" key={row.code}><span>{row.name_fr}</span><i className="candidates" style={{ width: `${Math.min(100, Number(candidates) || 0)}%` }} /><i className="hires" style={{ width: `${Math.min(100, Number(hires) || 0)}%` }} /><b>{hires === "—" ? "<5" : hires}</b></div>;
-      })}<button className="button button-secondary youth-expand" type="button" onClick={() => setShowAllYouth((current) => !current)}>{showAllYouth ? "Réduire" : "Voir tout (24)"}</button></div>
+      })}<button className="button button--secondary youth-expand" type="button" onClick={() => setShowAllYouth((current) => !current)}>{showAllYouth ? "Réduire" : "Voir tout (24)"}</button></div>
     </Card>
     <Card title="Écart de compétences : offre contre candidats" question="Demande publiée face à la disponibilité des candidats" footer={skills?.meta?.source ?? "Mahara Match"} onExport={() => exportChart("ecart-competences.csv", "skills-gap", "écart de compétences")}>
       <div className="butterfly">{(skills?.rows ?? []).map((row: any) => {
