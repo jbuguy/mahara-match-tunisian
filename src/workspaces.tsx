@@ -1442,7 +1442,7 @@ export function CandidateRoadmapPage({
       <div className="eyebrow">VOTRE PROGRESSION</div>
       <h1>Mon parcours professionnel</h1>
       <p className="workspace-page__intro">
-        Un plan d’étapes déterministe basé sur les compétences demandées dans les offres et celles
+        Un plan basé sur les compétences demandées dans les offres et celles
         déjà renseignées dans votre profil.
       </p>
       {isLoading && <p aria-live="polite">Préparation de votre parcours…</p>}

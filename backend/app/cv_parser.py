@@ -205,6 +205,29 @@ def _extract_cv_text(filename: str, file_bytes: bytes) -> str:
     raise ValueError("Unsupported CV format. Upload a PDF, DOCX, or TXT file.")
 
 
+def extract_learning_document_text(filename: str, file_bytes: bytes) -> str:
+    """Extract bounded, reviewable text from supported candidate learning files."""
+    suffix = os.path.splitext(filename.lower())[1]
+    if suffix not in {".pdf", ".docx", ".txt", ".md"}:
+        raise ValueError("Unsupported document format. Upload a PDF, DOCX, TXT, or Markdown file.")
+    try:
+        if suffix == ".pdf" and len(PdfReader(io.BytesIO(file_bytes)).pages) > 200:
+            raise ValueError("PDF documents are limited to 200 pages.")
+        if suffix == ".docx":
+            with zipfile.ZipFile(io.BytesIO(file_bytes)) as archive:
+                document_info = archive.getinfo("word/document.xml")
+                if document_info.file_size > 20 * 1024 * 1024:
+                    raise ValueError("The DOCX document content is too large to process.")
+        extracted = _extract_cv_text(filename, file_bytes).strip()
+    except ValueError:
+        raise
+    except Exception as error:
+        raise ValueError("The document could not be read. Check the file and try again.") from error
+    if not extracted:
+        raise ValueError("The document did not contain readable text.")
+    return extracted[:200000]
+
+
 def _read_pdf_text(file_bytes: bytes) -> str:
     reader = PdfReader(io.BytesIO(file_bytes))
     pages: list[str] = []

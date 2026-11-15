@@ -3115,6 +3115,22 @@ p {
 .assistant-project-row span:nth-child(2) { display:grid; gap:2px; min-width:0; }
 .assistant-project-row strong, .assistant-project-row small { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .assistant-project-row small { color:var(--color-muted); font-size:11px; }
+.learning-project-list-row { display:grid; grid-template-columns:minmax(0,1fr) 30px; align-items:center; gap:2px; }
+.learning-project-list-row .assistant-project-row { min-width:0; }
+.learning-project-archive { width:28px; height:28px; }
+.assistant-learning-archive-toggle { width:100%; padding:7px 8px; border:0; background:transparent; color:var(--color-muted); text-align:left; font:inherit; font-size:11px; cursor:pointer; }
+.assistant-learning-empty { margin:4px 8px 10px; color:var(--color-muted); font-size:12px; line-height:1.45; }
+.assistant-learning-objective { margin:4px 0 0; color:var(--color-muted); font-size:12px; }
+.assistant-learning-project-summary { padding:12px; border:1px solid var(--color-border); border-radius:10px; background:var(--color-surface); }
+.assistant-learning-project-summary > span { color:var(--color-muted); font-size:10px; font-weight:750; letter-spacing:.08em; }
+.assistant-learning-project-summary p { margin:6px 0; line-height:1.45; }
+.assistant-learning-project-summary small { color:var(--color-muted); }
+.assistant-learning-upload { display:grid; gap:8px; padding:12px; border:1px dashed var(--color-border); border-radius:10px; color:var(--color-muted); font-size:12px; }
+.assistant-learning-upload input { width:100%; font:inherit; color:var(--color-text); }
+.assistant-learning-document { display:grid; grid-template-columns:minmax(0,1fr) 30px 30px; align-items:center; gap:4px; padding:8px 0; border-bottom:1px solid var(--color-border); }
+.assistant-learning-document > span { display:grid; gap:3px; min-width:0; }
+.assistant-learning-document strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.assistant-learning-document small { color:var(--color-muted); font-size:11px; }
 .assistant-project-menu { height:28px; display:grid; place-items:center; }
 .assistant-conversation-row { min-height:40px; display:grid; grid-template-columns:minmax(0,1fr) 32px 32px; align-items:center; border-radius:8px; }
 .assistant-conversation-title {
@@ -3191,6 +3207,9 @@ p {
 .assistant-roadmap-step { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px; border:1px solid var(--color-border); border-radius:10px; }
 .assistant-roadmap-step > div { min-width:0; display:grid; gap:4px; }
 .assistant-roadmap-step small { line-height:1.35; }
+.assistant-learning-formations .assistant-roadmap-step { align-items:flex-start; }
+.assistant-learning-formations .assistant-roadmap-step .button { flex:0 0 auto; }
+.assistant-learning-enrollment { flex:0 0 auto; color:var(--color-muted); font-size:12px; }
 .assistant-roadmap-step > label { flex:0 0 130px; display:flex; align-items:center; gap:6px; font-size:11px; }
 .assistant-roadmap-note { margin:0; font-size:12px; line-height:1.5; }
 .assistant-project-panel header { height:56px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--color-border); padding:0 16px; }

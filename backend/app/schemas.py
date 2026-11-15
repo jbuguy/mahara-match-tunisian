@@ -679,6 +679,84 @@ class CandidateAssistantSessionResponse(BaseModel):
     messages: list[AssistantMessage]
     created_at: datetime
     updated_at: datetime
+    learning_project_id: str | None = None
+
+
+class CandidateLearningProjectCreate(BaseModel):
+    title: str = Field(min_length=2, max_length=160)
+    objective: str = Field(min_length=2, max_length=2000)
+    target_profession: str | None = Field(default=None, max_length=160)
+    starting_level: str | None = Field(default=None, max_length=60)
+
+    @field_validator("title", "objective")
+    @classmethod
+    def trim_required_project_fields(cls, value: str) -> str:
+        clean = value.strip()
+        if not clean:
+            raise ValueError("This field cannot be blank.")
+        return clean
+
+
+class CandidateLearningProjectResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    title: str
+    objective: str
+    target_profession: str | None
+    starting_level: str | None
+    status: Literal["active", "archived"]
+    created_at: datetime
+    updated_at: datetime
+
+
+class CandidateLearningMilestoneCreate(BaseModel):
+    title: str = Field(min_length=2, max_length=160)
+    description: str = Field(min_length=2, max_length=2000)
+    skill: str | None = Field(default=None, max_length=100)
+
+    @field_validator("title", "description")
+    @classmethod
+    def trim_milestone_text(cls, value: str) -> str:
+        clean = value.strip()
+        if not clean:
+            raise ValueError("This field cannot be blank.")
+        return clean
+
+
+class CandidateLearningMilestoneStatusUpdate(BaseModel):
+    status: Literal["planned", "in_progress", "completed"]
+
+
+class CandidateLearningMilestoneResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    learning_project_id: str
+    title: str
+    description: str
+    skill: str | None
+    sort_order: int
+    status: Literal["planned", "in_progress", "completed"]
+    created_at: datetime
+    updated_at: datetime
+
+
+class CandidateLearningDocumentResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    learning_project_id: str
+    filename: str
+    content_type: str
+    size_bytes: int
+    processing_status: Literal["completed", "failed"]
+    error_message: str | None
+    created_at: datetime
+
+
+class CandidateAssistantSessionCreate(BaseModel):
+    learning_project_id: str | None = None
 
 
 class CandidateAssistantSessionSummary(BaseModel):

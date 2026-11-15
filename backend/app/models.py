@@ -11,6 +11,8 @@ from sqlalchemy import (
     Enum as SqlEnum,
     ForeignKey,
     Float,
+    Integer,
+    LargeBinary,
     Index,
     Numeric,
     String,
@@ -745,6 +747,64 @@ class MissionStatusHistory(Base):
     previous_status: Mapped[MissionStatus | None] = mapped_column(SqlEnum(MissionStatus, name="mission_history_previous_status", native_enum=False, create_constraint=False, values_callable=lambda values: [member.value for member in values]), nullable=True)
     new_status: Mapped[MissionStatus] = mapped_column(SqlEnum(MissionStatus, name="mission_history_new_status", native_enum=False, create_constraint=False, values_callable=lambda values: [member.value for member in values]), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+class CandidateLearningProject(Base):
+    __tablename__ = "candidate_learning_projects"
+    __table_args__ = (
+        Index("ix_candidate_learning_projects_user_status", "user_id", "status"),
+        CheckConstraint(
+            "status IN ('active', 'archived')",
+            name="ck_candidate_learning_projects_status",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    title: Mapped[str] = mapped_column(String(160), nullable=False)
+    objective: Mapped[str] = mapped_column(String(2000), nullable=False)
+    target_profession: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    starting_level: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="active", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
+
+
+class CandidateLearningMilestone(Base):
+    __tablename__ = "candidate_learning_milestones"
+    __table_args__ = (
+        Index("ix_candidate_learning_milestones_project_order", "learning_project_id", "sort_order"),
+        CheckConstraint("status IN ('planned', 'in_progress', 'completed')", name="ck_candidate_learning_milestones_status"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    learning_project_id: Mapped[str] = mapped_column(ForeignKey("candidate_learning_projects.id", ondelete="CASCADE"), nullable=False)
+    title: Mapped[str] = mapped_column(String(160), nullable=False)
+    description: Mapped[str] = mapped_column(String(2000), nullable=False)
+    skill: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="planned", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
+
+
+class CandidateLearningDocument(Base):
+    __tablename__ = "candidate_learning_documents"
+    __table_args__ = (
+        Index("ix_candidate_learning_documents_project_created", "learning_project_id", "created_at"),
+        CheckConstraint("processing_status IN ('completed', 'failed')", name="ck_candidate_learning_documents_status"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    learning_project_id: Mapped[str] = mapped_column(ForeignKey("candidate_learning_projects.id", ondelete="CASCADE"), nullable=False)
+    filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    content_type: Mapped[str] = mapped_column(String(120), nullable=False)
+    size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
+    content: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    extracted_text: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    processing_status: Mapped[str] = mapped_column(String(20), default="completed", nullable=False)
+    error_message: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+
+
 class CandidateRoadmapStep(Base):
     __tablename__ = "candidate_roadmap_steps"
     __table_args__ = (
@@ -858,11 +918,15 @@ class CandidateAssistantSession(Base):
     __tablename__ = "candidate_assistant_sessions"
     __table_args__ = (
         Index("ix_candidate_assistant_sessions_user_updated", "user_id", "updated_at"),
+        Index("ix_candidate_assistant_sessions_project_updated", "learning_project_id", "updated_at"),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
     user_id: Mapped[str] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    learning_project_id: Mapped[str | None] = mapped_column(
+        ForeignKey("candidate_learning_projects.id", ondelete="CASCADE"), nullable=True
     )
     title: Mapped[str] = mapped_column(String(120), nullable=False)
     messages: Mapped[list[dict[str, str]]] = mapped_column(JSON, default=list, nullable=False)

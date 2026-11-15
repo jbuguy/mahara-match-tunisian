@@ -11,6 +11,8 @@ The application uses a React frontend and a FastAPI/PostgreSQL backend.
 
 - Candidate profiles, CV-assisted profile extraction, skills, job matches,
   applications, career roadmaps, and interview preparation.
+- Candidate learning projects with project-scoped assistant conversations,
+  ordered learning milestones, and private PDF, DOCX, TXT, and Markdown files.
 - Career assistants in Derja, Arabic, and French, with saved conversation
   sessions and optional voice transcription and speech synthesis.
 - Technical and behavioural assessments with deterministic and AI-assisted
@@ -235,6 +237,7 @@ Representative endpoints include:
 | Authentication | `POST /auth/register`, `POST /auth/login`, `GET /auth/me` |
 | Candidate profile | `GET/PATCH /candidate/profile`, `POST /candidate/profile/cv` |
 | Career assistant | `/candidate/assistant/sessions`, `/candidate/assistant/chat` |
+| Learning projects | `/candidate/learning-projects`, project milestones, and private documents |
 | Opportunities | `GET /candidate/matches`, `POST /candidate/applications` |
 | Interview preparation | `/candidate/interview-prep/...` |
 | Employer planning | `/employer/planning-sessions`, `/employer/offers` |
@@ -242,6 +245,10 @@ Representative endpoints include:
 
 Protected endpoints require a JWT from the sign-in response. Ownership and
 organization membership are enforced independently of frontend navigation.
+Learning project files are stored privately with their project in PostgreSQL;
+uploads are limited to 10 MB each, 20 documents per project, and 50 MB per
+project. Readable text is extracted from supported files and included only in
+the matching project's assistant context.
 
 ## Roles and privacy
 
