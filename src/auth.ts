@@ -279,9 +279,26 @@ export type OrganisationProfile = {
 };
 
 export type JobMatch = JobOffer & {
-  match_score: number;
+  match_score: number | null;
   matched_skills: string[];
   missing_skills: string[];
+  score_version: string;
+  score_components: {
+    direct_required: number | null;
+    related_required: number | null;
+    foundational_required: number | null;
+    mandatory_direct_coverage: number | null;
+  };
+  explanations: {
+    kind: "direct_skill" | "related_skill" | "foundational_skill" | "missing_required_skill";
+    requirement: string;
+    evidence: string | null;
+    contribution: number;
+    source: string;
+    relationship_type?: "RELATED_TO" | "FOUNDATION_OF" | null;
+    confidence?: number | null;
+    strength?: number | null;
+  }[];
 };
 
 export type JobApplicationStatus =

@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { Badge, Button, Card, ProgressBar } from "./components/ui";
 import { FloatingAssistant } from "./components/FloatingAssistant";
+import { LanguageSwitch } from "./components/LanguageSwitch";
 import {
   AdminDashboardPage,
   CandidateApplicationsPage,
@@ -65,6 +66,7 @@ import { ProfessionalServicesPage } from "./ProfessionalServices";
 import { MissionsWorkspace } from "./MissionsWorkspace";
 import { ServiceRequestsWorkspace } from "./ServiceRequestsWorkspace";
 import { UnifiedAssistantWorkspace } from "./UnifiedAssistantWorkspace";
+import { getInitialLanguage, translate, type Language } from "./i18n";
 
 const roleConfiguration: Record<
   Role,
@@ -145,6 +147,7 @@ export default function App() {
   const [activePage, setActivePage] = useState("Vue d’ensemble");
   const [menuOpen, setMenuOpen] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [language, setLanguage] = useState<Language>(getInitialLanguage);
   const [guestPage, setGuestPage] = useState<"discovery" | "auth">(() =>
     window.location.hash === "#guest-auth" || window.location.hash === "#guest-auth-signup"
       ? "auth"
@@ -160,6 +163,12 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(Boolean(accessToken));
   const [authError, setAuthError] = useState("");
   const isDashboard = activePage === "Vue d’ensemble";
+  const t = (text: string) => translate(language, text);
+
+  function changeLanguage(nextLanguage: Language) {
+    window.localStorage.setItem("mahara-match-language", nextLanguage);
+    setLanguage(nextLanguage);
+  }
 
   useEffect(() => {
     function syncGuestRoute() {
@@ -286,9 +295,9 @@ export default function App() {
 
   if (isLoading) {
     return (
-      <div className="app-shell" data-theme={theme}>
+      <div className="app-shell" data-theme={theme} lang={language} dir={language === "ar" ? "rtl" : "ltr"}>
         <main className="auth-page" aria-live="polite">
-          <p>Vérification de votre session…</p>
+          <p>{t("Vérification de votre session…")}</p>
         </main>
       </div>
     );
@@ -298,14 +307,20 @@ export default function App() {
     const pendingOfferTitle = sessionStorage.getItem("mahara-match-return-job-title");
     const pendingServiceTitle = sessionStorage.getItem("mahara-match-return-service-title");
     const pendingNote = pendingOfferTitle
-      ? `Connectez-vous pour postuler à « ${pendingOfferTitle} »`
+      ? language === "ar"
+        ? `سجّل الدخول للترشح إلى « ${pendingOfferTitle} »`
+        : `Connectez-vous pour postuler à « ${pendingOfferTitle} »`
       : pendingServiceTitle
-        ? `Connectez-vous pour demander « ${pendingServiceTitle} »`
+        ? language === "ar"
+          ? `سجّل الدخول لطلب « ${pendingServiceTitle} »`
+          : `Connectez-vous pour demander « ${pendingServiceTitle} »`
         : "";
     return (
-      <div className="app-shell" data-theme={theme}>
+      <div className="app-shell" data-theme={theme} lang={language} dir={language === "ar" ? "rtl" : "ltr"}>
         {guestPage === "discovery" ? (
           <GuestDiscovery
+            language={language}
+            onLanguageChange={changeLanguage}
             onApply={(offer) => {
               sessionStorage.setItem("mahara-match-return-job", offer.id);
               sessionStorage.setItem("mahara-match-return-job-title", offer.title);
@@ -319,6 +334,8 @@ export default function App() {
           />
         ) : (
           <GuestAuth
+            language={language}
+            onLanguageChange={changeLanguage}
             error={authError}
             isRegistering={isRegistering}
             pendingNote={pendingNote}
@@ -339,13 +356,13 @@ export default function App() {
 
 
   return (
-    <div className={`app-shell ${activePage === "Assistant" ? "app-shell--assistant" : ""}`} data-theme={theme}>
+    <div className={`app-shell ${activePage === "Assistant" ? "app-shell--assistant" : ""}`} data-theme={theme} lang={language} dir={language === "ar" ? "rtl" : "ltr"}>
       <aside className={`sidebar ${menuOpen ? "sidebar--open" : ""}`}>
         <div className="brand-row">
           <a
             className="brand"
             href="#accueil"
-            aria-label="Mahara Match, accueil"
+            aria-label={t("Mahara Match, accueil")}
             onClick={() => setActivePage("Vue d’ensemble")}
           >
             <span className="brand__mark" aria-hidden="true">
@@ -358,21 +375,21 @@ export default function App() {
           <button
             className="icon-button sidebar__close"
             type="button"
-            aria-label="Fermer le menu"
+            aria-label={t("Fermer le menu")}
             onClick={() => setMenuOpen(false)}
           >
             <X size={20} />
           </button>
         </div>
 
-        <div className="sidebar__label">ESPACE {configuration.label.toLocaleUpperCase("fr-FR")}</div>
-        <nav className="nav-list" aria-label="Navigation principale">
+        <div className="sidebar__label">{t("ESPACE")} {t(configuration.label).toLocaleUpperCase(language === "ar" ? "ar" : "fr-FR")}</div>
+        <nav className="nav-list" aria-label={t("Navigation principale")}>
           {configuration.navigation.map(({ label, icon: Icon }) => (
             <button
               className={`nav-item ${activePage === label ? "nav-item--active" : ""}`}
               key={label}
               type="button"
-              aria-label={label}
+              aria-label={t(label)}
               aria-current={activePage === label ? "page" : undefined}
               onClick={() => {
                 setActivePage(label);
@@ -381,9 +398,9 @@ export default function App() {
               }}
             >
               <Icon size={19} strokeWidth={1.8} aria-hidden="true" />
-              <span>{label}</span>
+              <span>{t(label)}</span>
               {isCandidate && label === "Assistant" && (
-                <span className="nav-item__new">Nouveau</span>
+                <span className="nav-item__new">{t("Nouveau")}</span>
               )}
             </button>
           ))}
@@ -394,25 +411,25 @@ export default function App() {
             <span className="sidebar-tip__icon">
               <Sparkles size={17} aria-hidden="true" />
             </span>
-            <strong>Vos compétences ouvrent des portes.</strong>
-            <p>Complétez votre profil pour découvrir les prochaines étapes.</p>
+            <strong>{t("Vos compétences ouvrent des portes.")}</strong>
+            <p>{t("Complétez votre profil pour découvrir les prochaines étapes.")}</p>
             <Button
               variant="secondary"
               className="sidebar-tip__button"
               onClick={() => setActivePage("Mon profil")}
             >
-              Compléter mon profil <ArrowUpRight size={15} aria-hidden="true" />
+              {t("Compléter mon profil")} <ArrowUpRight size={15} aria-hidden="true" />
             </Button>
           </Card>
         )}
 
         <div className="account-switcher">
           <span className="avatar" aria-hidden="true">
-            {configuration.label.slice(0, 1)}
+            {t(configuration.label).slice(0, 1)}
           </span>
           <span className="account-switcher__text">
             <strong>{user.email}</strong>
-            <small>{configuration.label}</small>
+            <small>{t(configuration.label)}</small>
           </span>
           <ChevronDown size={16} aria-hidden="true" />
         </div>
@@ -422,7 +439,7 @@ export default function App() {
         <button
           className="sidebar-scrim"
           type="button"
-          aria-label="Fermer le menu"
+          aria-label={t("Fermer le menu")}
           onClick={() => setMenuOpen(false)}
         />
       )}
@@ -432,34 +449,35 @@ export default function App() {
           <button
             className="icon-button menu-toggle"
             type="button"
-            aria-label="Ouvrir le menu"
+            aria-label={t("Ouvrir le menu")}
             onClick={() => setMenuOpen(true)}
           >
             <Menu size={21} />
           </button>
           <div className="breadcrumbs">
-            <span>Mon espace</span>
+            <span>{t("Mon espace")}</span>
             <span aria-hidden="true">/</span>
-            <strong>{activePage}</strong>
+            <strong>{t(activePage)}</strong>
           </div>
           <div className="topbar__actions">
-            {user.role !== "candidate" && <button className="professional-profile-link" type="button" onClick={() => setActivePage("Profil professionnel")}>Profil professionnel</button>}
-            <button className="professional-profile-link" type="button" onClick={() => setActivePage("Missions")}>Missions</button>
-            <button className="professional-profile-link" type="button" onClick={() => setActivePage("Mes demandes")}>Mes demandes</button>
+            {user.role !== "candidate" && <button className="professional-profile-link" type="button" onClick={() => setActivePage("Profil professionnel")}>{t("Profil professionnel")}</button>}
+            <button className="professional-profile-link" type="button" onClick={() => setActivePage("Missions")}>{t("Missions")}</button>
+            <button className="professional-profile-link" type="button" onClick={() => setActivePage("Mes demandes")}>{t("Mes demandes")}</button>
+            <LanguageSwitch language={language} onChange={changeLanguage} />
             <button
               className="icon-button"
               type="button"
-              aria-label={theme === "light" ? "Activer le thème sombre" : "Activer le thème clair"}
+              aria-label={theme === "light" ? t("Activer le thème sombre") : t("Activer le thème clair")}
               onClick={() => setTheme(theme === "light" ? "dark" : "light")}
             >
               {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
             </button>
             <span className="topbar__divider" />
             <span className="avatar avatar--small" aria-hidden="true">
-              {configuration.label.slice(0, 1)}
+              {t(configuration.label).slice(0, 1)}
             </span>
-            <span className="topbar__account">{configuration.label}</span>
-            <button className="icon-button" type="button" aria-label="Se déconnecter" onClick={handleLogout}>
+            <span className="topbar__account">{t(configuration.label)}</span>
+            <button className="icon-button" type="button" aria-label={t("Se déconnecter")} onClick={handleLogout}>
               <LogOut size={18} />
             </button>
           </div>
@@ -468,7 +486,7 @@ export default function App() {
         <div className="page-content">
           {isDashboard ? (
             isCandidate ? (
-              <Dashboard onNavigate={setActivePage} />
+              <Dashboard language={language} onNavigate={setActivePage} />
             ) : user.role === "ministry_admin" ? (
               <AdminDashboardPage token={accessToken} />
             ) : user.role === "training_provider" ? (
@@ -477,9 +495,10 @@ export default function App() {
               <EmployerDashboardPage token={accessToken} onNavigate={setActivePage} />
             ) : (
               <RoleDashboard
-                title={configuration.dashboardTitle}
-                description={configuration.dashboardDescription}
-                role={configuration.label}
+                title={t(configuration.dashboardTitle)}
+                description={t(configuration.dashboardDescription)}
+                role={t(configuration.label)}
+                language={language}
                 onNavigate={setActivePage}
               />
             )
@@ -532,15 +551,13 @@ export default function App() {
             <TrainingProviderDashboardPage token={accessToken} />
           ) : (
             <section className="page-placeholder">
-              <Badge>En préparation</Badge>
-              <h1>{activePage}</h1>
+              <Badge>{t("En préparation")}</Badge>
+              <h1>{t(activePage)}</h1>
               <p>
-                Cet espace n’est pas encore disponible. Aucune information n’est
-                simulée ; vos données apparaîtront ici lorsque la fonctionnalité
-                sera prête.
+                {t("Cet espace n’est pas encore disponible. Aucune information n’est simulée ; vos données apparaîtront ici lorsque la fonctionnalité sera prête.")}
               </p>
               <Button variant="secondary" onClick={() => setActivePage("Vue d’ensemble")}>
-                Retour à la vue d’ensemble
+                {t("Retour à la vue d’ensemble")}
               </Button>
             </section>
           )}
@@ -563,34 +580,34 @@ function RoleDashboard({
   title,
   description,
   role,
+  language,
   onNavigate,
 }: {
   title: string;
   description: string;
   role: string;
+  language: Language;
   onNavigate: (page: string) => void;
 }) {
+  const t = (text: string) => translate(language, text);
   return (
     <section className="role-dashboard">
       <div className="eyebrow">{role.toLocaleUpperCase("fr-FR")}</div>
       <h1>{title}</h1>
       <p className="role-dashboard__description">{description}</p>
       <Card className="role-dashboard__empty">
-        {role === "Employeur" ? (
+        {role === t("Employeur") ? (
           <>
-            <Badge>Gestion des offres</Badge>
-            <h2>Publiez une offre pour trouver les bons profils</h2>
-            <p>Décrivez le poste et ses compétences clés pour la proposer aux candidats.</p>
-            <Button onClick={() => onNavigate("Mes offres")}>Créer une offre</Button>
+            <Badge>{t("Gestion des offres")}</Badge>
+            <h2>{t("Publiez une offre pour trouver les bons profils")}</h2>
+            <p>{t("Décrivez le poste et ses compétences clés pour la proposer aux candidats.")}</p>
+            <Button onClick={() => onNavigate("Mes offres")}>{t("Créer une offre")}</Button>
           </>
         ) : (
           <>
-            <Badge>En préparation</Badge>
-            <h2>Votre espace est prêt à être configuré</h2>
-            <p>
-              Les fonctions de ce rôle ne sont pas encore disponibles. Aucune offre,
-              candidature, formation ou statistique n’est simulée.
-            </p>
+            <Badge>{t("En préparation")}</Badge>
+            <h2>{t("Votre espace est prêt à être configuré")}</h2>
+            <p>{t("Les fonctions de ce rôle ne sont pas encore disponibles. Aucune offre, candidature, formation ou statistique n’est simulée.")}</p>
           </>
         )}
       </Card>
@@ -598,26 +615,27 @@ function RoleDashboard({
   );
 }
 
-function Dashboard({ onNavigate }: { onNavigate: (page: string) => void }) {
+function Dashboard({ language, onNavigate }: { language: Language; onNavigate: (page: string) => void }) {
+  const t = (text: string) => translate(language, text);
   return (
     <>
       <section className="welcome-row">
         <div>
           <div className="eyebrow">
-            {new Intl.DateTimeFormat("fr-FR", {
+            {new Intl.DateTimeFormat(language === "ar" ? "ar-TN" : "fr-FR", {
               weekday: "long",
               day: "numeric",
               month: "long",
             }).format(new Date()).toLocaleUpperCase("fr-FR")}
           </div>
-          <h1>Bonjour et bienvenue</h1>
+          <h1>{t("Bonjour et bienvenue")}</h1>
           <p className="welcome-row__subtitle">
-            Votre prochain projet professionnel commence ici.
+            {t("Votre prochain projet professionnel commence ici.")}
           </p>
         </div>
         <Button onClick={() => onNavigate("Mon profil")}>
           <UserRound size={17} aria-hidden="true" />
-          Compléter mon profil
+          {t("Compléter mon profil")}
         </Button>
       </section>
 
@@ -625,28 +643,27 @@ function Dashboard({ onNavigate }: { onNavigate: (page: string) => void }) {
         <div className="profile-card__content">
           <div className="profile-card__heading">
             <div>
-              <div className="eyebrow eyebrow--light">VOTRE PROFIL</div>
-              <h2 id="profile-title">Faites briller vos compétences</h2>
+              <div className="eyebrow eyebrow--light">{t("VOTRE PROFIL")}</div>
+              <h2 id="profile-title">{t("Faites briller vos compétences")}</h2>
             </div>
             <div className="profile-score" aria-label="Profil à compléter">
               <span>—</span>
-              <small>à compléter</small>
+              <small>{t("à compléter")}</small>
             </div>
           </div>
           <p>
-            Quelques informations suffisent pour commencer à explorer des
-            opportunités qui vous ressemblent.
+            {t("Quelques informations suffisent pour commencer à explorer des opportunités qui vous ressemblent.")}
           </p>
           <div className="profile-card__footer">
             <div className="profile-progress">
               <div className="profile-progress__label">
-                <span>Profil en cours de création</span>
-                <span>Ajoutez vos premières informations</span>
+                <span>{t("Profil en cours de création")}</span>
+                <span>{t("Ajoutez vos premières informations")}</span>
               </div>
-              <ProgressBar value={0} label="Profil en cours de création" />
+              <ProgressBar value={0} label={t("Profil en cours de création")} />
             </div>
             <Button variant="light" onClick={() => onNavigate("Mon profil")}>
-              Démarrer <ArrowUpRight size={16} aria-hidden="true" />
+              {t("Démarrer")} <ArrowUpRight size={16} aria-hidden="true" />
             </Button>
           </div>
         </div>
@@ -664,13 +681,13 @@ function Dashboard({ onNavigate }: { onNavigate: (page: string) => void }) {
 
       <section className="section-heading">
         <div>
-          <div className="eyebrow">VOTRE ESPACE</div>
-          <h2>Un premier pas à la fois</h2>
+          <div className="eyebrow">{t("VOTRE ESPACE")}</div>
+          <h2>{t("Un premier pas à la fois")}</h2>
         </div>
-        <Badge tone="accent">Bienvenue</Badge>
+        <Badge tone="accent">{t("Bienvenue")}</Badge>
       </section>
 
-      <section className="overview-grid" aria-label="Aperçu de votre espace">
+      <section className="overview-grid" aria-label={t("Aperçu de votre espace")}>
         <Card className="overview-card">
           <div className="overview-card__top">
             <span className="overview-icon overview-icon--blue">
@@ -680,10 +697,10 @@ function Dashboard({ onNavigate }: { onNavigate: (page: string) => void }) {
               <ArrowUpRight size={17} />
             </span>
           </div>
-          <h3>Opportunités</h3>
-          <p>Vos pistes professionnelles apparaîtront ici lorsque votre profil sera prêt.</p>
+          <h3>{t("Opportunités")}</h3>
+          <p>{t("Vos pistes professionnelles apparaîtront ici lorsque votre profil sera prêt.")}</p>
           <button className="text-link" type="button" onClick={() => onNavigate("Mes opportunités")}>
-            En savoir plus <ArrowUpRight size={14} aria-hidden="true" />
+            {t("En savoir plus")} <ArrowUpRight size={14} aria-hidden="true" />
           </button>
         </Card>
 
@@ -696,10 +713,10 @@ function Dashboard({ onNavigate }: { onNavigate: (page: string) => void }) {
               <ArrowUpRight size={17} />
             </span>
           </div>
-          <h3>Mon parcours</h3>
-          <p>Explorez des étapes adaptées à votre expérience après avoir renseigné vos compétences.</p>
+          <h3>{t("Mon parcours")}</h3>
+          <p>{t("Explorez des étapes adaptées à votre expérience après avoir renseigné vos compétences.")}</p>
           <button className="text-link" type="button" onClick={() => onNavigate("Mon parcours")}>
-            En savoir plus <ArrowUpRight size={14} aria-hidden="true" />
+            {t("En savoir plus")} <ArrowUpRight size={14} aria-hidden="true" />
           </button>
         </Card>
 
@@ -708,22 +725,22 @@ function Dashboard({ onNavigate }: { onNavigate: (page: string) => void }) {
           <div className="assistant-card__icon">
             <Sparkles size={20} aria-hidden="true" />
           </div>
-          <Badge tone="accent">À votre rythme</Badge>
-          <h3>Besoin d’un coup de main ?</h3>
-          <p>Obtenez des conseils pour valoriser vos compétences et mieux explorer les offres.</p>
+          <Badge tone="accent">{t("À votre rythme")}</Badge>
+          <h3>{t("Besoin d’un coup de main ?")}</h3>
+          <p>{t("Obtenez des conseils pour valoriser vos compétences et mieux explorer les offres.")}</p>
           <Button
             variant="secondary"
             className="assistant-card__button"
             onClick={() => onNavigate("Assistant")}
           >
-            Découvrir l’assistant <ArrowUpRight size={15} aria-hidden="true" />
+            {t("Découvrir l’assistant")} <ArrowUpRight size={15} aria-hidden="true" />
           </Button>
         </Card>
       </section>
 
       <footer className="page-footer">
         <span>Mahara Match</span>
-        <span>Vos compétences, votre avenir.</span>
+        <span>{t("Vos compétences, votre avenir.")}</span>
       </footer>
     </>
   );

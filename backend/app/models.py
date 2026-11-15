@@ -485,6 +485,42 @@ class SkillCatalogue(Base):
     aliases: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
 
 
+class SkillRelationship(Base):
+    __tablename__ = "skill_relationships"
+    __table_args__ = (
+        CheckConstraint(
+            "relation_type IN ('RELATED_TO', 'FOUNDATION_OF')",
+            name="ck_skill_relationships_relation_type",
+        ),
+        CheckConstraint("strength >= 0 AND strength <= 1", name="ck_skill_relationships_strength"),
+        CheckConstraint(
+            "confidence >= 0 AND confidence <= 1",
+            name="ck_skill_relationships_confidence",
+        ),
+        CheckConstraint("from_skill_id != to_skill_id", name="ck_skill_relationships_distinct_skills"),
+        UniqueConstraint(
+            "from_skill_id",
+            "to_skill_id",
+            "relation_type",
+            name="uq_skill_relationships_edge",
+        ),
+        Index("ix_skill_relationships_from_type", "from_skill_id", "relation_type"),
+        Index("ix_skill_relationships_to_type", "to_skill_id", "relation_type"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    from_skill_id: Mapped[str] = mapped_column(
+        ForeignKey("skills_catalogue.id", ondelete="CASCADE"), nullable=False
+    )
+    to_skill_id: Mapped[str] = mapped_column(
+        ForeignKey("skills_catalogue.id", ondelete="CASCADE"), nullable=False
+    )
+    relation_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    strength: Mapped[float] = mapped_column(Float, nullable=False)
+    confidence: Mapped[float] = mapped_column(Float, nullable=False)
+    source: Mapped[str] = mapped_column(String(200), nullable=False)
+
+
 class CandidateSkill(Base):
     __tablename__ = "candidate_skills"
     user_id: Mapped[str] = mapped_column(ForeignKey("candidate_profiles.user_id", ondelete="CASCADE"), primary_key=True)

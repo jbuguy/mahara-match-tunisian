@@ -61,6 +61,24 @@ describe("guest discovery", () => {
     expect(screen.getByText(/autre mot-clé, une autre ville ou une autre catégorie/i)).toBeVisible();
   });
 
+  it("renders the public discovery page in Arabic and reports language changes", async () => {
+    mockPublicAPI();
+    const onLanguageChange = vi.fn();
+    render(
+      <GuestDiscovery
+        language="ar"
+        onLanguageChange={onLanguageChange}
+        onApply={vi.fn()}
+        onRequestService={vi.fn()}
+      />,
+    );
+
+    expect(await screen.findByRole("heading", { name: "ما الذي تبحث عنه؟" })).toBeVisible();
+    expect(screen.getByRole("tab", { name: /الكل/ })).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "التبديل إلى الفرنسية" }));
+    expect(onLanguageChange).toHaveBeenCalledWith("fr");
+  });
+
   it("routes an apply action to the auth page and remembers the offer", async () => {
     mockPublicAPI([job]);
     render(<App />);

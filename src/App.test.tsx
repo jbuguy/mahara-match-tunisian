@@ -56,8 +56,27 @@ function authenticate(role: Role) {
 describe("role-aware app shell", () => {
   beforeEach(() => {
     sessionStorage.clear();
+    localStorage.clear();
     vi.unstubAllGlobals();
     window.history.replaceState(null, "", "/");
+  });
+
+  it("switches the app shell to Arabic and applies right-to-left layout", async () => {
+    authenticate("candidate");
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: /bonjour et bienvenue/i })).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "التبديل إلى العربية" }));
+
+    expect(await screen.findByRole("heading", { name: "مرحبًا بك" })).toBeVisible();
+    expect(screen.getByRole("navigation", { name: "التنقل الرئيسي" })).toBeVisible();
+    expect(document.querySelector(".app-shell")).toHaveAttribute("dir", "rtl");
+    expect(document.querySelector(".app-shell")).toHaveAttribute("lang", "ar");
+    expect(localStorage.getItem("mahara-match-language")).toBe("ar");
+
+    fireEvent.click(screen.getByRole("button", { name: "التبديل إلى الفرنسية" }));
+    expect(await screen.findByRole("heading", { name: /bonjour et bienvenue/i })).toBeVisible();
+    expect(document.querySelector(".app-shell")).toHaveAttribute("dir", "ltr");
   });
 
   it("shows a real candidate empty state instead of fabricated opportunity data", async () => {

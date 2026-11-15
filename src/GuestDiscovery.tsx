@@ -18,6 +18,8 @@ import {
   type PublicProfessional,
   type PublicService,
 } from "./auth";
+import { LanguageSwitch } from "./components/LanguageSwitch";
+import { translate, type Language } from "./i18n";
 
 type SearchFilters = { q: string; location: string; limit: number; offset: number };
 type PublicPage<T> = { items: T[]; total: number; limit: number; offset: number };
@@ -144,19 +146,19 @@ function formatRange(
   return min || max;
 }
 
-function displayValue(value: string | null | undefined): string | undefined {
+function displayValue(value: string | null | undefined, language: Language): string | undefined {
   if (!value) return undefined;
-  return guestValueLabels[value] ?? value.replace(/_/g, " ");
+  return translate(language, guestValueLabels[value] ?? value.replace(/_/g, " "));
 }
 
-function availabilityText(value: unknown): string {
+function availabilityText(value: unknown, language: Language): string {
   if (value === null || value === undefined) return "";
-  if (typeof value === "boolean") return value ? "Oui" : "Non";
+  if (typeof value === "boolean") return translate(language, value ? "Oui" : "Non");
   if (typeof value === "string" || typeof value === "number") return String(value);
-  if (Array.isArray(value)) return value.map(availabilityText).filter(Boolean).join(", ");
+  if (Array.isArray(value)) return value.map((item) => availabilityText(item, language)).filter(Boolean).join(", ");
   if (typeof value === "object") {
     return Object.entries(value)
-      .map(([key, item]) => `${key} : ${availabilityText(item)}`)
+      .map(([key, item]) => `${key} : ${availabilityText(item, language)}`)
       .filter((entry) => !entry.endsWith(" : "))
       .join(" · ");
   }
@@ -164,12 +166,17 @@ function availabilityText(value: unknown): string {
 }
 
 export function GuestDiscovery({
+  language = "fr",
+  onLanguageChange = () => {},
   onApply,
   onRequestService,
 }: {
+  language?: Language;
+  onLanguageChange?: (language: Language) => void;
   onApply: (offer: JobOffer) => void;
   onRequestService: (service: PublicService) => void;
 }) {
+  const t = (text: string) => translate(language, text);
   const [query, setQuery] = useState("");
   const [location, setLocation] = useState("");
   const [activeTab, setActiveTab] = useState<GuestTab>("all");
@@ -329,10 +336,10 @@ export function GuestDiscovery({
         title: item.title,
         location: item.location,
         description: item.description,
-        meta: displayValue(item.employment_type),
+        meta: displayValue(item.employment_type, language),
         figure: formatRange(item.salary_min, item.salary_max),
         skills: item.required_skills,
-        action: "Voir l’offre",
+        action: t("Voir l’offre"),
         open: () => void openDetail({ type: "jobs", item }),
       })),
     },
@@ -345,12 +352,12 @@ export function GuestDiscovery({
         title: item.display_name,
         location: item.location,
         description: item.introduction,
-        meta: item.available ? "Disponible" : "Indisponible",
+        meta: t(item.available ? "Disponible" : "Indisponible"),
         figure: item.accepting_requests
-          ? "Accepte de nouvelles demandes"
+          ? t("Accepte de nouvelles demandes")
           : item.service_area.join(", ") || undefined,
         skills: item.skills,
-        action: "Voir le profil",
+        action: t("Voir le profil"),
         open: () => void openDetail({ type: "professionals", item }),
       })),
     },
@@ -363,10 +370,10 @@ export function GuestDiscovery({
         title: item.title,
         location: item.location,
         description: item.description,
-        meta: displayValue(item.price_type),
-        figure: item.price_min ? `À partir de ${formatAmount(item.price_min)}` : undefined,
+        meta: displayValue(item.price_type, language),
+        figure: item.price_min ? `${t("À partir de")} ${formatAmount(item.price_min)}` : undefined,
         skills: item.skills,
-        action: "Voir le service",
+        action: t("Voir le service"),
         open: () => void openDetail({ type: "services", item }),
       })),
     },
@@ -379,13 +386,13 @@ export function GuestDiscovery({
         title: item.title,
         location: item.location,
         description: item.summary,
-        meta: displayValue(item.delivery_mode),
+        meta: displayValue(item.delivery_mode, language),
         figure:
           item.duration_hours !== null && item.duration_hours !== undefined
             ? `${item.duration_hours} h`
             : undefined,
         skills: item.skills,
-        action: "Voir la formation",
+        action: t("Voir la formation"),
         open: () => void openDetail({ type: "training", item }),
       })),
     },
@@ -398,10 +405,10 @@ export function GuestDiscovery({
         title: item.title,
         location: item.location,
         description: item.description,
-        meta: [displayValue(item.work_mode), displayValue(item.budget_type)].filter(Boolean).join(" · "),
+        meta: [displayValue(item.work_mode, language), displayValue(item.budget_type, language)].filter(Boolean).join(" · "),
         figure: formatRange(item.budget_min, item.budget_max),
         skills: item.required_skills,
-        action: "Voir la mission",
+        action: t("Voir la mission"),
         open: () => void openDetail({ type: "missions", item }),
       })),
     },
@@ -442,18 +449,18 @@ export function GuestDiscovery({
         <div className="guest-card__topline">
           <span className="guest-type-chip">
             <span className="guest-type-chip__dot" aria-hidden="true" />
-            {categoryLabels[card.type]}
+            {t(categoryLabels[card.type])}
           </span>
           {card.meta && <span className="guest-card__meta">{card.meta}</span>}
         </div>
         <h3>{card.title}</h3>
         <p className="guest-card__location">
           <MapPin size={16} aria-hidden="true" />
-          <span>{card.location || "À distance"}</span>
+          <span>{card.location || t("À distance")}</span>
         </p>
         {card.description && <p className="guest-card__description">{card.description}</p>}
         {card.skills.length > 0 && (
-          <ul className="guest-card__skills" aria-label="Compétences">
+          <ul className="guest-card__skills" aria-label={t("Compétences")}>
             {card.skills.slice(0, 5).map((skill) => <li key={skill}>{skill}</li>)}
           </ul>
         )}
@@ -472,41 +479,42 @@ export function GuestDiscovery({
     <main className="guest-experience">
       <section className="guest-hero-band">
         <header className="guest-header guest-content">
-          <a className="guest-brand" href="#accueil" aria-label="Mahara Match, accueil">
+          <a className="guest-brand" href="#accueil" aria-label={t("Mahara Match, accueil")}>
             <span className="guest-brand__mark" aria-hidden="true">m</span>
             <span>mahara<span>match</span></span>
           </a>
-          <nav className="guest-header__links" aria-label="Compte">
-            <a href="#guest-auth">Se connecter</a>
-            <a className="guest-button guest-button--light" href="#guest-auth-signup">Créer un compte</a>
+          <nav className="guest-header__links" aria-label={t("Compte")}>
+            <LanguageSwitch language={language} onChange={onLanguageChange} />
+            <a href="#guest-auth">{t("Se connecter")}</a>
+            <a className="guest-button guest-button--light" href="#guest-auth-signup">{t("Créer un compte")}</a>
           </nav>
         </header>
         <div className="guest-hero guest-content">
-          <p className="guest-eyebrow">MAHARA MATCH · LES OPPORTUNITÉS EN TUNISIE</p>
-          <h1>Qu’est-ce que vous recherchez&nbsp;?</h1>
+          <p className="guest-eyebrow">{t("MAHARA MATCH · LES OPPORTUNITÉS EN TUNISIE")}</p>
+          <h1>{t("Qu’est-ce que vous recherchez ?")}</h1>
           <p className="guest-hero__subtitle">
-            Emplois, professionnels, services, formations et missions : trouvez votre prochaine opportunité.
+            {t("Emplois, professionnels, services, formations et missions : trouvez votre prochaine opportunité.")}
           </p>
           <form className="guest-search" onSubmit={submitSearch}>
             <label>
-              <span>Métier, compétence ou mot-clé</span>
+              <span>{t("Métier, compétence ou mot-clé")}</span>
               <input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Ex. développeur Python"
+                placeholder={t("Ex. développeur Python")}
               />
             </label>
             <label>
-              <span>Ville ou gouvernorat</span>
+              <span>{t("Ville ou gouvernorat")}</span>
               <input
                 value={location}
                 onChange={(event) => setLocation(event.target.value)}
-                placeholder="Ex. Tunis"
+                placeholder={t("Ex. Tunis")}
               />
             </label>
             <button type="submit" className="guest-button guest-button--terracotta">
               <Search size={18} aria-hidden="true" />
-              Rechercher
+              {t("Rechercher")}
             </button>
           </form>
         </div>
@@ -517,23 +525,23 @@ export function GuestDiscovery({
           <section className="guest-detail" aria-live="polite">
             <button type="button" className="guest-back-link" onClick={returnToResults}>
               <ArrowLeft size={17} aria-hidden="true" />
-              Retour aux résultats
+              {t("Retour aux résultats")}
             </button>
             {detailLoading ? (
-              <p className="guest-loading" aria-live="polite">Chargement du détail…</p>
+              <p className="guest-loading" aria-live="polite">{t("Chargement du détail…")}</p>
             ) : detailError ? (
               <p className="guest-error" role="alert">{detailError}</p>
             ) : detail.type === "jobs" ? (
               <article aria-labelledby="guest-detail-title">
-                <p className="guest-eyebrow">OFFRE D’EMPLOI</p>
+                <p className="guest-eyebrow">{t("OFFRE D’EMPLOI")}</p>
                 <h2 id="guest-detail-title">{detail.item.title}</h2>
                 <div className="guest-detail__columns">
                   <div className="guest-detail__primary">
-                    <h3>Description du poste</h3>
+                    <h3>{t("Description du poste")}</h3>
                     <p className="guest-detail__prose">{detail.item.description}</p>
                     {detail.item.required_skills.length > 0 && (
                       <div>
-                        <h3>Compétences demandées</h3>
+                        <h3>{t("Compétences demandées")}</h3>
                         <ul className="guest-detail__skills">
                           {detail.item.required_skills.map((skill) => <li key={skill}>{skill}</li>)}
                         </ul>
@@ -541,30 +549,30 @@ export function GuestDiscovery({
                     )}
                     {detail.item.preferred_skills && detail.item.preferred_skills.length > 0 && (
                       <div>
-                        <h3>Compétences appréciées</h3>
+                        <h3>{t("Compétences appréciées")}</h3>
                         <ul className="guest-detail__skills">
                           {detail.item.preferred_skills.map((skill) => <li key={skill}>{skill}</li>)}
                         </ul>
                       </div>
                     )}
                   </div>
-                  <aside className="guest-detail__aside" aria-label="Informations sur l’offre">
+                  <aside className="guest-detail__aside" aria-label={t("Informations sur l’offre")}>
                     {formatRange(detail.item.salary_min, detail.item.salary_max) && (
-                      <div><span>Salaire</span><strong>{formatRange(detail.item.salary_min, detail.item.salary_max)}</strong></div>
+                      <div><span>{t("Salaire")}</span><strong>{formatRange(detail.item.salary_min, detail.item.salary_max)}</strong></div>
                     )}
                     {detail.item.employment_type && (
-                      <div><span>Type de contrat</span><strong>{detail.item.employment_type}</strong></div>
+                      <div><span>{t("Type de contrat")}</span><strong>{detail.item.employment_type}</strong></div>
                     )}
-                    <div><span>Lieu</span><strong>{detail.item.location || "À distance"}</strong></div>
+                    <div><span>{t("Lieu")}</span><strong>{detail.item.location || t("À distance")}</strong></div>
                     {detail.item.workplace_arrangement && (
-                      <div><span>Organisation du travail</span><strong>{detail.item.workplace_arrangement}</strong></div>
+                      <div><span>{t("Organisation du travail")}</span><strong>{detail.item.workplace_arrangement}</strong></div>
                     )}
                     <button
                       type="button"
                       className="guest-button guest-button--dark guest-detail__apply"
                       onClick={() => onApply(detail.item)}
                     >
-                      Se connecter pour postuler
+                      {t("Se connecter pour postuler")}
                     </button>
                   </aside>
                 </div>
@@ -573,34 +581,34 @@ export function GuestDiscovery({
               <article className="guest-detail__panel">
                 <p className="guest-eyebrow">{detail.item.category}</p>
                 <h2 id="guest-detail-title">{detail.item.title}</h2>
-                <p className="guest-card__location"><MapPin size={16} aria-hidden="true" />{detail.item.location || "À distance"}</p>
+                <p className="guest-card__location"><MapPin size={16} aria-hidden="true" />{detail.item.location || t("À distance")}</p>
                 <p className="guest-detail__prose">{detail.item.description}</p>
                 <ul className="guest-detail__skills">{detail.item.skills.map((skill) => <li key={skill}>{skill}</li>)}</ul>
                 <p className="guest-detail__fact">
-                  Tarif : {displayValue(detail.item.price_type)}
+                  {t("Tarif")} : {displayValue(detail.item.price_type, language)}
                   {formatRange(detail.item.price_min, detail.item.price_max) && ` · ${formatRange(detail.item.price_min, detail.item.price_max)}`}
                 </p>
                 {detail.item.portfolio_items.map((item) => (
                   <p key={item.url}><a href={item.url} target="_blank" rel="noreferrer">{item.title}</a></p>
                 ))}
                 <button type="button" className="guest-button guest-button--dark" onClick={() => onRequestService(detail.item)}>
-                  Se connecter pour demander ce service
+                  {t("Se connecter pour demander ce service")}
                 </button>
               </article>
             ) : detail.type === "professionals" ? (
               <article className="guest-detail__panel">
-                <p className="guest-eyebrow">PROFESSIONNEL</p>
+                <p className="guest-eyebrow">{t("PROFESSIONNEL")}</p>
                 <h2 id="guest-detail-title">{detail.item.display_name}</h2>
                 <h3>{detail.item.headline}</h3>
-                <p className="guest-card__location"><MapPin size={16} aria-hidden="true" />{detail.item.location || "À distance"}</p>
+                <p className="guest-card__location"><MapPin size={16} aria-hidden="true" />{detail.item.location || t("À distance")}</p>
                 <p className="guest-detail__prose">{detail.item.introduction}</p>
                 <p>{detail.item.skills.join(" · ")}</p>
-                {detail.item.service_area.length > 0 && <p>Zones desservies : {detail.item.service_area.join(" · ")}</p>}
-                <p>{detail.item.available ? "Disponible" : "Indisponible"}{detail.item.accepting_requests ? " · Accepte de nouvelles demandes" : ""}</p>
+                {detail.item.service_area.length > 0 && <p>{t("Zones desservies")} : {detail.item.service_area.join(" · ")}</p>}
+                <p>{t(detail.item.available ? "Disponible" : "Indisponible")}{detail.item.accepting_requests ? ` · ${t("Accepte de nouvelles demandes")}` : ""}</p>
                 {Object.keys(detail.item.availability).length > 0 && (
-                  <div><h3>Disponibilités</h3><ul className="guest-detail__availability">
+                  <div><h3>{t("Disponibilités")}</h3><ul className="guest-detail__availability">
                     {Object.entries(detail.item.availability).map(([key, value]) => (
-                      <li key={key}><strong>{key}</strong>{availabilityText(value) && ` : ${availabilityText(value)}`}</li>
+                      <li key={key}><strong>{key}</strong>{availabilityText(value, language) && ` : ${availabilityText(value, language)}`}</li>
                     ))}
                   </ul></div>
                 )}
@@ -608,35 +616,35 @@ export function GuestDiscovery({
                   <p key={item.url}><a href={item.url} target="_blank" rel="noreferrer">{item.title}</a></p>
                 ))}
                 {detail.item.services.length > 0 && (
-                  <div><h3>Services publiés</h3>{detail.item.services.map((item) => <p key={item.id}>{item.title} — {item.category}</p>)}</div>
+                  <div><h3>{t("Services publiés")}</h3>{detail.item.services.map((item) => <p key={item.id}>{item.title} — {item.category}</p>)}</div>
                 )}
               </article>
             ) : detail.type === "training" ? (
               <article className="guest-detail__panel">
-                <p className="guest-eyebrow">FORMATION</p>
+                <p className="guest-eyebrow">{t("FORMATION")}</p>
                 <h2 id="guest-detail-title">{detail.item.title}</h2>
                 <p className="guest-detail__prose">{detail.item.summary}</p>
-                <p className="guest-card__location"><MapPin size={16} aria-hidden="true" />{detail.item.location || "À distance"}</p>
-                {detail.item.duration_hours !== null && detail.item.duration_hours !== undefined && <p>Durée : {detail.item.duration_hours} h</p>}
-                {detail.item.delivery_mode && <p>Modalité : {displayValue(detail.item.delivery_mode)}</p>}
-                {detail.item.price_tnd !== null && detail.item.price_tnd !== undefined && <p>Prix : {detail.item.price_tnd} TND</p>}
+                <p className="guest-card__location"><MapPin size={16} aria-hidden="true" />{detail.item.location || t("À distance")}</p>
+                {detail.item.duration_hours !== null && detail.item.duration_hours !== undefined && <p>{t("Durée")} : {detail.item.duration_hours} h</p>}
+                {detail.item.delivery_mode && <p>{t("Modalité")} : {displayValue(detail.item.delivery_mode, language)}</p>}
+                {detail.item.price_tnd !== null && detail.item.price_tnd !== undefined && <p>{t("Prix")} : {detail.item.price_tnd} TND</p>}
                 <ul className="guest-detail__skills">{detail.item.skills.map((skill) => <li key={skill}>{skill}</li>)}</ul>
               </article>
             ) : (
               <article className="guest-detail__panel">
-                <p className="guest-eyebrow">MISSION · {detail.item.category}</p>
+                <p className="guest-eyebrow">{t("MISSION")} · {detail.item.category}</p>
                 <h2 id="guest-detail-title">{detail.item.title}</h2>
-                <p className="guest-card__location"><MapPin size={16} aria-hidden="true" />{detail.item.location || "À distance"}</p>
+                <p className="guest-card__location"><MapPin size={16} aria-hidden="true" />{detail.item.location || t("À distance")}</p>
                 <p className="guest-detail__prose">{detail.item.description}</p>
                 <ul className="guest-detail__skills">{detail.item.required_skills.map((skill) => <li key={skill}>{skill}</li>)}</ul>
-                {formatRange(detail.item.budget_min, detail.item.budget_max) && <p>Budget : {formatRange(detail.item.budget_min, detail.item.budget_max)}</p>}
-                <p>{[displayValue(detail.item.work_mode), displayValue(detail.item.budget_type), detail.item.duration].filter(Boolean).join(" · ")}</p>
+                {formatRange(detail.item.budget_min, detail.item.budget_max) && <p>{t("Budget")} : {formatRange(detail.item.budget_min, detail.item.budget_max)}</p>}
+                <p>{[displayValue(detail.item.work_mode, language), displayValue(detail.item.budget_type, language), detail.item.duration].filter(Boolean).join(" · ")}</p>
               </article>
             )}
           </section>
         ) : (
           <>
-            <div className="guest-tabs" role="tablist" aria-label="Catégories de résultats">
+            <div className="guest-tabs" role="tablist" aria-label={t("Catégories de résultats")}>
               {(Object.keys(tabLabels) as GuestTab[]).map((tab) => (
                 <button
                   type="button"
@@ -669,7 +677,7 @@ export function GuestDiscovery({
                     }
                   }}
                 >
-                  {tabLabels[tab]}
+                  {t(tabLabels[tab])}
                   <span>{tab === "all" ? Object.values(counts).reduce((sum, count) => sum + count, 0) : counts[tab]}</span>
                 </button>
               ))}
@@ -678,31 +686,31 @@ export function GuestDiscovery({
             <section id="guest-results-panel" role="tabpanel" aria-labelledby={`guest-tab-${activeTab}`} className="guest-results">
               <header className="guest-results__heading">
                 <div>
-                  <p className="guest-eyebrow">VOTRE PROCHAINE OPPORTUNITÉ</p>
-                  <h2>{tabHeadings[activeTab]}</h2>
+                  <p className="guest-eyebrow">{t("VOTRE PROCHAINE OPPORTUNITÉ")}</p>
+                  <h2>{t(tabHeadings[activeTab])}</h2>
                 </div>
                 <span className="guest-results__count" aria-live="polite">
-                  {activeCount} résultat{activeCount === 1 ? "" : "s"}
+                  {activeCount} {t(activeCount === 1 ? "résultat" : "résultats")}
                 </span>
               </header>
 
               {activeErrors.map((group) => (
                 <p className="guest-error" role="alert" key={group.type}>
-                  {group.state.error}
+                  {t(group.state.error)}
                 </p>
               ))}
               {anyLoading && (
                 <p className="guest-loading" aria-live="polite">
-                  {activeCards.length === 0 ? "Chargement des résultats…" : "Actualisation des résultats…"}
+                  {t(activeCards.length === 0 ? "Chargement des résultats…" : "Actualisation des résultats…")}
                 </p>
               )}
               {activeTab === "all" && activeCards.length > 0 ? (
-                <div className="guest-card-grid" aria-label="Résultats de toutes les catégories">
+                <div className="guest-card-grid" aria-label={t("Résultats de toutes les catégories")}>
                   {cardGroups.map((group) => group.cards.length > 0 && (
                     <div className="guest-card-grid__group" key={group.type}>
                       <h3>
-                        {tabLabels[group.type]}
-                        <button type="button" onClick={() => setActiveTab(group.type)}>Voir tout <ArrowRight size={15} aria-hidden="true" /></button>
+                        {t(tabLabels[group.type])}
+                        <button type="button" onClick={() => setActiveTab(group.type)}>{t("Voir tout")} <ArrowRight size={15} aria-hidden="true" /></button>
                       </h3>
                       {group.cards.slice(0, 6).map(renderCard)}
                     </div>
@@ -715,20 +723,20 @@ export function GuestDiscovery({
               ) : null}
               {!anyLoading && activeCards.length === 0 && activeErrors.length === 0 && (
                 <div className="guest-empty">
-                  <h3>Aucun résultat pour cette recherche</h3>
-                  <p>Essayez un autre mot-clé, une autre ville ou une autre catégorie.</p>
+                  <h3>{t("Aucun résultat pour cette recherche")}</h3>
+                  <p>{t("Essayez un autre mot-clé, une autre ville ou une autre catégorie.")}</p>
                 </div>
               )}
 
               {activeTab === "jobs" && jobs.total > 20 && (
-                <div className="guest-pagination" aria-label="Pagination des offres">
+                <div className="guest-pagination" aria-label={t("Pagination des offres")}>
                   <button
                     type="button"
                     className="guest-button guest-button--outline"
                     disabled={jobs.loading || jobs.offset === 0}
                     onClick={() => void changeJobPage(Math.max(0, jobs.offset - 20))}
                   >
-                    <ArrowLeft size={16} aria-hidden="true" /> Précédent
+                    <ArrowLeft size={16} aria-hidden="true" /> {t("Précédent")}
                   </button>
                   <span>{jobs.items.length ? jobs.offset + 1 : 0}–{Math.min(jobs.offset + jobs.items.length, jobs.total)} sur {jobs.total}</span>
                   <button
@@ -737,7 +745,7 @@ export function GuestDiscovery({
                     disabled={jobs.loading || jobs.offset + jobs.items.length >= jobs.total}
                     onClick={() => void changeJobPage(jobs.offset + 20)}
                   >
-                    Suivant <ArrowRight size={16} aria-hidden="true" />
+                    {t("Suivant")} <ArrowRight size={16} aria-hidden="true" />
                   </button>
                 </div>
               )}
@@ -749,7 +757,7 @@ export function GuestDiscovery({
                     disabled={activeState.loading}
                     onClick={() => void loadMore(activeTab)}
                   >
-                    {activeState.loading ? "Chargement…" : "Afficher plus de résultats"}
+                    {t(activeState.loading ? "Chargement…" : "Afficher plus de résultats")}
                   </button>
                 </div>
               )}
@@ -763,18 +771,18 @@ export function GuestDiscovery({
           <section className="guest-bottom-cta">
             <div className="guest-content">
               <div>
-                <p className="guest-eyebrow">PRÊT·E À PASSER À L’ACTION ?</p>
-                <h2>Créez votre compte pour postuler, publier ou vous former</h2>
+                <p className="guest-eyebrow">{t("PRÊT·E À PASSER À L’ACTION ?")}</p>
+                <h2>{t("Créez votre compte pour postuler, publier ou vous former")}</h2>
               </div>
-              <a className="guest-button guest-button--terracotta" href="#guest-auth-signup">Créer un compte</a>
+              <a className="guest-button guest-button--terracotta" href="#guest-auth-signup">{t("Créer un compte")}</a>
             </div>
           </section>
           <footer className="guest-footer guest-content">
-            <a className="guest-brand" href="#accueil" aria-label="Mahara Match, accueil">
+            <a className="guest-brand" href="#accueil" aria-label={t("Mahara Match, accueil")}>
               <span className="guest-brand__mark" aria-hidden="true">m</span>
               <span>mahara<span>match</span></span>
             </a>
-            <span>Les opportunités prennent forme ensemble.</span>
+            <span>{t("Les opportunités prennent forme ensemble.")}</span>
           </footer>
         </>
       )}

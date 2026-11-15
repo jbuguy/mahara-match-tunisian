@@ -1149,10 +1149,36 @@ class EmployerAnalyticsResponse(BaseModel):
     has_sufficient_data: bool
 
 
+class MatchScoreComponents(BaseModel):
+    direct_required: int | None
+    related_required: int | None
+    foundational_required: int | None
+    mandatory_direct_coverage: int | None
+
+
+class MatchExplanation(BaseModel):
+    kind: Literal[
+        "direct_skill",
+        "related_skill",
+        "foundational_skill",
+        "missing_required_skill",
+    ]
+    requirement: str
+    evidence: str | None
+    contribution: float = Field(ge=0, le=1)
+    source: str
+    relationship_type: Literal["RELATED_TO", "FOUNDATION_OF"] | None = None
+    confidence: float | None = Field(default=None, ge=0, le=1)
+    strength: float | None = Field(default=None, ge=0, le=1)
+
+
 class JobMatchResponse(JobOfferResponse):
-    match_score: int
+    match_score: int | None
     matched_skills: list[str]
     missing_skills: list[str]
+    score_version: str
+    score_components: MatchScoreComponents
+    explanations: list[MatchExplanation]
 
 
 class JobApplicationResponse(BaseModel):

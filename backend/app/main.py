@@ -2,6 +2,7 @@ import os
 import json
 import logging
 import re
+from dataclasses import asdict
 from datetime import datetime, timezone
 
 from fastapi import (
@@ -80,12 +81,15 @@ from app.models import (
     OrganisationMembership,
     OrganisationType,
     Role,
+    SkillCatalogue,
+    SkillRelationship,
     TechnicalAssessmentStatus,
     TalentPoolMember,
     TrainingCourse,
     User,
 )
 from app.permissions import Permission
+from app.matching.scoring import score_skill_match
 from app.schemas import (
     AuditEventResponse,
     AssistantMessage,
@@ -1259,9 +1263,9 @@ def candidate_matches(
         resource_id=user.id,
     )
     session.commit()
-    candidate_skills = {
-        skill.casefold(): skill for skill in (profile.skills if profile else [])
-    }
+    candidate_skills = profile.skills if profile else []
+    catalogue = session.scalars(select(SkillCatalogue)).all()
+    relationships = session.scalars(select(SkillRelationship)).all()
     offers = session.scalars(
         select(JobOffer)
         .where(JobOffer.status == JobOfferStatus.PUBLISHED)
@@ -1269,21 +1273,36 @@ def candidate_matches(
     )
     matches: list[JobMatchResponse] = []
     for offer in offers:
-        matched = [
-            skill
-            for skill in offer.required_skills
-            if skill.casefold() in candidate_skills
-        ]
-        missing = [skill for skill in offer.required_skills if skill not in matched]
+        score = score_skill_match(
+            candidate_skills,
+            offer.required_skills,
+            catalogue,
+            relationships,
+        )
         matches.append(
             JobMatchResponse(
                 **JobOfferResponse.model_validate(offer).model_dump(),
-                match_score=int(100 * len(matched) / len(offer.required_skills) + 0.5),
-                matched_skills=matched,
-                missing_skills=missing,
+                match_score=score.score,
+                matched_skills=score.matched_skills,
+                missing_skills=score.missing_skills,
+                score_version="skill-graph-v1",
+                score_components={
+                    "direct_required": score.direct_required,
+                    "related_required": score.related_required,
+                    "foundational_required": score.foundational_required,
+                    "mandatory_direct_coverage": score.mandatory_direct_coverage,
+                },
+                explanations=[asdict(explanation) for explanation in score.explanations],
             )
         )
-    return matches
+    return sorted(
+        matches,
+        key=lambda match: (
+            match.match_score is None,
+            -(match.score_components.mandatory_direct_coverage or 0),
+            -(match.match_score or 0),
+        ),
+    )
 
 
 @app.get(

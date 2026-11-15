@@ -32,7 +32,7 @@ def normalize_skill_key(value: str) -> str:
 
 def canonicalize_skills(session: Session, raw_skills: list[str], entity_type: str, entity_id: str) -> list[str]:
     aliases = {
-        normalize_skill_key(alias): (skill["canonical_name_fr"], skill["id"])
+        normalize_skill_key(alias): (skill.canonical_name_fr, skill.id)
         for skill in session.scalars(select(SkillCatalogue)).all()
         for alias in [skill.canonical_name_fr, skill.canonical_name_en, *skill.aliases]
     }

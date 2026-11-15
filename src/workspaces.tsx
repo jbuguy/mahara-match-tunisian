@@ -2370,7 +2370,8 @@ export function CandidateMatchesPage({
       <div className="eyebrow">OPPORTUNITÉS POUR VOUS</div>
       <h1>Offres compatibles avec vos compétences</h1>
       <p className="workspace-page__intro">
-        Le score compare uniquement les compétences renseignées aux compétences demandées.
+        Le score distingue les compétences exactes des compétences transférables identifiées.
+        Il ne prédit pas une décision de recrutement.
       </p>
       {isLoading && <p aria-live="polite">Recherche des offres…</p>}
       {error && <p className="workspace-error" role="alert">{error}</p>}
@@ -2428,6 +2429,10 @@ function MatchCard({
     }
   }
 
+  const inferredSkillExplanations = match.explanations.filter(
+    (item) => item.kind === "related_skill" || item.kind === "foundational_skill",
+  );
+
   return (
     <Card className="offer-card">
       <div className="offer-card__top">
@@ -2435,14 +2440,20 @@ function MatchCard({
           <h2>{match.title}</h2>
           <p className="offer-card__location"><MapPin size={15} aria-hidden="true" />{match.location}</p>
         </div>
-        <Badge tone={match.match_score >= 60 ? "success" : "neutral"}>
-          {match.match_score}% de correspondance
+        <Badge tone={match.match_score !== null && match.match_score >= 60 ? "success" : "neutral"}>
+          {match.match_score === null
+            ? "Correspondance non évaluée"
+            : `${match.match_score}% de correspondance`}
         </Badge>
       </div>
       <p className="offer-card__description">{match.description}</p>
       <div className="job-match-summary" aria-label="Résumé de la correspondance">
-        <span><strong>{match.matched_skills.length}</strong> compétence{match.matched_skills.length === 1 ? "" : "s"} correspondante{match.matched_skills.length === 1 ? "" : "s"}</span>
-        <span><strong>{match.missing_skills.length}</strong> à développer</span>
+        <span>
+          <strong>{match.matched_skills.length}</strong> compétence{match.matched_skills.length === 1 ? "" : "s"} exacte{match.matched_skills.length === 1 ? "" : "s"}
+        </span>
+        <span>
+          <strong>{inferredSkillExplanations.length}</strong> compétence{inferredSkillExplanations.length === 1 ? "" : "s"} transférable{inferredSkillExplanations.length === 1 ? "" : "s"}
+        </span>
       </div>
       <details className="job-detail">
         <summary>Voir le détail de l’offre et des compétences</summary>
@@ -2450,11 +2461,21 @@ function MatchCard({
           <p><strong>Lieu :</strong> {match.location}</p>
           <p><strong>Publiée le :</strong> {new Date(match.created_at).toLocaleDateString("fr-FR")}</p>
           <SkillList label="Compétences requises" skills={match.required_skills} tone="matched" />
-          <p className="market-footnote">Le score compare les compétences indiquées dans votre profil à celles de l’offre. Il ne prédit pas la décision de recrutement.</p>
+          <p className="market-footnote">Les relations entre compétences apportent un crédit partiel et ne remplacent pas une compétence requise. Version du score : {match.score_version}.</p>
         </div>
       </details>
       <SkillList label="Compétences correspondantes" skills={match.matched_skills} tone="matched" />
-      <SkillList label="À développer" skills={match.missing_skills} tone="missing" />
+      <SkillList label="Compétences requises sans correspondance exacte" skills={match.missing_skills} tone="missing" />
+      {inferredSkillExplanations.length > 0 && (
+        <ul className="job-match-explanations" aria-label="Compétences transférables prises en compte">
+          {inferredSkillExplanations.map((item) => (
+              <li key={`${item.kind}-${item.requirement}`}>
+                {item.evidence ?? "Une compétence du profil"} contribue partiellement à « {item.requirement} »
+                {item.kind === "foundational_skill" ? " (compétence fondamentale)" : " (compétence liée)"}.
+              </li>
+          ))}
+        </ul>
+      )}
       {error && <p className="workspace-error" role="alert">{error}</p>}
       <Button disabled={isApplied || isApplying} onClick={() => void apply()}>
         {isApplying
@@ -2733,7 +2754,7 @@ export function RoleAssistant({
     ? [
         {
           question: "Comment obtenir de meilleures correspondances ?",
-          answer: "Ajoutez à votre profil des compétences précises que vous maîtrisez réellement. Le score compare ces compétences avec celles demandées dans chaque offre.",
+          answer: "Ajoutez à votre profil des compétences précises que vous maîtrisez réellement. Les compétences exactes comptent pleinement; les compétences liées ou fondamentales ne contribuent que partiellement.",
           action: "Mettre à jour mon profil",
           page: "Mon profil",
         },
