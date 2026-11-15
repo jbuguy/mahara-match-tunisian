@@ -194,7 +194,7 @@ Configure the matching `MAHARA_*_BASE_URL`, model, and API-key variables from
 services. If an assistant or voice provider is unavailable, the backend should
 continue to respond without claiming that an unavailable service succeeded.
 
-The default embedding model is `BAAI/bge-m3` and produces 1024-dimensional
+The default embedding model is `intfloat/multilingual-e5-large-instruct` and produces 1024-dimensional
 vectors. After changing the pgvector migration, re-embed all existing chunks
 with the configured embedding service:
 

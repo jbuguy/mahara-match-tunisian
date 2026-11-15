@@ -12,6 +12,9 @@ from sqlalchemy.orm import Session
 from app.database import SessionLocal
 from app.knowledge_base import KnowledgeDocument
 from app.models import (
+    CandidateLearningDocument,
+    CandidateLearningMilestone,
+    CandidateLearningProject,
     CandidateProfile,
     CourseEnrollment,
     CourseEnrollmentStatus,
@@ -505,6 +508,125 @@ def _ensure_course_enrollment(session: Session, candidate_id: str, course_id: st
         ))
 
 
+def _ensure_candidate_learning(
+    session: Session,
+    candidate: User,
+    title: str,
+    objective: str,
+    target_profession: str,
+    starting_level: str,
+    milestones: list[dict[str, str]],
+    filename: str,
+    document_text: str,
+) -> CandidateLearningProject:
+    project = session.scalar(
+        select(CandidateLearningProject).where(
+            CandidateLearningProject.user_id == candidate.id,
+            CandidateLearningProject.title == title,
+        )
+    )
+    if project is None:
+        project = CandidateLearningProject(
+            user_id=candidate.id,
+            title=title,
+            objective=objective,
+            target_profession=target_profession,
+            starting_level=starting_level,
+            status="active",
+        )
+        session.add(project)
+        session.flush()
+
+    for order, milestone_data in enumerate(milestones, start=1):
+        milestone = session.scalar(
+            select(CandidateLearningMilestone).where(
+                CandidateLearningMilestone.learning_project_id == project.id,
+                CandidateLearningMilestone.title == milestone_data["title"],
+            )
+        )
+        if milestone is None:
+            session.add(CandidateLearningMilestone(
+                learning_project_id=project.id,
+                title=milestone_data["title"],
+                description=milestone_data["description"],
+                skill=milestone_data["skill"],
+                sort_order=order,
+                status="completed" if order == 1 else "in_progress" if order == 2 else "planned",
+            ))
+
+    document = session.scalar(
+        select(CandidateLearningDocument).where(
+            CandidateLearningDocument.learning_project_id == project.id,
+            CandidateLearningDocument.filename == filename,
+        )
+    )
+    if document is None:
+        content = document_text.encode("utf-8")
+        session.add(CandidateLearningDocument(
+            learning_project_id=project.id,
+            filename=filename,
+            content_type="text/markdown",
+            size_bytes=len(content),
+            content=content,
+            extracted_text=document_text,
+            processing_status="completed",
+        ))
+    return project
+
+
+def _ensure_demo_learning_projects(
+    session: Session,
+    user_by_email: dict[str, User],
+) -> tuple[int, int, int]:
+    milestones = [
+        {"title": "Cadrer le besoin et le modèle de données", "description": "Définir les utilisateurs, les parcours prioritaires et les principales entités avant de coder.", "skill": "Analyse et conception"},
+        {"title": "Construire une première version fonctionnelle", "description": "Livrer un parcours complet avec validation des entrées, gestion des erreurs et documentation.", "skill": "Développement"},
+        {"title": "Tester, améliorer et présenter le projet", "description": "Ajouter des tests utiles, corriger les défauts et préparer une démonstration claire du résultat.", "skill": "Tests et communication"},
+    ]
+    candidates = [user_by_email["candidate@demo.maharamatch.test"]]
+    candidates.extend(
+        user_by_email[record["email"]]
+        for record in DEMO_CANDIDATES
+        if record["email"] in user_by_email
+    )
+    for candidate in candidates:
+        if candidate.email == "candidate@demo.maharamatch.test":
+            skill = "Python"
+            profession = "Développeur backend"
+        else:
+            profile = next(record for record in DEMO_CANDIDATES if record["email"] == candidate.email)
+            skill = profile["skills"][0]
+            profession = profile["skills"][0]
+        title = f"Projet portfolio {profession}"
+        objective = f"Renforcer mes compétences en {skill} avec un projet concret, documenté et présentable à un recruteur."
+        document_text = (
+            f"# Notes du projet\n\nObjectif : {objective}\n\n"
+            f"Compétence principale : {skill}.\n\n"
+            "Plan de travail : cadrer le besoin, réaliser une première version, "
+            "puis tester et préparer une démonstration.\n"
+        )
+        _ensure_candidate_learning(
+            session,
+            candidate,
+            title,
+            objective,
+            profession,
+            "Intermédiaire" if candidate.email.startswith("ahmed.") else "Débutant",
+            milestones,
+            "notes-projet.md",
+            document_text,
+        )
+    return (
+        len(candidates),
+        session.query(CandidateLearningMilestone).join(CandidateLearningProject).filter(
+            CandidateLearningProject.user_id.in_([candidate.id for candidate in candidates])
+        ).count(),
+        session.query(CandidateLearningDocument).join(CandidateLearningProject).filter(
+            CandidateLearningProject.user_id.in_([candidate.id for candidate in candidates])
+        ).count(),
+    )
+
+
 def seed_demo_data(session: Session, password: str | None = None) -> dict[str, int]:
     configured_password = password or os.getenv("MAHARA_DEMO_PASSWORD") or DEMO_BASE_PASSWORD
     if len(configured_password) < 12:
@@ -542,6 +664,14 @@ def seed_demo_data(session: Session, password: str | None = None) -> dict[str, i
         user = _get_or_create_user(session, candidate["email"], Role.CANDIDATE, configured_password)
         user_by_email[candidate["email"]] = user
         _ensure_profile(session, user.id, candidate)
+
+    learning_projects, learning_milestones, learning_documents = _ensure_demo_learning_projects(
+        session, user_by_email | {
+            "candidate@demo.maharamatch.test": session.scalar(
+                select(User).where(User.email == "candidate@demo.maharamatch.test")
+            )
+        }
+    )
 
     for employer in DEMO_EMPLOYERS:
         user = _get_or_create_user(session, employer["email"], Role.EMPLOYER, configured_password)
@@ -627,6 +757,9 @@ def seed_demo_data(session: Session, password: str | None = None) -> dict[str, i
         "ministry_indicators": session.query(NationalIndicator)
         .filter(NationalIndicator.indicator_id.like("synthetic_demo_%"))
         .count(),
+        "learning_projects": learning_projects,
+        "learning_milestones": learning_milestones,
+        "learning_documents": learning_documents,
     }
 
 
@@ -643,6 +776,9 @@ def main() -> None:
         f"{result['training_courses']} training courses, "
         f"{result['synthetic_offers']} new synthetic offers, and "
         f"{result['ministry_indicators']} ministry indicators."
+        f" Learning: {result['learning_projects']} projects, "
+        f"{result['learning_milestones']} milestones, "
+        f"{result['learning_documents']} documents."
     )
 
 
