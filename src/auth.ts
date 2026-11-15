@@ -70,8 +70,43 @@ export type CandidateAssistantSession = {
   messages: CandidateAssistantMessage[];
   created_at: string;
   updated_at: string;
+  learning_project_id?: string | null;
 };
 export type CandidateAssistantSessionSummary = Omit<CandidateAssistantSession, "messages">;
+
+export type CandidateLearningProject = {
+  id: string;
+  title: string;
+  objective: string;
+  target_profession: string | null;
+  starting_level: string | null;
+  status: "active" | "archived";
+  created_at: string;
+  updated_at: string;
+};
+
+export type CandidateLearningMilestone = {
+  id: string;
+  learning_project_id: string;
+  title: string;
+  description: string;
+  skill: string | null;
+  sort_order: number;
+  status: "planned" | "in_progress" | "completed";
+  created_at: string;
+  updated_at: string;
+};
+
+export type CandidateLearningDocument = {
+  id: string;
+  learning_project_id: string;
+  filename: string;
+  content_type: string;
+  size_bytes: number;
+  processing_status: "completed" | "failed";
+  error_message: string | null;
+  created_at: string;
+};
 
 export type EmployerPlanningSessionStatus = "draft" | "in_progress" | "analysis_ready" | "completed" | "archived";
 export type EmployerPlanningSession = {
@@ -922,8 +957,10 @@ export function sendCandidateAssistantMessage(
 
 export function fetchCandidateAssistantSessions(
   token: string,
+  learningProjectId?: string,
 ): Promise<CandidateAssistantSessionSummary[]> {
-  return authenticatedRequest(token, "/candidate/assistant/sessions");
+  const query = learningProjectId ? `?learning_project_id=${encodeURIComponent(learningProjectId)}` : "";
+  return authenticatedRequest(token, `/candidate/assistant/sessions${query}`);
 }
 
 export function fetchCandidateAssistantSession(
@@ -935,10 +972,80 @@ export function fetchCandidateAssistantSession(
 
 export function createCandidateAssistantSession(
   token: string,
+  learningProjectId?: string,
 ): Promise<CandidateAssistantSession> {
   return authenticatedRequest(token, "/candidate/assistant/sessions", {
     method: "POST",
+    body: JSON.stringify({ learning_project_id: learningProjectId ?? null }),
   });
+}
+
+export function fetchCandidateLearningProjects(token: string, includeArchived = false): Promise<CandidateLearningProject[]> {
+  return authenticatedRequest(token, `/candidate/learning-projects${includeArchived ? "?include_archived=true" : ""}`);
+}
+
+export function createCandidateLearningProject(
+  token: string,
+  project: Pick<CandidateLearningProject, "title" | "objective" | "target_profession" | "starting_level">,
+): Promise<CandidateLearningProject> {
+  return authenticatedRequest(token, "/candidate/learning-projects", { method: "POST", body: JSON.stringify(project) });
+}
+
+export function toggleCandidateLearningProjectArchive(token: string, projectId: string): Promise<CandidateLearningProject> {
+  return authenticatedRequest(token, `/candidate/learning-projects/${projectId}/archive`, { method: "PATCH" });
+}
+
+export function fetchCandidateLearningMilestones(token: string, projectId: string): Promise<CandidateLearningMilestone[]> {
+  return authenticatedRequest(token, `/candidate/learning-projects/${projectId}/milestones`);
+}
+
+export function createCandidateLearningMilestone(
+  token: string,
+  projectId: string,
+  milestone: Pick<CandidateLearningMilestone, "title" | "description" | "skill">,
+): Promise<CandidateLearningMilestone> {
+  return authenticatedRequest(token, `/candidate/learning-projects/${projectId}/milestones`, {
+    method: "POST",
+    body: JSON.stringify(milestone),
+  });
+}
+
+export function updateCandidateLearningMilestoneStatus(
+  token: string,
+  projectId: string,
+  milestoneId: string,
+  status: CandidateLearningMilestone["status"],
+): Promise<CandidateLearningMilestone> {
+  return authenticatedRequest(token, `/candidate/learning-projects/${projectId}/milestones/${milestoneId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  });
+}
+
+export function fetchCandidateLearningDocuments(token: string, projectId: string): Promise<CandidateLearningDocument[]> {
+  return authenticatedRequest(token, `/candidate/learning-projects/${projectId}/documents`);
+}
+
+export function uploadCandidateLearningDocument(token: string, projectId: string, file: File): Promise<CandidateLearningDocument> {
+  const form = new FormData();
+  form.append("file", file, file.name);
+  return authenticatedRequest(token, `/candidate/learning-projects/${projectId}/documents`, { method: "POST", body: form });
+}
+
+export async function downloadCandidateLearningDocument(token: string, projectId: string, documentId: string): Promise<Blob> {
+  const response = await fetch(`${API_BASE_URL}/candidate/learning-projects/${projectId}/documents/${documentId}/download`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw await errorFromResponse(response);
+  return response.blob();
+}
+
+export async function deleteCandidateLearningDocument(token: string, projectId: string, documentId: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/candidate/learning-projects/${projectId}/documents/${documentId}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw await errorFromResponse(response);
 }
 
 export function sendCandidateAssistantSessionMessage(

@@ -1,11 +1,15 @@
-import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+﻿import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import {
-  Bot, Check, ChevronRight, Copy, FileText, Menu, MoreHorizontal,
+  Archive, Bot, Check, ChevronRight, Copy, Download, FileText, Menu, MoreHorizontal,
   Mic, MicOff, Paperclip, Pause, Pencil, Plus, RefreshCcw,
   Search, Send, Square, Trash2, Volume2, X,
 } from "lucide-react";
 import {
   createCandidateRoadmapProject,
+  createCandidateLearningProject,
+  createCandidateLearningMilestone,
+  deleteCandidateLearningDocument,
+  downloadCandidateLearningDocument,
   decideCandidateRoadmapProposal,
   enrollInCourse,
   fetchCandidateEnrollments,
@@ -21,6 +25,9 @@ import {
   deleteEmployerPlanningSession,
   fetchCandidateAssistantSession,
   fetchCandidateAssistantSessions,
+  fetchCandidateLearningProjects,
+  fetchCandidateLearningMilestones,
+  fetchCandidateLearningDocuments,
   fetchEmployerPlanningSessions,
   fetchEmployerPlanningMessages,
   renameCandidateAssistantSession,
@@ -35,9 +42,15 @@ import {
   updateCandidateRoadmapGoal,
   updateCandidateRoadmapStep,
   updateCandidateRoadmapProjectStatus,
+  toggleCandidateLearningProjectArchive,
+  updateCandidateLearningMilestoneStatus,
+  uploadCandidateLearningDocument,
   type CandidateAssistantMessage,
   type CandidateAssistantSession,
   type CandidateAssistantSessionSummary,
+  type CandidateLearningProject,
+  type CandidateLearningMilestone,
+  type CandidateLearningDocument,
   type CandidateRoadmap,
   type CandidateRoadmapAssessment,
   type CandidateRoadmapGoalUpdate,
@@ -95,6 +108,8 @@ export function UnifiedAssistantWorkspace({
 }: { token: string; role: Role; projectId?: string; onNavigate?: (page: string) => void }) {
   const [sessions, setSessions] = useState<CandidateAssistantSessionSummary[]>([]);
   const [activeSession, setActiveSession] = useState<CandidateAssistantSession | null>(null);
+  const [learningProjects, setLearningProjects] = useState<CandidateLearningProject[]>([]);
+  const [activeLearningProject, setActiveLearningProject] = useState<CandidateLearningProject | null>(null);
   const [projects, setProjects] = useState<EmployerPlanningSession[]>([]);
   const [activeProject, setActiveProject] = useState<EmployerPlanningSession | null>(null);
   const [projectMessages, setProjectMessages] = useState<PlanningMessage[]>([]);
@@ -107,8 +122,11 @@ export function UnifiedAssistantWorkspace({
   const [railOpen, setRailOpen] = useState(false);
   const [panelOpen, setPanelOpen] = useState(() => localStorage.getItem("mahara-project-panel") !== "closed");
   const [roadmapOpen, setRoadmapOpen] = useState(false);
+  const [learningRoadmapOpen, setLearningRoadmapOpen] = useState(false);
   const [panelTab, setPanelTab] = useState<"resume" | "context" | "recommendations">("resume");
   const [newProjectOpen, setNewProjectOpen] = useState(false);
+  const [newLearningProjectOpen, setNewLearningProjectOpen] = useState(false);
+  const [showArchivedLearningProjects, setShowArchivedLearningProjects] = useState(false);
   const [projectMenu, setProjectMenu] = useState<string | null>(null);
   const [editingConversationId, setEditingConversationId] = useState<string | null>(null);
   const [conversationTitleDraft, setConversationTitleDraft] = useState("");
@@ -139,6 +157,14 @@ export function UnifiedAssistantWorkspace({
           setSessions(history.some((item) => item.id === first?.id) ? history : [first as CandidateAssistantSession, ...history]);
           setActiveSession(first);
           if (first) sessionStorage.setItem("mahara-assistant-session", first.id);
+        }
+        if (role === "candidate") {
+          try {
+            const learningProjectRows = await fetchCandidateLearningProjects(token, true);
+            if (!cancelled) setLearningProjects(learningProjectRows);
+          } catch {
+            // The general assistant remains usable if the optional project list is unavailable.
+          }
         }
         if (role === "employer") {
           const rows = await fetchEmployerPlanningSessions(token);
@@ -225,11 +251,54 @@ export function UnifiedAssistantWorkspace({
 
   async function newConversation() {
     try {
-      const created = await createCandidateAssistantSession(token);
+      const created = await createCandidateAssistantSession(token, activeLearningProject?.id);
       setActiveSession(created);
       setSessions((current) => [created, ...current]);
       sessionStorage.setItem("mahara-assistant-session", created.id);
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Impossible de créer la conversation."); }
+  }
+
+  async function openLearningProject(project: CandidateLearningProject | null) {
+    setError("");
+    setLoading(true);
+    try {
+      const history = await fetchCandidateAssistantSessions(token, project?.id);
+      if (!history.length && project?.status === "archived") {
+        throw new Error("Ce projet archivé n’a pas encore de conversation. Restaurez-le pour démarrer une conversation.");
+      }
+      const session = history[0]
+        ? await fetchCandidateAssistantSession(token, history[0].id)
+        : await createCandidateAssistantSession(token, project?.id);
+      setActiveLearningProject(project);
+      setSessions(history.length ? history : [session]);
+      setActiveSession(session);
+      sessionStorage.setItem("mahara-assistant-session", session.id);
+      setRailOpen(false);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Impossible d’ouvrir ce projet.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function archiveLearningProject(project: CandidateLearningProject) {
+    try {
+      const updated = await toggleCandidateLearningProjectArchive(token, project.id);
+      setLearningProjects((current) => current.map((item) => item.id === updated.id ? updated : item));
+      if (activeLearningProject?.id === updated.id && updated.status === "archived") {
+        setLearningRoadmapOpen(false);
+        await openLearningProject(null);
+      }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Impossible de mettre à jour le projet.");
+    }
+  }
+
+  async function createLearningProject(input: Pick<CandidateLearningProject, "title" | "objective" | "target_profession" | "starting_level">) {
+    const created = await createCandidateLearningProject(token, input);
+    setLearningProjects((current) => [created, ...current]);
+    setNewLearningProjectOpen(false);
+    await openLearningProject(created);
   }
 
   function startRenamingConversation(session: CandidateAssistantSessionSummary) {
@@ -311,6 +380,26 @@ export function UnifiedAssistantWorkspace({
           {projectMenu && <button className="assistant-project-delete" type="button" onClick={() => void removeProject(projects.find((item) => item.id === projectMenu)!)}><Trash2 size={14}/> Supprimer</button>}
         </nav>
       </>}
+      {role === "candidate" && <>
+        <div className="assistant-section__heading">
+          <span>MES PROJETS D’APPRENTISSAGE</span>
+          <button className="icon-button" aria-label="Créer un projet d’apprentissage" onClick={() => setNewLearningProjectOpen(true)}><Plus size={16}/></button>
+        </div>
+        <nav className="assistant-project-list assistant-learning-projects" aria-label="Projets d’apprentissage">
+          <button className={`assistant-project-row ${activeLearningProject === null ? "is-active" : ""}`} onClick={() => void openLearningProject(null)}>
+            <span className="status-dot"/><span><strong>Assistant général</strong><small>Conversation hors projet</small></span>
+          </button>
+          {learningProjects.filter((project) => showArchivedLearningProjects || project.status === "active").map((project) =>
+            <div className="learning-project-list-row" key={project.id}>
+              <button className={`assistant-project-row ${activeLearningProject?.id === project.id ? "is-active" : ""}`} onClick={() => void openLearningProject(project)}>
+                <span className="status-dot"/><span><strong>{project.title}</strong><small>{project.status === "archived" ? "Archivé" : project.target_profession || "Projet d’apprentissage"}</small></span>
+              </button>
+              <button className="icon-button learning-project-archive" aria-label={`${project.status === "archived" ? "Restaurer" : "Archiver"} ${project.title}`} title={project.status === "archived" ? "Restaurer" : "Archiver"} onClick={() => void archiveLearningProject(project)}><Archive size={14}/></button>
+            </div>)}
+          {learningProjects.some((project) => project.status === "archived") && <button className="assistant-learning-archive-toggle" onClick={() => setShowArchivedLearningProjects((current) => !current)}>{showArchivedLearningProjects ? "Masquer les archives" : "Afficher les projets archivés"}</button>}
+          {!learningProjects.length && <p className="assistant-learning-empty">Créez un projet pour garder son objectif et ses conversations ensemble.</p>}
+        </nav>
+      </>}
       <div className="assistant-section__heading"><span>CONVERSATIONS</span></div>
       <nav className="assistant-conversation-list" aria-label="Conversations">
         {visibleSessions.map((session) => <div className={`assistant-conversation-row ${activeSession?.id === session.id ? "is-active" : ""}`} key={session.id}>
@@ -345,8 +434,9 @@ export function UnifiedAssistantWorkspace({
     <main className="unified-assistant__chat">
       <header className="assistant-chat__header">
         <h1 className="sr-only">{role === "candidate" ? "Votre assistant carrière" : role === "employer" ? "Votre assistant recrutement" : "Votre assistant"}</h1>
-        <div><strong>{isProjectMode ? activeProject?.title : activeSession?.title || "Assistant"}</strong>{isProjectMode && <><span className="assistant-project-type">{projectTypes[activeProject!.project_type]}</span><span className="status-badge">En cours</span></>}</div>
-        {role === "candidate" && <button className="button button--secondary button--small" aria-expanded={roadmapOpen} onClick={() => setRoadmapOpen((current) => !current)}>Mon parcours</button>}
+        <div><strong>{isProjectMode ? activeProject?.title : activeLearningProject?.title || activeSession?.title || "Assistant"}</strong>{isProjectMode && <><span className="assistant-project-type">{projectTypes[activeProject!.project_type]}</span><span className="status-badge">En cours</span></>}{activeLearningProject && <><span className="assistant-project-type">{activeLearningProject.target_profession || "Projet d’apprentissage"}</span><span className="status-badge">{activeLearningProject.status === "active" ? "Actif" : "Archivé"}</span></>}</div>
+        {role === "candidate" && <button className="button button--secondary button--small" aria-expanded={roadmapOpen} onClick={() => { setLearningRoadmapOpen(false); setRoadmapOpen((current) => !current); }}>Mon parcours</button>}
+        {activeLearningProject && <button className="button button--secondary button--small" aria-expanded={learningRoadmapOpen} onClick={() => { setRoadmapOpen(false); setLearningRoadmapOpen((current) => !current); }}>Roadmap du projet</button>}
         {isProjectMode && <button className="button button--secondary button--small" onClick={() => { setPanelOpen((current) => { localStorage.setItem("mahara-project-panel", current ? "closed" : "open"); return !current; }); }}>Panneau du projet</button>}
       </header>
       <div className="assistant-chat__messages" aria-live="polite">
@@ -354,7 +444,8 @@ export function UnifiedAssistantWorkspace({
           (isProjectMode ? projectMessages : activeSession?.messages ?? []).length ? (isProjectMode ? projectMessages : activeSession?.messages ?? []).map((message, index) => <AssistantMessage key={`${message.role}-${index}`} message={message} />) :
           <div className="assistant-empty">
             <span className="assistant-empty__icon"><Bot size={28}/></span>
-            <h2>{isProjectMode ? "Précisons votre projet" : role === "candidate" ? "Votre assistant carrière" : role === "employer" ? "Votre assistant recrutement" : "Parlons de votre avenir"}</h2>
+            <h2>{isProjectMode || activeLearningProject ? "Reprenons votre objectif" : role === "candidate" ? "Votre assistant carrière" : role === "employer" ? "Votre assistant recrutement" : "Parlons de votre avenir"}</h2>
+            {activeLearningProject && <p className="assistant-learning-objective">{activeLearningProject.objective}</p>}
             <div className="assistant-prompts">{prompts[role].map((prompt) => <button key={prompt} onClick={() => void sendMessage(prompt)}>{prompt}<ChevronRight size={16}/></button>)}</div>
           </div>}
         {sending && <p className="assistant-pending">L’assistant prépare sa réponse…</p>}
@@ -374,6 +465,8 @@ export function UnifiedAssistantWorkspace({
     </main>
     {isProjectMode && activeProject && panelOpen && <ProjectPanel token={token} project={activeProject} activeTab={panelTab} onTabChange={setPanelTab} onClose={() => setPanelOpen(false)}/>}
     {role === "candidate" && roadmapOpen && <RoadmapPanel token={token} onClose={() => setRoadmapOpen(false)} onNavigate={onNavigate}/>}
+    {role === "candidate" && activeLearningProject && learningRoadmapOpen && <LearningProjectRoadmapPanel token={token} project={activeLearningProject} onClose={() => setLearningRoadmapOpen(false)}/>}
+    {newLearningProjectOpen && <LearningProjectDialog onClose={() => setNewLearningProjectOpen(false)} onCreated={createLearningProject}/>}
     {newProjectOpen && <NewProjectDialog token={token} onClose={() => setNewProjectOpen(false)} onCreated={(project) => { setProjects((current) => [project, ...current]); setNewProjectOpen(false); window.location.hash = `#assistant/project/${project.id}`; }}/>}
   </section>;
 }
@@ -477,6 +570,240 @@ function NewProjectDialog({ token, onClose, onCreated }: { token: string; onClos
   </div>;
 }
 
+function LearningProjectDialog({
+  onClose,
+  onCreated,
+}: {
+  onClose: () => void;
+  onCreated: (project: Pick<CandidateLearningProject, "title" | "objective" | "target_profession" | "starting_level">) => Promise<void>;
+}) {
+  const [title, setTitle] = useState("");
+  const [objective, setObjective] = useState("");
+  const [targetProfession, setTargetProfession] = useState("");
+  const [startingLevel, setStartingLevel] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      await onCreated({
+        title: title.trim(),
+        objective: objective.trim(),
+        target_profession: targetProfession.trim() || null,
+        starting_level: startingLevel.trim() || null,
+      });
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Impossible de créer le projet.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+    <form className="assistant-project-dialog" role="dialog" aria-modal="true" aria-labelledby="new-learning-project-title" onSubmit={(event) => void submit(event)}>
+      <header><h2 id="new-learning-project-title">Nouveau projet d’apprentissage</h2><button type="button" className="icon-button" aria-label="Fermer" onClick={onClose}><X size={18}/></button></header>
+      <p>Créez un espace pour votre objectif. Vos conversations restent séparées entre les projets.</p>
+      <label className="form-field"><span className="form-field__label">Nom du projet</span><input className="input" required minLength={2} maxLength={160} value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Ex. Devenir développeuse backend"/></label>
+      <label className="form-field"><span className="form-field__label">Objectif d’apprentissage</span><textarea className="input" required minLength={2} maxLength={2000} value={objective} onChange={(event) => setObjective(event.target.value)} placeholder="Que souhaitez-vous apprendre ou être capable de réaliser ?"/></label>
+      <label className="form-field"><span className="form-field__label">Métier visé (facultatif)</span><input className="input" maxLength={160} value={targetProfession} onChange={(event) => setTargetProfession(event.target.value)}/></label>
+      <label className="form-field"><span className="form-field__label">Votre niveau de départ (facultatif)</span><input className="input" maxLength={60} value={startingLevel} onChange={(event) => setStartingLevel(event.target.value)} placeholder="Ex. Débutant, notions de Python"/></label>
+      {error && <p role="alert" className="workspace-error">{error}</p>}
+      <div className="assistant-dialog-actions"><button type="button" className="button button--secondary" onClick={onClose}>Annuler</button><button className="button button--primary" disabled={busy || title.trim().length < 2 || objective.trim().length < 2}>{busy ? "Création…" : "Créer le projet"}</button></div>
+    </form>
+  </div>;
+}
+
+function LearningProjectRoadmapPanel({
+  token,
+  project,
+  onClose,
+}: {
+  token: string;
+  project: CandidateLearningProject;
+  onClose: () => void;
+}) {
+  const [milestones, setMilestones] = useState<CandidateLearningMilestone[]>([]);
+  const [documents, setDocuments] = useState<CandidateLearningDocument[]>([]);
+  const [courses, setCourses] = useState<TrainingCourse[]>([]);
+  const [enrollments, setEnrollments] = useState<CourseEnrollment[]>([]);
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [skill, setSkill] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
+  const [documentError, setDocumentError] = useState("");
+  const [courseError, setCourseError] = useState("");
+  const [enrollingCourseId, setEnrollingCourseId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void Promise.allSettled([
+      fetchCandidateLearningMilestones(token, project.id),
+      fetchCandidateLearningDocuments(token, project.id),
+      fetchPublishedCourses(token),
+      fetchCandidateEnrollments(token),
+    ]).then(([milestoneResult, documentResult, courseResult, enrollmentResult]) => {
+      if (cancelled) return;
+      if (milestoneResult.status === "fulfilled") setMilestones(milestoneResult.value);
+      else setError(milestoneResult.reason instanceof Error ? milestoneResult.reason.message : "Impossible de charger la roadmap du projet.");
+      if (documentResult.status === "fulfilled") setDocuments(documentResult.value);
+      else setDocumentError(documentResult.reason instanceof Error ? documentResult.reason.message : "Impossible de charger les documents.");
+      if (courseResult.status === "fulfilled") setCourses(courseResult.value);
+      else setCourseError(courseResult.reason instanceof Error ? courseResult.reason.message : "Impossible de charger les formations.");
+      if (enrollmentResult.status === "fulfilled") setEnrollments(enrollmentResult.value);
+      else setCourseError(enrollmentResult.reason instanceof Error ? enrollmentResult.reason.message : "Impossible de charger vos inscriptions.");
+    }).finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [token, project.id]);
+
+  async function addMilestone(event: FormEvent) {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      const created = await createCandidateLearningMilestone(token, project.id, {
+        title: title.trim(),
+        description: description.trim(),
+        skill: skill.trim() || null,
+      });
+      setMilestones((current) => [...current, created]);
+      setTitle("");
+      setDescription("");
+      setSkill("");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Impossible d’ajouter cette étape.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function changeStatus(milestone: CandidateLearningMilestone, status: CandidateLearningMilestone["status"]) {
+    setBusy(true);
+    setError("");
+    try {
+      const updated = await updateCandidateLearningMilestoneStatus(token, project.id, milestone.id, status);
+      setMilestones((current) => current.map((item) => item.id === updated.id ? updated : item));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Impossible de mettre à jour cette étape.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function enrollInRecommendedCourse(courseId: string) {
+    setEnrollingCourseId(courseId);
+    setCourseError("");
+    try {
+      const enrollment = await enrollInCourse(token, courseId);
+      setEnrollments((current) => [...current.filter((item) => item.course_id !== courseId), enrollment]);
+    } catch (cause) {
+      setCourseError(cause instanceof Error ? cause.message : "Impossible de s’inscrire à cette formation.");
+    } finally {
+      setEnrollingCourseId(null);
+    }
+  }
+
+  async function uploadDocument(file?: File) {
+    if (!file) return;
+    setUploading(true);
+    setDocumentError("");
+    try {
+      const created = await uploadCandidateLearningDocument(token, project.id, file);
+      setDocuments((current) => [created, ...current]);
+    } catch (cause) {
+      setDocumentError(cause instanceof Error ? cause.message : "Impossible d’ajouter ce document.");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function downloadDocument(file: CandidateLearningDocument) {
+    try {
+      const blob = await downloadCandidateLearningDocument(token, project.id, file.id);
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = file.filename;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch (cause) {
+      setDocumentError(cause instanceof Error ? cause.message : "Impossible de télécharger ce document.");
+    }
+  }
+
+  async function removeDocument(file: CandidateLearningDocument) {
+    if (!window.confirm(`Supprimer « ${file.filename} » de ce projet ?`)) return;
+    try {
+      await deleteCandidateLearningDocument(token, project.id, file.id);
+      setDocuments((current) => current.filter((item) => item.id !== file.id));
+    } catch (cause) {
+      setDocumentError(cause instanceof Error ? cause.message : "Impossible de supprimer ce document.");
+    }
+  }
+
+  const completed = milestones.filter((milestone) => milestone.status === "completed").length;
+  const progress = milestones.length ? Math.round(completed * 100 / milestones.length) : 0;
+  const projectSkills = new Set(milestones.map((milestone) => milestone.skill?.trim().toLocaleLowerCase()).filter((value): value is string => Boolean(value)));
+  const recommendedCourses = courses.map((course) => ({
+    course,
+    matchedSkills: course.skills.filter((courseSkill) => projectSkills.has(courseSkill.trim().toLocaleLowerCase())),
+  })).filter(({ matchedSkills }) => matchedSkills.length > 0);
+
+  return <aside className="assistant-roadmap-panel assistant-learning-roadmap-panel" aria-label={`Roadmap de ${project.title}`}>
+    <header><div><strong>{project.title}</strong><small>Roadmap · {progress}% terminée</small></div><button className="icon-button" aria-label="Fermer la roadmap" onClick={onClose}><X size={17}/></button></header>
+    <div className="assistant-roadmap-panel__body">
+      <section className="assistant-learning-project-summary"><span>OBJECTIF</span><p>{project.objective}</p>{project.starting_level && <small>Niveau de départ : {project.starting_level}</small>}</section>
+      <section className="assistant-roadmap-section assistant-learning-documents">
+        <h3>Fichiers du projet</h3>
+        <label className="assistant-learning-upload"><span>{uploading ? "Analyse du document…" : "Ajouter un PDF, DOCX, TXT ou Markdown (10 Mo max)"}</span><input type="file" accept=".pdf,.docx,.txt,.md,application/pdf,text/plain,text/markdown,application/vnd.openxmlformats-officedocument.wordprocessingml.document" disabled={uploading || project.status !== "active"} onChange={(event) => { void uploadDocument(event.target.files?.[0]); event.target.value = ""; }}/></label>
+        {documents.map((file) => <article className="assistant-learning-document" key={file.id}>
+          <span><strong>{file.filename}</strong><small>{file.processing_status === "completed" ? `${Math.ceil(file.size_bytes / 1024)} Ko · Texte disponible pour l’assistant` : file.error_message || "Le texte n’a pas pu être extrait."}</small></span>
+          <button type="button" className="icon-button" aria-label={`Télécharger ${file.filename}`} onClick={() => void downloadDocument(file)}><Download size={15}/></button>
+          <button type="button" className="icon-button" aria-label={`Supprimer ${file.filename}`} onClick={() => void removeDocument(file)}><Trash2 size={15}/></button>
+        </article>)}
+        {!documents.length && !loading && <p className="assistant-roadmap-note">Aucun document ajouté.</p>}
+        {documentError && <p className="workspace-error" role="alert">{documentError}</p>}
+      </section>
+      <section className="assistant-roadmap-section">
+        <h3>Étapes d’apprentissage</h3>
+        {loading ? <p role="status">Chargement des étapes…</p> : milestones.length ? milestones.map((milestone, index) => <article className="assistant-roadmap-step" key={milestone.id}>
+          <div><strong>{index + 1}. {milestone.title}</strong><small>{milestone.skill ? `${milestone.skill} · ` : ""}{milestone.description}</small></div>
+          <select className="input" aria-label={`État de ${milestone.title}`} value={milestone.status} disabled={busy} onChange={(event) => void changeStatus(milestone, event.target.value as CandidateLearningMilestone["status"])}>
+            <option value="planned">À commencer</option><option value="in_progress">En cours</option><option value="completed">Terminée</option>
+          </select>
+        </article>) : <p className="assistant-roadmap-note">Ajoutez des étapes pour organiser votre apprentissage.</p>}
+      </section>
+      <section className="assistant-roadmap-section assistant-learning-formations">
+        <h3>Formations liées à votre projet</h3>
+        {!projectSkills.size ? <p className="assistant-roadmap-note">Ajoutez une compétence à une étape pour trouver des formations correspondantes.</p> : recommendedCourses.length ? recommendedCourses.map(({ course, matchedSkills }) => {
+          const enrollment = enrollments.find((item) => item.course_id === course.id);
+          const full = course.enrollment_count >= course.capacity;
+          return <article className="assistant-roadmap-step" key={course.id}>
+            <div><strong>{course.title}</strong><small>{matchedSkills.join(" · ")} · {course.duration_hours} h{course.location ? ` · ${course.location}` : " · En ligne"}</small></div>
+            {enrollment ? <span className="assistant-learning-enrollment">{enrollment.status === "completed" ? "Terminée" : enrollment.status === "withdrawn" ? "Désinscrit·e" : "Inscrit·e"}</span> : <button type="button" className="button button--secondary" disabled={Boolean(enrollingCourseId) || full || project.status !== "active"} onClick={() => void enrollInRecommendedCourse(course.id)}>{enrollingCourseId === course.id ? "Inscription…" : full ? "Complète" : "S’inscrire"}</button>}
+          </article>;
+        }) : <p className="assistant-roadmap-note">Aucune formation publiée ne correspond aux compétences de vos étapes.</p>}
+        {courseError && <p className="workspace-error" role="alert">{courseError}</p>}
+        <p className="assistant-roadmap-note">Les formations affichées proviennent du catalogue publié. Leur inscription reste distincte de la progression des étapes.</p>
+      </section>
+      <form className="assistant-roadmap-goal" onSubmit={(event) => void addMilestone(event)}>
+        <h3>Ajouter une étape</h3>
+        <label><span>Étape ou résultat attendu</span><input className="input" required minLength={2} maxLength={160} value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Ex. Créer une API REST"/></label>
+        <label><span>Description</span><textarea className="input" required minLength={2} maxLength={2000} value={description} onChange={(event) => setDescription(event.target.value)}/></label>
+        <label><span>Compétence concernée (facultatif)</span><input className="input" maxLength={100} value={skill} onChange={(event) => setSkill(event.target.value)}/></label>
+        <button className="button button--primary" disabled={busy || loading}>{busy ? "Enregistrement…" : "Ajouter à la roadmap"}</button>
+      </form>
+      {error && <p className="workspace-error" role="alert">{error}</p>}
+      <p className="assistant-roadmap-note">La progression suit les étapes que vous marquez. Elle ne constitue pas une validation de maîtrise.</p>
+    </div>
+  </aside>;
+}
+
 function RoadmapPanel({ token, onClose, onNavigate }: { token: string; onClose: () => void; onNavigate?: (page: string) => void }) {
   const [roadmap, setRoadmap] = useState<CandidateRoadmap | null>(null);
   const [matches, setMatches] = useState<JobMatch[]>([]);
@@ -499,22 +826,39 @@ function RoadmapPanel({ token, onClose, onNavigate }: { token: string; onClose: 
 
   useEffect(() => {
     let cancelled = false;
-    void Promise.all([fetchCandidateRoadmap(token), fetchCandidateMatches(token), fetchPublishedCourses(token), fetchCandidateEnrollments(token), fetchCandidateRoadmapProjects(token), fetchCandidateRoadmapAssessments(token), fetchCandidateRoadmapProposals(token)])
-      .then(([currentRoadmap, currentMatches, currentCourses, currentEnrollments, currentProjects, currentAssessments, currentProposals]) => {
+    const requests = [
+      fetchCandidateRoadmap(token),
+      fetchCandidateMatches(token),
+      fetchPublishedCourses(token),
+      fetchCandidateEnrollments(token),
+      fetchCandidateRoadmapProjects(token),
+      fetchCandidateRoadmapAssessments(token),
+      fetchCandidateRoadmapProposals(token),
+    ] as const;
+    void Promise.allSettled(requests)
+      .then(([roadmapResult, matchesResult, coursesResult, enrollmentsResult, projectsResult, assessmentsResult, proposalsResult]) => {
         if (cancelled) return;
+        if (roadmapResult.status === "rejected") {
+          setError(roadmapResult.reason instanceof Error ? roadmapResult.reason.message : "Impossible de charger le parcours.");
+          return;
+        }
+        const currentRoadmap = roadmapResult.value;
+        const currentMatches = matchesResult.status === "fulfilled" ? matchesResult.value : [];
         setRoadmap(currentRoadmap);
         setMatches(currentMatches);
-        setCourses(currentCourses);
-        setEnrollments(currentEnrollments);
-        setProjects(currentProjects);
-        setAssessments(currentAssessments);
-        setProposals(currentProposals);
+        setCourses(coursesResult.status === "fulfilled" ? coursesResult.value : []);
+        setEnrollments(enrollmentsResult.status === "fulfilled" ? enrollmentsResult.value : []);
+        setProjects(projectsResult.status === "fulfilled" ? projectsResult.value : []);
+        setAssessments(assessmentsResult.status === "fulfilled" ? assessmentsResult.value : []);
+        setProposals(proposalsResult.status === "fulfilled" ? proposalsResult.value : []);
         if (currentRoadmap.goal_type) setGoalType(currentRoadmap.goal_type);
         setTargetOfferId(currentRoadmap.target_offer_id ?? currentMatches[0]?.id ?? "");
         setGoalTitle(currentRoadmap.goal_title ?? currentMatches[0]?.title ?? "");
         setSkillText((currentRoadmap.selected_skills ?? []).join(", "));
+        if ([matchesResult, coursesResult, enrollmentsResult, projectsResult, assessmentsResult, proposalsResult].some((result) => result.status === "rejected")) {
+          setNotice("Une partie des recommandations ou du suivi est momentanément indisponible. Votre parcours reste accessible.");
+        }
       })
-      .catch((cause) => { if (!cancelled) setError(cause instanceof Error ? cause.message : "Impossible de charger le parcours."); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [token]);
@@ -635,7 +979,7 @@ function RoadmapPanel({ token, onClose, onNavigate }: { token: string; onClose: 
           </section>
           <section className="assistant-roadmap-section"><h3>Évaluations</h3>
             {assessments.length ? assessments.map((assessment) => <article className="assistant-roadmap-step" key={assessment.assessment_id}><div><strong>{assessment.skill}</strong><small>{assessment.assessment_type === "technical" ? "Technique" : "Comportementale"} · {assessment.status === "completed" ? "Terminée" : "En cours"} · Score {assessment.score}/{assessment.max_score}</small></div></article>) : <p className="assistant-roadmap-note">Aucune évaluation commencée. Les résultats s’afficheront ici.</p>}
-            {roadmap.target_offer_id && onNavigate && <button className="button button--secondary button--small" onClick={() => onNavigate("PrÃƒÂ©parer un entretien")}>Ouvrir les évaluations</button>}
+            {roadmap.target_offer_id && onNavigate && <button className="button button--secondary button--small" onClick={() => onNavigate("Préparer un entretien")}>Ouvrir les évaluations</button>}
             <p className="assistant-roadmap-note">Les résultats viennent des évaluations existantes et ne confirment pas automatiquement une maîtrise.</p>
           </section>
           <section className="assistant-roadmap-section"><h3>Formations du catalogue</h3>
