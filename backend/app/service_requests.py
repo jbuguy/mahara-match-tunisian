@@ -13,6 +13,7 @@ from app.models import (
     EmployerNotification,
     ProfessionalProfile,
     ProfessionalProfileVisibility,
+    Role,
     ServiceListing,
     ServiceListingStatus,
     ServiceRequest,
@@ -85,11 +86,13 @@ def create_service_request(
     service = session.scalar(
         select(ServiceListing)
         .join(ProfessionalProfile, ProfessionalProfile.user_id == ServiceListing.owner_user_id)
+        .join(User, User.id == ProfessionalProfile.user_id)
         .where(
             ServiceListing.id == service_id,
             ServiceListing.status == ServiceListingStatus.PUBLISHED,
             ProfessionalProfile.visibility == ProfessionalProfileVisibility.PUBLIC,
             ProfessionalProfile.accepting_requests.is_(True),
+            User.role == Role.CANDIDATE,
         )
     )
     if service is None:

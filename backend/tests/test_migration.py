@@ -130,3 +130,62 @@ def test_candidate_profile_migration_preserves_existing_skills(
     assert row.education is None
     engine.dispose()
     command.downgrade(alembic_config, "base")
+
+
+def test_professional_profile_migration_backfills_opaque_public_ids(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    database_path = tmp_path / "professional-public-ids.db"
+    database_url = f"sqlite:///{database_path.as_posix()}"
+    monkeypatch.setenv("DATABASE_URL", database_url)
+    alembic_config = Config(str(Path(__file__).parents[1] / "alembic.ini"))
+    alembic_config.set_main_option("sqlalchemy.url", database_url)
+    command.upgrade(alembic_config, "0034_curated_skill_relationships")
+
+    engine = create_engine(database_url)
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                """
+                INSERT INTO users
+                    (id, email, password_hash, role, is_active, created_at)
+                VALUES
+                    ('candidate-1', 'candidate@example.test', 'hash', 'candidate',
+                     1, '2026-01-01T00:00:00')
+                """
+            )
+        )
+        connection.execute(
+            text(
+                """
+                INSERT INTO professional_profiles
+                    (user_id, display_name, headline, introduction, languages,
+                     skills, visibility, available, accepting_requests,
+                     availability, created_at, updated_at, service_area,
+                     portfolio_items)
+                VALUES
+                    ('candidate-1', 'Amira', 'Developer', '', '[]', '[]',
+                     'private', 1, 1, '{}', '2026-01-01T00:00:00',
+                     '2026-01-01T00:00:00', '[]', '[]')
+                """
+            )
+        )
+
+    command.upgrade(alembic_config, "head")
+    with engine.connect() as connection:
+        public_id = connection.execute(
+            text(
+                "SELECT public_id FROM professional_profiles "
+                "WHERE user_id = 'candidate-1'"
+            )
+        ).scalar_one()
+    assert public_id
+    assert public_id != "candidate-1"
+    assert "public_id" in {
+        column["name"]
+        for column in inspect(engine).get_columns("professional_profiles")
+    }
+
+    engine.dispose()
+    command.downgrade(alembic_config, "base")

@@ -8,10 +8,12 @@ from sqlalchemy.orm import Session
 
 from app.audit import record_audit_event
 from app.database import get_session
-from app.dependencies import get_current_user
+from app.dependencies import require_role
 from app.models import (
+    CandidateProfile,
     ProfessionalProfile,
     ProfessionalProfileVisibility,
+    Role,
     ServiceListing,
     ServiceListingStatus,
     User,
@@ -27,6 +29,7 @@ from app.schemas import (
     ServiceListingResponse,
     ServiceListingStatusUpdate,
 )
+from app.skill_catalog import sync_candidate_skills
 
 router = APIRouter()
 
@@ -35,8 +38,28 @@ def _service_response(listing: ServiceListing) -> ServiceListingResponse:
     return ServiceListingResponse.model_validate(listing)
 
 
-def _public_service(listing: ServiceListing) -> PublicServiceListingResponse:
-    return PublicServiceListingResponse.model_validate(listing)
+def _merge_skills(*groups: list[str]) -> list[str]:
+    merged: list[str] = []
+    seen: set[str] = set()
+    for group in groups:
+        for skill in group:
+            key = skill.casefold()
+            if key not in seen:
+                merged.append(skill)
+                seen.add(key)
+    return merged
+
+
+def _public_service(
+    listing: ServiceListing,
+    owner_public_id: str,
+) -> PublicServiceListingResponse:
+    fields = ServiceListingResponse.model_validate(listing).model_dump(
+        exclude={"owner_user_id", "status", "updated_at"}
+    )
+    return PublicServiceListingResponse.model_validate(
+        {**fields, "owner_public_id": owner_public_id}
+    )
 
 
 def _public_profile(
@@ -44,7 +67,7 @@ def _public_profile(
     services: list[ServiceListing],
 ) -> PublicProfessionalProfileResponse:
     return PublicProfessionalProfileResponse(
-        id=profile.user_id,
+        id=profile.public_id,
         display_name=profile.display_name,
         headline=profile.headline,
         introduction=profile.introduction,
@@ -58,29 +81,39 @@ def _public_profile(
         availability=profile.availability,
         service_area=profile.service_area,
         portfolio_items=profile.portfolio_items,
-        services=[_public_service(item) for item in services],
+        services=[_public_service(item, profile.public_id) for item in services],
     )
 
 
 @router.get("/me/professional-profile", response_model=ProfessionalProfileResponse)
 def get_my_professional_profile(
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_role(Role.CANDIDATE)),
     session: Session = Depends(get_session),
 ) -> ProfessionalProfileResponse:
     profile = session.get(ProfessionalProfile, user.id)
     if profile is None:
         raise HTTPException(status_code=404, detail="Professional profile not found.")
-    return ProfessionalProfileResponse.model_validate(profile)
+    response = ProfessionalProfileResponse.model_validate(profile)
+    candidate_profile = session.get(CandidateProfile, user.id)
+    if candidate_profile is not None:
+        response = response.model_copy(
+            update={"skills": _merge_skills(candidate_profile.skills, profile.skills)}
+        )
+    return response
 
 
 @router.put("/me/professional-profile", response_model=ProfessionalProfileResponse)
 def save_my_professional_profile(
     request: ProfessionalProfileFields,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_role(Role.CANDIDATE)),
     session: Session = Depends(get_session),
 ) -> ProfessionalProfileResponse:
     profile = session.get(ProfessionalProfile, user.id)
     values = request.model_dump()
+    candidate_profile = session.get(CandidateProfile, user.id)
+    if candidate_profile is not None:
+        sync_candidate_skills(session, user.id, request.skills)
+        candidate_profile.skills = request.skills
     if profile is None:
         profile = ProfessionalProfile(user_id=user.id, **values)
         session.add(profile)
@@ -92,12 +125,17 @@ def save_my_professional_profile(
     record_audit_event(session, action=action, actor=user, resource_type="professional_profile", resource_id=user.id)
     session.commit()
     session.refresh(profile)
-    return ProfessionalProfileResponse.model_validate(profile)
+    response = ProfessionalProfileResponse.model_validate(profile)
+    if candidate_profile is not None:
+        response = response.model_copy(
+            update={"skills": _merge_skills(candidate_profile.skills, profile.skills)}
+        )
+    return response
 
 
 @router.get("/me/services", response_model=list[ServiceListingResponse])
 def my_services(
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_role(Role.CANDIDATE)),
     session: Session = Depends(get_session),
 ) -> list[ServiceListingResponse]:
     return [
@@ -113,7 +151,7 @@ def my_services(
 @router.post("/me/services", response_model=ServiceListingResponse, status_code=status.HTTP_201_CREATED)
 def create_service(
     request: ServiceListingCreate,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_role(Role.CANDIDATE)),
     session: Session = Depends(get_session),
 ) -> ServiceListingResponse:
     profile = session.get(ProfessionalProfile, user.id)
@@ -132,7 +170,7 @@ def create_service(
 def update_service(
     listing_id: str,
     request: ServiceListingCreate,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_role(Role.CANDIDATE)),
     session: Session = Depends(get_session),
 ) -> ServiceListingResponse:
     listing = session.scalar(
@@ -158,7 +196,7 @@ def update_service(
 def update_service_status(
     listing_id: str,
     request: ServiceListingStatusUpdate,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_role(Role.CANDIDATE)),
     session: Session = Depends(get_session),
 ) -> ServiceListingResponse:
     listing = session.scalar(
@@ -203,6 +241,7 @@ def search_public_services(
     filters = [
         ServiceListing.status == ServiceListingStatus.PUBLISHED,
         ProfessionalProfile.visibility == ProfessionalProfileVisibility.PUBLIC,
+        User.role == Role.CANDIDATE,
     ]
     if q:
         pattern = f"%{q.strip()}%"
@@ -218,16 +257,16 @@ def search_public_services(
         filters.append(ServiceListing.location.ilike(f"%{location.strip()}%"))
     if service_mode:
         filters.append(ServiceListing.service_mode == service_mode)
-    base_query = select(ServiceListing).join(
+    base_query = select(ServiceListing, ProfessionalProfile.public_id).join(
         ProfessionalProfile, ProfessionalProfile.user_id == ServiceListing.owner_user_id
-    ).where(*filters)
+    ).join(User, User.id == ProfessionalProfile.user_id).where(*filters)
     total = session.scalar(select(func.count()).select_from(base_query.subquery())) or 0
-    listings = session.scalars(
+    listings = session.execute(
         base_query.order_by(ServiceListing.created_at.desc(), ServiceListing.id)
         .offset(offset).limit(limit)
-    )
+    ).all()
     return PublicServiceSearchPage(
-        items=[_public_service(item) for item in listings],
+        items=[_public_service(item, public_id) for item, public_id in listings],
         total=total,
         limit=limit,
         offset=offset,
@@ -239,18 +278,20 @@ def get_public_service(
     listing_id: str,
     session: Session = Depends(get_session),
 ) -> PublicServiceListingResponse:
-    listing = session.scalar(
-        select(ServiceListing)
+    row = session.execute(
+        select(ServiceListing, ProfessionalProfile.public_id)
         .join(ProfessionalProfile, ProfessionalProfile.user_id == ServiceListing.owner_user_id)
+        .join(User, User.id == ProfessionalProfile.user_id)
         .where(
             ServiceListing.id == listing_id,
             ServiceListing.status == ServiceListingStatus.PUBLISHED,
             ProfessionalProfile.visibility == ProfessionalProfileVisibility.PUBLIC,
+            User.role == Role.CANDIDATE,
         )
-    )
-    if listing is None:
+    ).first()
+    if row is None:
         raise HTTPException(status_code=404, detail="Service listing not found.")
-    return _public_service(listing)
+    return _public_service(row[0], row[1])
 
 
 @router.get("/public/professionals", response_model=PublicProfessionalSearchPage, tags=["public discovery"])
@@ -263,7 +304,10 @@ def search_public_professionals(
     offset: int = Query(default=0, ge=0),
     session: Session = Depends(get_session),
 ) -> PublicProfessionalSearchPage:
-    filters = [ProfessionalProfile.visibility == ProfessionalProfileVisibility.PUBLIC]
+    filters = [
+        ProfessionalProfile.visibility == ProfessionalProfileVisibility.PUBLIC,
+        User.role == Role.CANDIDATE,
+    ]
     if q:
         pattern = f"%{q.strip()}%"
         filters.append(
@@ -278,7 +322,9 @@ def search_public_professionals(
         filters.append(cast(ProfessionalProfile.skills, String).ilike(f"%{skill.strip()}%"))
     if available is not None:
         filters.append(ProfessionalProfile.available.is_(available))
-    base_query = select(ProfessionalProfile).where(*filters)
+    base_query = select(ProfessionalProfile).join(
+        User, User.id == ProfessionalProfile.user_id
+    ).where(*filters)
     total = session.scalar(select(func.count()).select_from(base_query.subquery())) or 0
     profiles = session.scalars(
         base_query.order_by(ProfessionalProfile.updated_at.desc(), ProfessionalProfile.user_id)
@@ -287,7 +333,7 @@ def search_public_professionals(
     return PublicProfessionalSearchPage(
         items=[
             PublicProfessionalProfileResponse(
-                id=item.user_id,
+                id=item.public_id,
                 display_name=item.display_name,
                 headline=item.headline,
                 introduction=item.introduction,
@@ -317,9 +363,13 @@ def get_public_professional(
     session: Session = Depends(get_session),
 ) -> PublicProfessionalProfileResponse:
     profile = session.scalar(
-        select(ProfessionalProfile).where(
-            ProfessionalProfile.user_id == user_id,
+        select(ProfessionalProfile)
+        .join(User, User.id == ProfessionalProfile.user_id)
+        .where(
+            (ProfessionalProfile.public_id == user_id)
+            | (ProfessionalProfile.user_id == user_id),
             ProfessionalProfile.visibility == ProfessionalProfileVisibility.PUBLIC,
+            User.role == Role.CANDIDATE,
         )
     )
     if profile is None:

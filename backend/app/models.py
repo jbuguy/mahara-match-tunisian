@@ -555,6 +555,9 @@ class ProfessionalProfile(Base):
     user_id: Mapped[str] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
     )
+    public_id: Mapped[str] = mapped_column(
+        String(36), unique=True, default=lambda: str(uuid4()), nullable=False
+    )
     display_name: Mapped[str] = mapped_column(String(120), nullable=False)
     headline: Mapped[str] = mapped_column(String(200), nullable=False)
     introduction: Mapped[str] = mapped_column(String(5000), default="", nullable=False)

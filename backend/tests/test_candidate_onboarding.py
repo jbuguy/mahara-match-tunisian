@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app import main
 from app import assistant_services
 from app.assistant_services import AssistantServiceError, generate_assistant_reply
-from app.models import CandidateProfile, Role, User
+from app.models import CandidateProfile, ProfessionalProfile, Role, ServiceListing, User
 from app.security import create_access_token
 
 
@@ -149,7 +149,21 @@ def test_candidate_assistant_returns_uncommitted_profile_suggestions(
         AsyncMock(
             return_value={
                 "reply": "Merci ! Où habites-tu ?",
-                "profile_updates": {"full_name": "Amira Ben Salem"},
+                "profile_updates": {
+                    "full_name": "Amira Ben Salem",
+                    "professional_headline": "Designer graphique",
+                    "professional_introduction": "Je crée des identités visuelles.",
+                    "professional_languages": ["français", "arabe"],
+                    "professional_availability": {"weekdays": ["morning"]},
+                    "service_suggestion": {
+                        "title": "Création de logo",
+                        "category": "Design",
+                        "description": "Conception d'une identité visuelle.",
+                        "skills": ["Illustrator"],
+                        "service_mode": "remote",
+                        "price_type": "quote",
+                    },
+                },
             }
         ),
     )
@@ -162,8 +176,12 @@ def test_candidate_assistant_returns_uncommitted_profile_suggestions(
     assert response.status_code == 200
     assert response.json()["reply"] == "Merci ! Où habites-tu ?"
     assert response.json()["profile_updates"]["full_name"] == "Amira Ben Salem"
+    assert response.json()["profile_updates"]["professional_languages"] == ["français", "arabe"]
+    assert response.json()["profile_updates"]["service_suggestion"]["title"] == "Création de logo"
     profile = session.get(CandidateProfile, users[Role.CANDIDATE].id)
     assert profile is None or profile.full_name is None
+    assert session.get(ProfessionalProfile, users[Role.CANDIDATE].id) is None
+    assert session.query(ServiceListing).filter_by(owner_user_id=users[Role.CANDIDATE].id).count() == 0
 
 
 def test_assistant_endpoints_are_candidate_only(

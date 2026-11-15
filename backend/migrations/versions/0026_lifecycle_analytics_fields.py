@@ -23,7 +23,7 @@ def upgrade() -> None:
         "submitted", "reviewing", "shortlisted", "interview", "interview_completed",
         "offer_made", "interviewed", "offered", "hired", "rejected", "withdrawn",
     )
-    with op.batch_alter_table("job_applications", recreate="never") as batch:
+    with op.batch_alter_table("job_applications") as batch:
         batch.drop_constraint("job_application_status", type_="check")
         batch.alter_column(
             "status",
@@ -107,7 +107,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    with op.batch_alter_table("job_applications", recreate="never") as batch:
+    with op.batch_alter_table("job_applications") as batch:
         batch.drop_constraint("job_application_status", type_="check")
         batch.alter_column(
             "status",

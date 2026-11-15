@@ -41,9 +41,28 @@ export type CandidateAssistantMessage = {
   role: "user" | "assistant";
   content: string;
 };
+export type AssistantServiceSuggestion = {
+  title: string;
+  category: string;
+  description: string;
+  skills: string[];
+  service_mode: ServiceListing["service_mode"];
+  price_type: ServiceListing["price_type"];
+};
+export type CandidateAssistantProfileUpdates = Partial<CandidateProfileDraft> & {
+  professional_introduction?: string | null;
+  professional_languages?: string[] | null;
+  professional_availability?: Record<string, unknown> | null;
+  service_suggestion?: AssistantServiceSuggestion | null;
+};
+export type CandidateAssistantProfessionalSuggestion =
+  | { kind: "profile"; field: "headline" | "introduction"; value: string }
+  | { kind: "profile"; field: "languages"; value: string[] }
+  | { kind: "profile"; field: "availability"; value: Record<string, unknown> }
+  | { kind: "service"; suggestion: AssistantServiceSuggestion };
 export type CandidateAssistantReply = {
   reply: string;
-  profile_updates: Partial<CandidateProfileDraft>;
+  profile_updates: CandidateAssistantProfileUpdates;
 };
 export type CandidateAssistantSession = {
   id: string;
@@ -213,6 +232,7 @@ export type ServiceListing = {
 
 export type ProfessionalProfile = {
   user_id: string;
+  public_id: string;
   display_name: string;
   headline: string;
   introduction: string;
@@ -233,12 +253,14 @@ export type ProfessionalProfile = {
 
 export type PortfolioItem = { title: string; url: string; description: string };
 
-export type PublicProfessional = Omit<ProfessionalProfile, "user_id" | "visibility" | "created_at" | "updated_at"> & {
+export type PublicProfessional = Omit<ProfessionalProfile, "user_id" | "public_id" | "visibility" | "created_at" | "updated_at"> & {
   id: string;
   services: PublicService[];
 };
 
-export type PublicService = Omit<ServiceListing, "status" | "updated_at">;
+export type PublicService = Omit<ServiceListing, "owner_user_id" | "status" | "updated_at"> & {
+  owner_public_id: string;
+};
 export type ServiceRequestStatus = "requested" | "accepted" | "declined" | "in_progress" | "completion_requested" | "completed" | "cancelled" | "disputed";
 export type ServiceRequest = { id: string; service_id: string; service_title: string; requester_user_id: string; provider_user_id: string; description: string; location: string | null; preferred_date: string | null; budget: string | null; attachments: string[]; agreed_scope: string | null; report_reason: string | null; status: ServiceRequestStatus; created_at: string; updated_at: string };
 export type ServiceReview = { id: string; provider_user_id: string; rating: number; comment: string | null; created_at: string };
@@ -820,7 +842,7 @@ export function fetchMyProfessionalProfile(token: string): Promise<ProfessionalP
   return authenticatedRequest(token, "/me/professional-profile");
 }
 
-export function saveMyProfessionalProfile(token: string, profile: Omit<ProfessionalProfile, "user_id" | "created_at" | "updated_at">): Promise<ProfessionalProfile> {
+export function saveMyProfessionalProfile(token: string, profile: Omit<ProfessionalProfile, "user_id" | "public_id" | "created_at" | "updated_at">): Promise<ProfessionalProfile> {
   return authenticatedRequest(token, "/me/professional-profile", { method: "PUT", body: JSON.stringify(profile) });
 }
 
@@ -828,11 +850,11 @@ export function fetchMyServices(token: string): Promise<ServiceListing[]> {
   return authenticatedRequest(token, "/me/services");
 }
 
-export function createMyService(token: string, service: Pick<ServiceListing, "title" | "description" | "category" | "skills" | "location" | "service_mode" | "price_type" | "price_min" | "price_max">): Promise<ServiceListing> {
+export function createMyService(token: string, service: Pick<ServiceListing, "title" | "description" | "category" | "skills" | "portfolio_items" | "location" | "service_mode" | "price_type" | "price_min" | "price_max">): Promise<ServiceListing> {
   return authenticatedRequest(token, "/me/services", { method: "POST", body: JSON.stringify(service) });
 }
 
-export function updateMyService(token: string, serviceId: string, service: Pick<ServiceListing, "title" | "description" | "category" | "skills" | "location" | "service_mode" | "price_type" | "price_min" | "price_max">): Promise<ServiceListing> {
+export function updateMyService(token: string, serviceId: string, service: Pick<ServiceListing, "title" | "description" | "category" | "skills" | "portfolio_items" | "location" | "service_mode" | "price_type" | "price_min" | "price_max">): Promise<ServiceListing> {
   return authenticatedRequest(token, `/me/services/${encodeURIComponent(serviceId)}`, { method: "PUT", body: JSON.stringify(service) });
 }
 

@@ -283,6 +283,7 @@ python -m alembic -c backend/alembic.ini upgrade head --sql
 
 ## Project documentation
 
+- [Product backlog](docs/PRODUCT_BACKLOG.md)
 - [Current tasks](TASKS.md)
 - [Audit baseline](docs/AUDIT.md)
 - [Pilot release gates](docs/PILOT_RELEASE_GATES.md)

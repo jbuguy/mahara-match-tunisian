@@ -1220,20 +1220,25 @@ describe("role-aware app shell", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Créer mon compte" }));
 
     expect(await screen.findByRole("heading", {
-      name: "Mon profil professionnel",
+      name: "Mon espace professionnel",
     })).toBeVisible();
-    expect(screen.getByText(/Derja tunisien/i)).toBeVisible();
     expect(fetchMock).toHaveBeenCalledWith(
       "http://127.0.0.1:8000/auth/register",
       expect.objectContaining({ method: "POST" }),
     );
 
+    fireEvent.click(screen.getByRole("button", { name: "Compléter mon profil avec l’assistant IA" }));
+    expect(screen.getByText(/Derja tunisien/i)).toBeVisible();
     fireEvent.change(screen.getByLabelText("Votre message"), {
       target: { value: "Ismi Amira Ben Salem" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Envoyer le message" }));
 
     expect(await screen.findByText("Super, on commence !")).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "Suggestions à vérifier" })).toBeVisible();
+    expect(screen.getByLabelText("Nom complet")).toHaveValue("");
+    fireEvent.click(screen.getByRole("button", { name: "Ajouter au brouillon" }));
+    fireEvent.click(screen.getByRole("button", { name: "Fermer l’assistant profil" }));
     expect(screen.getByLabelText("Nom complet")).toHaveValue("Amira Ben Salem");
     expect(
       fetchMock.mock.calls.some(

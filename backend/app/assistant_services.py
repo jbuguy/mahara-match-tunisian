@@ -56,6 +56,51 @@ ASSISTANT_RESPONSE_FORMAT = {
                             "type": ["array", "null"],
                             "items": {"type": "string"},
                         },
+                        "professional_headline": {"type": ["string", "null"]},
+                        "professional_introduction": {"type": ["string", "null"]},
+                        "professional_languages": {
+                            "type": ["array", "null"],
+                            "items": {"type": "string"},
+                        },
+                        "professional_availability": {
+                            "type": ["object", "null"],
+                            "properties": {
+                                "days": {
+                                    "type": ["array", "null"],
+                                    "items": {"type": "string"},
+                                },
+                                "hours": {"type": ["string", "null"]},
+                                "timezone": {"type": ["string", "null"]},
+                            },
+                            "required": ["days", "hours", "timezone"],
+                            "additionalProperties": False,
+                        },
+                        "service_suggestion": {
+                            "type": ["object", "null"],
+                            "properties": {
+                                "title": {"type": "string"},
+                                "category": {"type": "string"},
+                                "description": {"type": "string"},
+                                "skills": {"type": "array", "items": {"type": "string"}},
+                                "service_mode": {
+                                    "type": "string",
+                                    "enum": ["remote", "provider_location", "customer_location", "flexible"],
+                                },
+                                "price_type": {
+                                    "type": "string",
+                                    "enum": ["fixed", "hourly", "starting_at", "quote", "negotiable"],
+                                },
+                            },
+                            "required": [
+                                "title",
+                                "category",
+                                "description",
+                                "skills",
+                                "service_mode",
+                                "price_type",
+                            ],
+                            "additionalProperties": False,
+                        },
                     },
                     "required": [
                         "full_name",
@@ -66,6 +111,11 @@ ASSISTANT_RESPONSE_FORMAT = {
                         "education_entries",
                         "experience_entries",
                         "skills",
+                        "professional_headline",
+                        "professional_introduction",
+                        "professional_languages",
+                        "professional_availability",
+                        "service_suggestion",
                     ],
                     "additionalProperties": False,
                 },

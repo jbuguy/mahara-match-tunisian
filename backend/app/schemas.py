@@ -294,6 +294,7 @@ class ProfessionalProfileResponse(ProfessionalProfileFields):
     model_config = ConfigDict(from_attributes=True)
 
     user_id: str
+    public_id: str
     created_at: datetime
     updated_at: datetime
 
@@ -302,7 +303,7 @@ class PublicServiceListingResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
-    owner_user_id: str
+    owner_public_id: str
     title: str
     description: str
     category: str
@@ -628,6 +629,15 @@ class CandidateAssistantRequest(BaseModel):
         return self
 
 
+class CandidateAssistantServiceSuggestion(BaseModel):
+    title: str = Field(min_length=2, max_length=160)
+    category: str = Field(min_length=2, max_length=80)
+    description: str = Field(min_length=10, max_length=5000)
+    skills: list[str] = Field(default_factory=list, max_length=30)
+    service_mode: Literal["remote", "provider_location", "customer_location", "flexible"]
+    price_type: Literal["fixed", "hourly", "starting_at", "quote", "negotiable"]
+
+
 class CandidateProfileDraft(BaseModel):
     full_name: str | None = Field(default=None, max_length=200)
     phone: str | None = Field(default=None, max_length=40)
@@ -637,6 +647,11 @@ class CandidateProfileDraft(BaseModel):
     education_entries: list[EducationEntry] | None = Field(default=None, max_length=30)
     experience_entries: list[ExperienceEntry] | None = Field(default=None, max_length=30)
     skills: list[str] | None = Field(default=None, max_length=30)
+    professional_headline: str | None = Field(default=None, max_length=200)
+    professional_introduction: str | None = Field(default=None, max_length=5000)
+    professional_languages: list[str] | None = Field(default=None, max_length=12)
+    professional_availability: dict[str, object] | None = None
+    service_suggestion: CandidateAssistantServiceSuggestion | None = None
 
 
 class CandidateAssistantResponse(BaseModel):

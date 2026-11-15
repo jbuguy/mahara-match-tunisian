@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
-import { ApiError, createServiceRequest, createServiceReview, fetchMyServiceRequests, fetchPublicServices, updateServiceRequestStatus, type PublicService, type ServiceRequest, type ServiceRequestStatus } from "./auth";
+import { ApiError, createServiceRequest, createServiceReview, fetchMyProfessionalProfile, fetchMyServiceRequests, fetchPublicServices, updateServiceRequestStatus, type PublicService, type Role, type ServiceRequest, type ServiceRequestStatus } from "./auth";
 import { Button, Card } from "./components/ui";
 
 type RequestDraft = { description: string; location: string; preferred_date: string; budget: string };
 const emptyDraft: RequestDraft = { description: "", location: "", preferred_date: "", budget: "" };
 
-export function ServiceRequestsWorkspace({ token, userId }: { token: string; userId: string }) {
+export function ServiceRequestsWorkspace({ token, userId, role }: { token: string; userId: string; role: Role }) {
   const [services, setServices] = useState<PublicService[]>([]);
+  const [ownProfessionalPublicId, setOwnProfessionalPublicId] = useState<string | null>(null);
   const [returnServiceId, setReturnServiceId] = useState<string | null>(null);
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
   const [drafts, setDrafts] = useState<Record<string, RequestDraft>>({});
@@ -20,8 +21,18 @@ export function ServiceRequestsWorkspace({ token, userId }: { token: string; use
   async function load() {
     setBusy(true); setError("");
     try {
-      const [servicePage, myRequests] = await Promise.all([fetchPublicServices({ limit: 100 }), fetchMyServiceRequests(token)]);
+      const [servicePage, myRequests, ownProfile] = await Promise.all([
+        fetchPublicServices({ limit: 100 }),
+        fetchMyServiceRequests(token),
+        role === "candidate"
+          ? fetchMyProfessionalProfile(token).catch((cause: unknown) => {
+              if (cause instanceof ApiError && cause.status === 404) return null;
+              throw cause;
+            })
+          : Promise.resolve(null),
+      ]);
       setServices(servicePage.items); setRequests(myRequests);
+      setOwnProfessionalPublicId(ownProfile?.public_id ?? null);
       const pendingServiceId = sessionStorage.getItem("mahara-match-return-service");
       if (pendingServiceId) {
         if (servicePage.items.some((item) => item.id === pendingServiceId)) {
@@ -76,7 +87,7 @@ export function ServiceRequestsWorkspace({ token, userId }: { token: string; use
     {error && <p className="auth-error" role="alert">{error}</p>}{notice && <p role="status">{notice}</p>}
     <section><h2>Découvrir et demander un service</h2>{busy && services.length === 0 ? <p>Chargement…</p> : services.length ? <div className="guest-home__job-grid">{services.map((service) => {
       const draft = drafts[service.id] ?? emptyDraft;
-      const isOwnService = service.owner_user_id === userId;
+      const isOwnService = role === "candidate" && service.owner_public_id === ownProfessionalPublicId;
       return <Card as="article" id={`service-card-${service.id}`} tabIndex={-1} className={returnServiceId === service.id ? "service-request-card--return-target" : ""} key={service.id}><div className="eyebrow">{service.category}</div><h3>{service.title}</h3><p>{service.description}</p><p>{service.location || "À distance"} · {service.service_mode}</p>{!isOwnService && <><label className="form-field"><span>Décrivez votre besoin</span><textarea minLength={10} value={draft.description} onChange={(event) => editDraft(service.id, "description", event.target.value)} /></label><label className="form-field"><span>Lieu souhaité</span><input value={draft.location} onChange={(event) => editDraft(service.id, "location", event.target.value)} /></label><label className="form-field"><span>Date souhaitée</span><input type="date" value={draft.preferred_date} onChange={(event) => editDraft(service.id, "preferred_date", event.target.value)} /></label><label className="form-field"><span>Budget indicatif (TND)</span><input type="number" min="0" step="0.01" value={draft.budget} onChange={(event) => editDraft(service.id, "budget", event.target.value)} /></label><Button disabled={busy || draft.description.trim().length < 10} onClick={() => void submit(service)}>Demander ce service</Button></>}</Card>;
     })}</div> : <p className="guest-home__empty">Aucun service public n’est disponible.</p>}</section>
     <section><h2>Demandes envoyées et reçues</h2>{busy && requests.length === 0 ? <p>Chargement…</p> : requests.length ? requests.map((request) => {

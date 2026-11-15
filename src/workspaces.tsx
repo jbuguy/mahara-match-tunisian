@@ -20,6 +20,7 @@ import { ProfileBuilder, type ProfileBuilderValue } from "./components/ProfileBu
 import { LocationSelect } from "./components/LocationSelect";
 import {
   ApiError,
+  type AssistantServiceSuggestion,
   applyToJob,
   createCandidateAssistantSession,
   createEmployerOffer,
@@ -51,6 +52,8 @@ import {
   uploadCandidateCv,
   type CandidateAssistantMessage,
   type CandidateProfileDraft,
+  type CandidateAssistantProfileUpdates,
+  type CandidateAssistantProfessionalSuggestion,
   type CandidateAssistantSession,
   type CandidateAssistantSessionSummary,
   type CandidateInterviewPreparationProfile,
@@ -253,6 +256,7 @@ export function analyzeCommunicationSignals(value: string): {
 type CandidateProfileForm = {
   full_name: string;
   phone: string;
+  professional_headline: string;
   birth_year: string;
   location: string;
   governorate_code: string;
@@ -268,6 +272,7 @@ type CandidateProfileForm = {
 const emptyCandidateProfile: CandidateProfileForm = {
   full_name: "",
   phone: "",
+  professional_headline: "",
   birth_year: "",
   location: "",
   governorate_code: "",
@@ -280,7 +285,23 @@ const emptyCandidateProfile: CandidateProfileForm = {
   skills: [],
 };
 
-export function CandidateProfilePage({ token }: { token: string }) {
+export function CandidateProfilePage({
+  token,
+  embedded = false,
+  sharedSkills,
+  persistedSkills,
+  onSharedSkillsChange,
+  onSharedSkillsSaved,
+  onProfessionalSuggestionApply,
+}: {
+  token: string;
+  embedded?: boolean;
+  sharedSkills?: string[];
+  persistedSkills?: string[];
+  onSharedSkillsChange?: (skills: string[]) => void;
+  onSharedSkillsSaved?: (skills: string[]) => void;
+  onProfessionalSuggestionApply?: (suggestion: CandidateAssistantProfessionalSuggestion) => void;
+}) {
   const [profile, setProfile] = useState(emptyCandidateProfile);
   const [employerDiscoverable, setEmployerDiscoverable] = useState(false);
   const [isUpdatingDiscoverability, setIsUpdatingDiscoverability] = useState(false);
@@ -298,6 +319,8 @@ export function CandidateProfilePage({ token }: { token: string }) {
       content: "Aslema ! Je peux t’aider à compléter ton profil, en Derja, en arabe ou en français. Qu’est-ce que tu aimerais me dire sur toi ?",
     },
   ]);
+  const [profileAssistantOpen, setProfileAssistantOpen] = useState(false);
+  const [profileSuggestions, setProfileSuggestions] = useState<CandidateAssistantProfileUpdates>({});
   const [chatText, setChatText] = useState("");
   const [chatError, setChatError] = useState("");
   const [isSending, setIsSending] = useState(false);
@@ -308,8 +331,9 @@ export function CandidateProfilePage({ token }: { token: string }) {
   const audioStreamRef = useRef<MediaStream | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const cvDialogRef = useRef<HTMLDialogElement | null>(null);
+  const profileAssistantDialogRef = useRef<HTMLDialogElement | null>(null);
   const cvFileInputRef = useRef<HTMLInputElement | null>(null);
-  const savedProfileSnapshot = useRef("");
+  const savedProfileSnapshot = useRef<CandidateProfileForm | null>(null);
 
   useEffect(() => {
     const dialog = cvDialogRef.current;
@@ -317,6 +341,18 @@ export function CandidateProfilePage({ token }: { token: string }) {
     if (typeof dialog.showModal === "function") dialog.showModal();
     else dialog.setAttribute("open", "");
   }, [cvDraft]);
+
+  useEffect(() => {
+    const dialog = profileAssistantDialogRef.current;
+    if (!dialog) return;
+    if (profileAssistantOpen && !dialog.open) {
+      if (typeof dialog.showModal === "function") dialog.showModal();
+      else dialog.setAttribute("open", "");
+    } else if (!profileAssistantOpen && dialog.open) {
+      if (typeof dialog.close === "function") dialog.close();
+      else dialog.removeAttribute("open");
+    }
+  }, [profileAssistantOpen]);
 
   useEffect(() => {
     let cancelled = false;
@@ -327,6 +363,7 @@ export function CandidateProfilePage({ token }: { token: string }) {
           const loadedProfile = {
             full_name: profile.full_name ?? "",
             phone: profile.phone ?? "",
+            professional_headline: profile.professional_headline ?? "",
             birth_year: profile.birth_year?.toString() ?? "",
             location: profile.location ?? "",
             governorate_code: profile.governorate_code ?? "",
@@ -339,7 +376,7 @@ export function CandidateProfilePage({ token }: { token: string }) {
             skills: profile.skills,
           };
           setProfile(loadedProfile);
-          savedProfileSnapshot.current = JSON.stringify(loadedProfile);
+          savedProfileSnapshot.current = loadedProfile;
         }
       })
       .catch((cause: unknown) => {
@@ -352,6 +389,17 @@ export function CandidateProfilePage({ token }: { token: string }) {
       cancelled = true;
     };
   }, [token]);
+
+  useEffect(() => {
+    if (sharedSkills) setProfile((current) => ({ ...current, skills: sharedSkills }));
+  }, [sharedSkills]);
+  useEffect(() => {
+    if (!persistedSkills) return;
+    setProfile((current) => ({ ...current, skills: persistedSkills }));
+    if (savedProfileSnapshot.current) {
+      savedProfileSnapshot.current = { ...savedProfileSnapshot.current, skills: persistedSkills };
+    }
+  }, [persistedSkills]);
 
   async function updateDiscoverability(value: boolean) {
     setIsUpdatingDiscoverability(true);
@@ -370,9 +418,67 @@ export function CandidateProfilePage({ token }: { token: string }) {
     }
   }
 
+  async function saveProfileSection(section: "personal" | "education" | "experience" | "skills") {
+    setIsSaving(true);
+    setError("");
+    setNotice("");
+    try {
+      const updates = section === "personal"
+        ? {
+            full_name: profile.full_name,
+            phone: profile.phone,
+            professional_headline: profile.professional_headline || null,
+            birth_year: profile.birth_year ? Number(profile.birth_year) : null,
+            governorate_code: profile.governorate_code || null,
+            municipality_code: profile.municipality_code || null,
+            street_address: profile.street_address || null,
+          }
+        : section === "education"
+          ? { education: profile.education, education_entries: profile.education_entries }
+          : section === "experience"
+            ? { experience: profile.experience, experience_entries: profile.experience_entries }
+            : { skills: sharedSkills ?? profile.skills };
+      const saved = await updateCandidateProfile(token, updates);
+      let savedFields: Partial<CandidateProfileForm>;
+      if (section === "personal") {
+        savedFields = {
+          full_name: saved.full_name ?? "",
+          phone: saved.phone ?? "",
+          professional_headline: saved.professional_headline ?? "",
+          birth_year: saved.birth_year?.toString() ?? "",
+          location: saved.location ?? "",
+          governorate_code: saved.governorate_code ?? "",
+          municipality_code: saved.municipality_code ?? "",
+          street_address: saved.street_address ?? "",
+        };
+      } else if (section === "education") {
+        savedFields = {
+          education: saved.education ?? "",
+          education_entries: saved.education_entries,
+        };
+      } else if (section === "experience") {
+        savedFields = {
+          experience: saved.experience ?? "",
+          experience_entries: saved.experience_entries,
+        };
+      } else {
+        savedFields = { skills: saved.skills };
+        onSharedSkillsChange?.(saved.skills);
+        onSharedSkillsSaved?.(saved.skills);
+      }
+      setProfile((current) => ({ ...current, ...savedFields }));
+      savedProfileSnapshot.current = { ...(savedProfileSnapshot.current ?? profile), ...savedFields };
+      setNotice(profileSectionLabel(section));
+    } catch (cause: unknown) {
+      setError(errorMessage(cause));
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   useEffect(() => {
     const warnBeforeLeave = (event: BeforeUnloadEvent) => {
-      if (savedProfileSnapshot.current && JSON.stringify(profile) !== savedProfileSnapshot.current) {
+      if (savedProfileSnapshot.current && JSON.stringify(profile) !== JSON.stringify(savedProfileSnapshot.current)) {
         event.preventDefault();
         event.returnValue = "";
       }
@@ -390,6 +496,7 @@ export function CandidateProfilePage({ token }: { token: string }) {
       const saved = await updateCandidateProfile(token, {
         full_name: profile.full_name,
         phone: profile.phone,
+        professional_headline: profile.professional_headline || null,
         birth_year: profile.birth_year ? Number(profile.birth_year) : null,
         governorate_code: profile.governorate_code || null,
         municipality_code: profile.municipality_code || null,
@@ -398,11 +505,12 @@ export function CandidateProfilePage({ token }: { token: string }) {
         experience: profile.experience,
         education_entries: profile.education_entries,
         experience_entries: profile.experience_entries,
-        skills: profile.skills,
+        skills: sharedSkills ?? profile.skills,
       });
       const savedForm = {
         full_name: saved.full_name ?? "",
         phone: saved.phone ?? "",
+        professional_headline: saved.professional_headline ?? "",
         birth_year: saved.birth_year?.toString() ?? "",
         location: saved.location ?? "",
         governorate_code: saved.governorate_code ?? "",
@@ -415,7 +523,9 @@ export function CandidateProfilePage({ token }: { token: string }) {
         skills: saved.skills,
       };
       setProfile(savedForm);
-      savedProfileSnapshot.current = JSON.stringify(savedForm);
+      onSharedSkillsChange?.(saved.skills);
+      onSharedSkillsSaved?.(saved.skills);
+      savedProfileSnapshot.current = savedForm;
       setNotice("Votre profil a été enregistré. Vous pouvez le modifier à tout moment.");
     } catch (cause: unknown) {
       setError(errorMessage(cause));
@@ -436,6 +546,7 @@ export function CandidateProfilePage({ token }: { token: string }) {
       setCvDraft({
         full_name: extracted.full_name ?? profile.full_name,
         phone: extracted.phone ?? profile.phone,
+        professional_headline: profile.professional_headline,
         birth_year: extracted.birth_year?.toString() ?? profile.birth_year,
         location: extracted.location ?? profile.location,
         governorate_code: profile.governorate_code ?? "",
@@ -482,6 +593,7 @@ export function CandidateProfilePage({ token }: { token: string }) {
       const savedForm = {
         full_name: saved.full_name ?? "",
         phone: saved.phone ?? "",
+        professional_headline: cvDraft.professional_headline,
         birth_year: saved.birth_year?.toString() ?? "",
         location: saved.location ?? "",
         governorate_code: saved.governorate_code ?? "",
@@ -494,7 +606,9 @@ export function CandidateProfilePage({ token }: { token: string }) {
         skills: saved.skills,
       };
       setProfile(savedForm);
-      savedProfileSnapshot.current = JSON.stringify(savedForm);
+      onSharedSkillsChange?.(saved.skills);
+      onSharedSkillsSaved?.(saved.skills);
+      savedProfileSnapshot.current = savedForm;
       setCvDraft(null);
       setNotice("Votre profil extrait du CV a été enregistré.");
     } catch (cause: unknown) {
@@ -519,10 +633,9 @@ export function CandidateProfilePage({ token }: { token: string }) {
     try {
       const result = await sendCandidateAssistantMessage(token, nextMessages);
       setMessages([...nextMessages, { role: "assistant", content: result.reply }]);
-      setProfile((current) => applyProfileUpdates(current, result.profile_updates));
-      if (Object.values(result.profile_updates).some((value) => value !== null && value !== undefined)) {
-        setNotice("L’assistant a proposé des modifications. Vérifiez-les dans votre profil avant de les enregistrer.");
-      }
+      setProfileSuggestions(Object.fromEntries(
+        Object.entries(result.profile_updates).filter(([, value]) => value !== null && value !== undefined),
+      ) as CandidateAssistantProfileUpdates);
       void speakReply(result.reply);
     } catch (cause: unknown) {
       setChatText(content);
@@ -608,80 +721,99 @@ export function CandidateProfilePage({ token }: { token: string }) {
     setIsRecording(false);
   }
 
+  function acceptProfileSuggestion(field: keyof CandidateAssistantProfileUpdates) {
+    const value = profileSuggestions[field];
+    if (value === undefined || value === null) return;
+    if (field === "professional_introduction" && typeof value === "string") {
+      onProfessionalSuggestionApply?.({ kind: "profile", field: "introduction", value });
+    } else if (field === "professional_languages" && Array.isArray(value)) {
+      onProfessionalSuggestionApply?.({
+        kind: "profile",
+        field: "languages",
+        value: value.filter((item): item is string => typeof item === "string"),
+      });
+    } else if (field === "professional_availability" && typeof value === "object" && !Array.isArray(value)) {
+      onProfessionalSuggestionApply?.({ kind: "profile", field: "availability", value });
+    } else if (field === "service_suggestion" && isAssistantServiceSuggestion(value)) {
+      onProfessionalSuggestionApply?.({ kind: "service", suggestion: value });
+    } else {
+      setProfile((current) => applyProfileUpdates(current, { [field]: value } as Partial<CandidateProfileDraft>));
+      if (field === "professional_headline" && typeof value === "string") {
+        onProfessionalSuggestionApply?.({ kind: "profile", field: "headline", value });
+      }
+      if (field === "skills" && Array.isArray(value)) {
+        onSharedSkillsChange?.(value.filter((item): item is string => typeof item === "string"));
+      }
+    }
+    setProfileSuggestions((current) => {
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
+    setNotice(field === "service_suggestion"
+      ? "La proposition est prête à être vérifiée. Confirmez sa création dans l’éditeur de service."
+      : field === "professional_introduction" || field === "professional_languages" || field === "professional_availability"
+        ? "Suggestion ajoutée au brouillon professionnel. Enregistrez le profil professionnel pour la conserver."
+        : "Suggestion ajoutée à votre brouillon. Enregistrez le profil pour la conserver.");
+  }
+
   useEffect(() => () => {
     if (recorderRef.current?.state === "recording") recorderRef.current.stop();
     audioStreamRef.current?.getTracks().forEach((track) => track.stop());
   }, []);
 
   return (
-    <section className="workspace-page">
-      <div className="eyebrow">VOTRE PROFIL</div>
-      <h1>Mon profil candidat</h1>
-      <p className="workspace-page__intro">
-        Vérifiez vos informations et complétez les détails de votre parcours à votre rythme.
-      </p>
+    <section id="candidate-profile" className={`workspace-page candidate-profile-page${embedded ? " candidate-profile-page--embedded" : ""}`}>
+      {!embedded && <>
+        <div className="eyebrow">VOTRE PROFIL</div>
+        <h1>Mon profil candidat</h1>
+        <p className="workspace-page__intro">
+          Vérifiez vos informations et complétez les détails de votre parcours à votre rythme.
+        </p>
+      </>}
       <Card className="workspace-panel">
         {isLoading ? (
           <p aria-live="polite">Chargement de votre profil…</p>
         ) : (
           <>
-            <div className="profile-assistant">
-              <div className="assistant-workspace__heading">
-                <span className="assistant-workspace__icon"><Sparkles size={20} aria-hidden="true" /></span>
-                <div>
-                  <h2>Votre assistant profil</h2>
-                  <p>Parlez en Derja tunisien, en arabe ou en français de vos compétences, études et expériences. Vous vérifierez chaque suggestion avant de l’enregistrer.</p>
-                </div>
-              </div>
-              <div className="profile-assistant__messages" aria-live="polite" aria-label="Conversation avec l’assistant">
-                {messages.map((message, index) => (
-                  <p
-                    className={`profile-assistant__message profile-assistant__message--${message.role}`}
-                    key={`${message.role}-${index}`}
-                  >
-                    {message.content}
-                  </p>
-                ))}
-                {isSending && <p className="profile-assistant__pending">L’assistant prépare sa réponse…</p>}
-              </div>
-              <form
-                className="profile-assistant__composer"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void sendMessage();
-                }}
-              >
-                  <input
-                    id="candidate-assistant-message"
-                    className="input"
-                    aria-label="Votre message"
-                  value={chatText}
-                  onChange={(event) => setChatText(event.target.value)}
-                  placeholder="Écrivez en Derja, en arabe ou en français…"
-                  maxLength={3000}
-                  disabled={isSending || isTranscribing}
-                />
-                <Button
-                  type="button"
-                  variant={isRecording ? "secondary" : "ghost"}
-                  aria-label={isRecording ? "Arrêter l’enregistrement" : "Enregistrer un message vocal"}
-                  disabled={isSending || isTranscribing}
-                  onClick={() => isRecording ? stopRecording() : void startRecording()}
-                >
-                  {isRecording ? <Square size={17} aria-hidden="true" /> : <Mic size={18} aria-hidden="true" />}
-                </Button>
-                <Button type="submit" aria-label="Envoyer le message" disabled={isSending || isTranscribing || !chatText.trim()}>
-                  <Send size={17} aria-hidden="true" />
-                </Button>
-              </form>
-              {isTranscribing && <p className="workspace-assistant-status" role="status">Transcription de votre message…</p>}
-              {chatError && <p className="workspace-error" role="alert">{chatError}</p>}
-              {voiceError && <p className="workspace-assistant-status" role="status">{voiceError}</p>}
-              <p className="assistant-disclaimer">
-                Les informations proposées restent modifiables et ne sont enregistrées qu’après votre validation.
-                L’audio n’est pas conservé.
-              </p>
+            <div className="professional-space-assistant-action">
+              <div><h2>Construisez votre profil avec l’IA</h2><p>Décrivez votre parcours en Derja, en arabe ou en français, puis choisissez les suggestions à ajouter au brouillon.</p></div>
+              <Button type="button" onClick={() => setProfileAssistantOpen(true)}><Sparkles size={16} aria-hidden="true" /> Compléter mon profil avec l’assistant IA</Button>
             </div>
+            <dialog ref={profileAssistantDialogRef} className="profile-assistant-dialog" onCancel={(event) => { event.preventDefault(); setProfileAssistantOpen(false); }}>
+              <div className="profile-assistant">
+                <header className="profile-assistant-dialog__header">
+                  <div className="assistant-workspace__heading">
+                    <span className="assistant-workspace__icon"><Sparkles size={20} aria-hidden="true" /></span>
+                    <div><h2>Assistant IA du profil</h2><p>Parlez en Derja tunisien, en arabe ou en français. Aucune suggestion n’est enregistrée sans votre validation.</p></div>
+                  </div>
+                  <Button type="button" variant="ghost" aria-label="Fermer l’assistant profil" onClick={() => setProfileAssistantOpen(false)}>×</Button>
+                </header>
+                <div className="profile-assistant__messages" aria-live="polite" aria-label="Conversation avec l’assistant">
+                  {messages.map((message, index) => <p className={`profile-assistant__message profile-assistant__message--${message.role}`} key={`${message.role}-${index}`}>{message.content}</p>)}
+                  {isSending && <p className="profile-assistant__pending">L’assistant prépare sa réponse…</p>}
+                </div>
+                {Object.keys(profileSuggestions).length > 0 && <section className="profile-assistant-suggestions" aria-label="Suggestions de profil">
+                  <h3>Suggestions à vérifier</h3>
+                  {(Object.entries(profileSuggestions) as [keyof CandidateAssistantProfileUpdates, unknown][]).map(([field, value]) => <article key={field}>
+                    <div><strong>{profileSuggestionLabel(field)}</strong><p>{formatProfileSuggestion(value)}</p></div>
+                    <Button type="button" variant="secondary" onClick={() => acceptProfileSuggestion(field)}>{field === "service_suggestion" ? "Examiner le brouillon" : "Ajouter au brouillon"}</Button>
+                    <Button type="button" variant="ghost" aria-label={`Ignorer ${profileSuggestionLabel(field)}`} onClick={() => setProfileSuggestions((current) => { const next = { ...current }; delete next[field]; return next; })}>Ignorer</Button>
+                  </article>)}
+                </section>}
+                <form className="profile-assistant__composer" onSubmit={(event) => { event.preventDefault(); void sendMessage(); }}>
+                  <input id="candidate-assistant-message" className="input" aria-label="Votre message" value={chatText} onChange={(event) => setChatText(event.target.value)} placeholder="Écrivez en Derja, en arabe ou en français…" maxLength={3000} disabled={isSending || isTranscribing} />
+                  <Button type="button" variant={isRecording ? "secondary" : "ghost"} aria-label={isRecording ? "Arrêter l’enregistrement" : "Enregistrer un message vocal"} disabled={isSending || isTranscribing} onClick={() => isRecording ? stopRecording() : void startRecording()}>
+                    {isRecording ? <Square size={17} aria-hidden="true" /> : <Mic size={18} aria-hidden="true" />}
+                  </Button>
+                  <Button type="submit" aria-label="Envoyer le message" disabled={isSending || isTranscribing || !chatText.trim()}><Send size={17} aria-hidden="true" /></Button>
+                </form>
+                {isTranscribing && <p className="workspace-assistant-status" role="status">Transcription de votre message…</p>}
+                {chatError && <p className="workspace-error" role="alert">{chatError}</p>}
+                {voiceError && <p className="workspace-assistant-status" role="status">{voiceError}</p>}
+                <p className="assistant-disclaimer">Les propositions restent modifiables et ne sont enregistrées qu’après votre validation. Un service suggéré s’ouvre en brouillon à vérifier avant sa création. L’audio n’est pas conservé.</p>
+              </div>
+            </dialog>
             <div className="workspace-form profile-editor">
               <div className="profile-upload">
                 <div>
@@ -705,7 +837,7 @@ export function CandidateProfilePage({ token }: { token: string }) {
                 </div>
               </div>
               <form onSubmit={(event) => void saveProfile(event)}>
-                <h2>Vérifiez vos informations</h2>
+                <div className="profile-section-save-heading"><h2>Vérifiez vos informations</h2><Button type="button" variant="secondary" disabled={isSaving} onClick={() => void saveProfileSection("personal")}>Enregistrer les informations personnelles</Button></div>
                 <div className="profile-personal-fields">
                 <ProfileTextField
                   label="Nom complet"
@@ -718,6 +850,12 @@ export function CandidateProfilePage({ token }: { token: string }) {
                   value={profile.phone}
                   maxLength={40}
                   onChange={(value) => setProfile({ ...profile, phone: value })}
+                />
+                <ProfileTextField
+                  label="Titre professionnel"
+                  value={profile.professional_headline}
+                  maxLength={200}
+                  onChange={(value) => setProfile({ ...profile, professional_headline: value })}
                 />
                 <ProfileTextField
                   label="Année de naissance"
@@ -735,7 +873,7 @@ export function CandidateProfilePage({ token }: { token: string }) {
                   }
                 />
                 </div>
-                <ProfileBuilder value={profile} onChange={(value) => setProfile({ ...profile, ...value })} />
+                <ProfileBuilder value={{ ...profile, skills: sharedSkills ?? profile.skills }} onChange={(value) => { setProfile({ ...profile, ...value }); onSharedSkillsChange?.(value.skills); }} saving={isSaving} onSaveSection={(section) => void saveProfileSection(section)} />
 
                 <label className="candidate-discovery-consent">
                   <input
@@ -823,6 +961,16 @@ export function CandidateProfilePage({ token }: { token: string }) {
   );
 }
 
+function profileSectionLabel(section: "personal" | "education" | "experience" | "skills"): string {
+  const messages = {
+    personal: "Les informations personnelles ont été enregistrées.",
+    education: "La formation a été enregistrée.",
+    experience: "L’expérience professionnelle a été enregistrée.",
+    skills: "Les compétences ont été enregistrées.",
+  };
+  return messages[section];
+}
+
 function applyProfileUpdates(
   current: CandidateProfileForm,
   updates: Partial<CandidateProfileDraft>,
@@ -831,6 +979,7 @@ function applyProfileUpdates(
     ...current,
     full_name: updates.full_name ?? current.full_name,
     phone: updates.phone ?? current.phone,
+    professional_headline: updates.professional_headline ?? current.professional_headline,
     location: updates.location ?? current.location,
     education: updates.education ?? current.education,
     experience: updates.experience ?? current.experience,
@@ -838,6 +987,48 @@ function applyProfileUpdates(
     experience_entries: mergeEntries(current.experience_entries, updates.experience_entries ?? legacyExperience(updates.experience)),
     skills: updates.skills ? mergeSkills(current.skills, updates.skills) : current.skills,
   };
+}
+
+function profileSuggestionLabel(field: keyof CandidateAssistantProfileUpdates): string {
+  const labels: Partial<Record<keyof CandidateAssistantProfileUpdates, string>> = {
+    full_name: "Nom complet",
+    phone: "Téléphone",
+    birth_year: "Année de naissance",
+    location: "Lieu de résidence",
+    governorate_code: "Gouvernorat",
+    municipality_code: "Municipalité",
+    street_address: "Adresse",
+    education: "Formation",
+    experience: "Expérience",
+    education_entries: "Études et formations",
+    experience_entries: "Expériences professionnelles",
+    skills: "Compétences",
+    professional_headline: "Titre professionnel",
+    professional_introduction: "Présentation professionnelle",
+    professional_languages: "Langues professionnelles",
+    professional_availability: "Disponibilités",
+    service_suggestion: "Service proposé",
+    employer_discoverable: "Visibilité auprès des recruteurs",
+  };
+  return labels[field] ?? field;
+}
+
+function formatProfileSuggestion(value: unknown): string {
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  return JSON.stringify(value);
+}
+
+function isAssistantServiceSuggestion(value: unknown): value is AssistantServiceSuggestion {
+  if (!value || typeof value !== "object") return false;
+  const suggestion = value as Partial<AssistantServiceSuggestion>;
+  return typeof suggestion.title === "string"
+    && typeof suggestion.category === "string"
+    && typeof suggestion.description === "string"
+    && Array.isArray(suggestion.skills)
+    && typeof suggestion.service_mode === "string"
+    && typeof suggestion.price_type === "string";
 }
 
 function legacyEducation(value: string | null | undefined) {

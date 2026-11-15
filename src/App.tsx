@@ -47,7 +47,6 @@ import {
 import {
   CandidateInterviewPreparationPage,
   CandidateMatchesPage,
-  CandidateProfilePage,
   CandidateRoadmapPage,
   EmployerOffersPage,
 } from "./workspaces";
@@ -62,7 +61,7 @@ import {
 } from "./auth";
 import { GuestDiscovery } from "./GuestDiscovery";
 import { GuestAuth } from "./GuestAuth";
-import { ProfessionalServicesPage } from "./ProfessionalServices";
+import { ProfessionalSpacePage } from "./ProfessionalSpace";
 import { MissionsWorkspace } from "./MissionsWorkspace";
 import { ServiceRequestsWorkspace } from "./ServiceRequestsWorkspace";
 import { UnifiedAssistantWorkspace } from "./UnifiedAssistantWorkspace";
@@ -460,7 +459,6 @@ export default function App() {
             <strong>{t(activePage)}</strong>
           </div>
           <div className="topbar__actions">
-            {user.role !== "candidate" && <button className="professional-profile-link" type="button" onClick={() => setActivePage("Profil professionnel")}>{t("Profil professionnel")}</button>}
             <button className="professional-profile-link" type="button" onClick={() => setActivePage("Missions")}>{t("Missions")}</button>
             <button className="professional-profile-link" type="button" onClick={() => setActivePage("Mes demandes")}>{t("Mes demandes")}</button>
             <LanguageSwitch language={language} onChange={changeLanguage} />
@@ -502,17 +500,12 @@ export default function App() {
                 onNavigate={setActivePage}
               />
             )
-          ) : user.role !== "candidate" && activePage === "Profil professionnel" ? (
-            <ProfessionalServicesPage token={accessToken} />
           ) : activePage === "Missions" ? (
             <MissionsWorkspace token={accessToken} />
           ) : activePage === "Mes demandes" ? (
-            <ServiceRequestsWorkspace token={accessToken} userId={user.id} />
+            <ServiceRequestsWorkspace token={accessToken} userId={user.id} role={user.role} />
           ) : isCandidate && activePage === "Mon profil" ? (
-            <>
-              <CandidateProfilePage token={accessToken} />
-              <ProfessionalServicesPage token={accessToken} />
-            </>
+            <ProfessionalSpacePage token={accessToken} />
           ) : isCandidate && activePage === "Mes opportunités" ? (
             <CandidateMatchesPage token={accessToken} onNavigate={setActivePage} />
           ) : isCandidate && activePage === "Mon parcours" ? (
